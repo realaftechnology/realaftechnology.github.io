@@ -510,7 +510,7 @@ def followup():
     q_lower = question.lower()
 
     # Detect "next episode" / "episode after" — advance from last known episode
-    next_ep_request = any(p in q_lower for p in ['next episode', 'episode after', 'following episode', 'episode 2' if not ep_in_question else ''])
+    next_ep_request = any(p in q_lower for p in ['next episode', 'episode after', 'following episode'])
     prev_ep_request = any(p in q_lower for p in ['previous episode', 'episode before', 'last episode'])
 
     # Detect when user wants to expand search beyond the current episode
