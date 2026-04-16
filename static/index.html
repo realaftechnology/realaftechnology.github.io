@@ -650,12 +650,12 @@ async function loadEpisodeList() {
 }
 
 function formatEpSubtitle(title) {
-  // Strip "Ep 1016 - " or "Ep_1016_" prefix and file extension
+  // Strip "Ep 1016 - " or "Ep_1016_" or "Ep_01_" prefix and file extension
   let s = title
-    .replace(/^Ep[\s_]*\d{3,4}[\s_]*[-–]?[\s_]*/i, '')
+    .replace(/^Ep[\s_]*\d+[\s_]*[-–]?[\s_]*/i, '')
     .replace(/\.(mp3|mp4|m4a|docx|wav)$/i, '');
-  // Parse date MM.DD.YYYY or MM.DD.YY
-  const dm = s.match(/^(\d{2})\.(\d{2})\.(\d{2,4})[_\s]?/);
+  // Parse date: MM.DD.YYYY, MM.DD.YY, or MM_DD_YY, M_D_YY (underscores or dots)
+  const dm = s.match(/^(\d{1,2})[._](\d{1,2})[._](\d{2,4})[_\s]?/);
   let dateStr = '';
   if (dm) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -675,12 +675,12 @@ function renderEpisodeList(episodes) {
     return;
   }
   const sorted = [...episodes].sort((a, b) => {
-    const na = parseInt(a.title.match(/(\d{3,4})/)?.[1] || '0', 10);
-    const nb = parseInt(b.title.match(/(\d{3,4})/)?.[1] || '0', 10);
+    const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
+    const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
     return nb - na;
   });
   list.innerHTML = sorted.map(ep => {
-    const num = ep.title.match(/(\d{3,4})/)?.[1] || '';
+    const num = ep.title.match(/(\d+)/)?.[1] || '';
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
     const isActive = lockedEpisode === num;
