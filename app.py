@@ -7,7 +7,7 @@ import json
 import sqlite3
 import re
 import urllib.request
-from flask import Flask, request, jsonify, session, send_from_directory
+from flask import Flask, request, jsonify, session, send_from_directory, Response, stream_with_context
 from functools import wraps
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -279,6 +279,47 @@ def anthropic_call(system, messages, model, max_tokens, temperature=0.3):
         return json.loads(resp.read())["content"][0]["text"]
 
 
+def anthropic_stream(system, messages, model, max_tokens, temperature=0.3):
+    """Generator that yields SSE chunks from Anthropic streaming API."""
+    payload = json.dumps({
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "system": system,
+        "messages": messages,
+        "stream": True,
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": ANTHROPIC_KEY,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            for raw_line in resp:
+                line = raw_line.decode("utf-8").strip()
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    event = json.loads(data_str)
+                    if event.get("type") == "content_block_delta":
+                        text = event["delta"].get("text", "")
+                        if text:
+                            yield f"data: {json.dumps({'text': text})}\n\n"
+                except Exception:
+                    pass
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    yield "data: [DONE]\n\n"
+
+
 def ai_rerank(query, candidates, top_n=20):
     if not ANTHROPIC_KEY or not candidates: return candidates[:top_n]
     context = ""
@@ -397,17 +438,17 @@ Be direct. Do exactly what was asked."""
 
     user_msg = f'The user asked: "{query}"\n\nTranscript excerpts:\n{context}'
 
-    try:
-        text = anthropic_call(
+    return Response(
+        stream_with_context(anthropic_stream(
             system=system,
             messages=[{"role": "user", "content": user_msg}],
             model="claude-sonnet-4-6",
             max_tokens=2000,
             temperature=0.4,
-        )
-        return jsonify({"analysis": text})
-    except Exception as e:
-        return jsonify({"error": str(e)})
+        )),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def extract_episode_filter(text):
@@ -495,17 +536,17 @@ def followup():
         messages.append({"role": "assistant", "content": item["a"]})
     messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer using ONLY the episode and timestamp shown in the transcript labels. Do NOT repeat any quote listed above.'})
 
-    try:
-        text = anthropic_call(
+    return Response(
+        stream_with_context(anthropic_stream(
             system=system_prompt,
             messages=messages,
             model="claude-sonnet-4-6",
             max_tokens=1500,
             temperature=0.4,
-        )
-        return jsonify({"answer": text})
-    except Exception as e:
-        return jsonify({"error": str(e)})
+        )),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────────────────────
