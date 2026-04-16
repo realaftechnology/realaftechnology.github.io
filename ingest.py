@@ -212,8 +212,6 @@ def ingest_file(conn, filepath):
         print(f"  🔄  File changed, re-ingesting: {filename}")
         cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
         cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
-        # Rebuild FTS index to remove stale entries for this episode
-        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('rebuild')")
         conn.commit()
 
     # Extract text
@@ -295,12 +293,27 @@ def main():
     print(f"Found {len(docx_files)} transcript(s) to ingest\n")
 
     total = 0
+    reingest_happened = False
     for i, fname in enumerate(sorted(docx_files), 1):
         fpath = os.path.join(TRANSCRIPTS_DIR, fname)
         print(f"[{i}/{len(docx_files)}] {fname}")
         count = ingest_file(conn, fpath)
         print(f"    → {count} chunks stored")
+        if count > 0:
+            reingest_happened = True
         total += count
+
+    # If any episodes were (re-)ingested, rebuild FTS from scratch so
+    # stale entries from old versions don't pollute keyword search.
+    if reingest_happened:
+        print("\nRebuilding FTS index...")
+        cur = conn.cursor()
+        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+        rows = conn.execute("SELECT episode_id, text FROM segments").fetchall()
+        for row in rows:
+            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        conn.commit()
+        print(f"FTS rebuilt with {len(rows)} entries.")
 
     conn.close()
     print(f"\n✅ Done. {total} total chunks stored in {DB_PATH}")
