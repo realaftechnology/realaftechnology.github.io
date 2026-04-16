@@ -794,10 +794,10 @@ function renderResults(query, results, autoExpand = false) {
     </div>`;
   });
 
-  const panelOpen = autoExpand ? ' open' : '';
-  const btnLabel = autoExpand ? `Hide Transcripts &#8963;` : `View Transcripts (${results.length}) &#8964;`;
+  const sectionLabel = autoExpand ? 'AI Summary' : 'AI Analysis';
+  const btnLabel = `View Transcripts (${results.length}) &#8964;`;
 
-  let html = `<div class="section-header">AI Analysis</div>
+  let html = `<div class="section-header">${sectionLabel}</div>
   <div id="ai-section">
     <div class="ai-card">
       <div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>
@@ -806,7 +806,7 @@ function renderResults(query, results, autoExpand = false) {
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
       ${btnLabel}
     </button>
-    <div class="transcripts-panel${panelOpen}" id="transcripts-panel">${transcriptHtml}</div>
+    <div class="transcripts-panel" id="transcripts-panel">${transcriptHtml}</div>
     <div id="chat-thread"></div>
   </div>`;
 
