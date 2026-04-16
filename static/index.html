@@ -163,30 +163,32 @@ html, body {
 }
 .ai-body {
   font-size: 15px;
-  line-height: 1.65;
+  line-height: 1.6;
   color: var(--label);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 .ai-body h3 {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--label-tertiary);
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--label-quaternary);
+  letter-spacing: 0.4px;
   text-transform: uppercase;
-  margin: 14px 0 6px;
+  margin: 16px 0 4px;
 }
-.ai-body ul, .ai-body ol { padding-left: 20px; }
-.ai-body li { margin-bottom: 6px; color: var(--label); }
+.ai-body ul, .ai-body ol { padding-left: 18px; }
+.ai-body li { margin-bottom: 4px; color: var(--label-secondary); }
 .ai-body blockquote {
-  border-left: 3px solid var(--red);
-  padding-left: 12px;
-  margin: 10px 0;
-  color: var(--label-secondary);
-  font-style: italic;
+  border-left: 2px solid var(--red);
+  padding: 2px 0 2px 12px;
+  margin: 6px 0;
+  color: var(--label);
+  font-style: normal;
 }
-.ai-body p { margin-bottom: 8px; }
+.ai-body p { margin-bottom: 6px; }
+.ai-body p:last-child { margin-bottom: 0; }
 .ai-body strong { color: var(--label); font-weight: 600; }
+.ai-body hr { border: none; border-top: 0.5px solid var(--separator); margin: 12px 0; }
 
 /* ── VIEW TRANSCRIPTS BUTTON ── */
 .view-transcripts-btn {

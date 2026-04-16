@@ -228,6 +228,12 @@ def episode_search(ep_number):
     return [format_result(r, 0) for r in rows]
 
 
+def clean_ep_label(episode_title):
+    """Extract a short readable label from a filename-based episode title."""
+    m = re.search(r'(\d{3,4})', episode_title)
+    return f"Ep {m.group(1)}" if m else episode_title
+
+
 def format_result(row, score):
     return {
         "episode_title": row["episode_title"],
@@ -343,7 +349,7 @@ def analyze():
     query   = data.get("query", "")
     results = data.get("results", [])
 
-    context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in results])
+    context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in results])
 
     system = f"""You are an AI assistant with access to Andy Frisella podcast transcripts.
 {YOUTUBE_TITLE_KNOWLEDGE}
@@ -353,9 +359,10 @@ Answer questions directly and specifically using only the provided transcripts.
 - Piece together stories or narratives from all relevant mentions across episodes
 - Find and summarize specific content (predictions, stories, frameworks, quotes)
 - If asked for YouTube titles, follow the YOUTUBE TITLE GENERATION EXPERTISE above exactly
-- Always cite episode and timestamp for each key point
-- When quoting directly from a transcript, format the quoted text in **bold**
-- If the transcripts don't contain enough information, say so clearly
+- When quoting directly, use a blockquote and put the citation inline after: > "Quote text" — Ep 1014, 00:10:55
+- Do NOT put citations on a separate line and do NOT use horizontal rules (---) between sections
+- Use plain bold for section labels, not headers
+- Keep formatting minimal and clean
 
 Be direct and specific. Answer exactly what was asked."""
 
@@ -428,7 +435,7 @@ def followup():
 
     # Note: semantic search still uses OpenAI embeddings; only text generation uses Claude
 
-    context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
+    context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
     # Only inject blocklist for vague "give me another" requests — not when switching topics/episodes
     already_shown = ""
@@ -441,7 +448,8 @@ def followup():
         "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
         "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
         "If the user asks for a different quote, you MUST choose one with a DIFFERENT timestamp than any quote already shown. "
-        "When quoting directly from a transcript, format the quoted text in **bold**. "
+        "When quoting, use a blockquote with the citation inline: > \"Quote\" — Ep 1014, 00:10:55. "
+        "Do NOT put citations on a separate line. Do NOT use horizontal rules. Use plain bold for labels, not headers. "
         "If nothing new is available, say so directly.\n\n"
         + YOUTUBE_TITLE_KNOWLEDGE
     )
