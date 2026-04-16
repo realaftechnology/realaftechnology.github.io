@@ -108,17 +108,25 @@ def get_query_embedding(query):
         return None
 
 
-def semantic_search(query, limit=50):
+def semantic_search(query, limit=50, episode_filter=None):
     query_emb = get_query_embedding(query)
     if not query_emb: return []
     conn = get_db()
     if not conn: return []
-    rows = conn.execute("""
-        SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
-               e.title AS episode_title, e.filename
-        FROM segments s JOIN episodes e ON e.id = s.episode_id
-        WHERE s.embedding IS NOT NULL
-    """).fetchall()
+    if episode_filter:
+        rows = conn.execute("""
+            SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
+                   e.title AS episode_title, e.filename
+            FROM segments s JOIN episodes e ON e.id = s.episode_id
+            WHERE s.embedding IS NOT NULL AND e.title LIKE ?
+        """, (f"%{episode_filter}%",)).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
+                   e.title AS episode_title, e.filename
+            FROM segments s JOIN episodes e ON e.id = s.episode_id
+            WHERE s.embedding IS NOT NULL
+        """).fetchall()
     conn.close()
     scored = []
     for row in rows:
@@ -273,6 +281,7 @@ Answer the user's question directly and specifically using only these transcript
 - If they ask Andy to tell a story, piece together the narrative from all mentions across episodes
 - If they ask for specific content (headline 3, prediction, story), find and summarize it
 - Always cite the episode and timestamp for each key point
+- When quoting directly from a transcript, format the quoted text in **bold**
 - If the transcripts don't contain enough information to answer, say so clearly
 
 Be direct and specific. Answer the question they actually asked.'''
@@ -309,12 +318,21 @@ def followup():
     # Try episode filter from current question first, then fall back to original query
     ep_filter = extract_episode_filter(question) or extract_episode_filter(original_query)
 
-    if ep_filter:
-        fu_results = episode_search(ep_filter)
+    # For vague follow-ups ("give me another", "different one"), search using original query
+    vague_followup = any(w in question.lower() for w in ['another', 'different', 'other', 'more', 'else', 'new one'])
+    search_query = (original_query or question) if vague_followup else question
+
+    if ep_filter and has_embeddings() and OPENAI_KEY:
+        # Semantic search scoped to the episode — avoids flooding context with all chunks
+        fu_results = semantic_search(search_query, limit=25, episode_filter=ep_filter)
+        if not fu_results:
+            fu_results = episode_search(ep_filter)[:25]
+    elif ep_filter:
+        fu_results = episode_search(ep_filter)[:25]
     elif has_embeddings() and OPENAI_KEY:
-        fu_results = semantic_search(question, limit=20)
+        fu_results = semantic_search(search_query, limit=20)
     else:
-        fu_results = keyword_search(question, limit=20)
+        fu_results = keyword_search(search_query, limit=20)
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
@@ -329,6 +347,7 @@ def followup():
         "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
         "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
         "If the user asks for a different quote, you MUST choose one with a DIFFERENT timestamp than any quote already shown. "
+        "When quoting directly from a transcript, format the quoted text in **bold**. "
         "If nothing new is available, say so directly."
     )
 

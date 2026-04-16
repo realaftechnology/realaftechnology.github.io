@@ -224,12 +224,10 @@ html, body {
   overflow-wrap: break-word;
 }
 .chat-q-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--red);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .chat-a-body {
   font-size: 15px;
@@ -485,6 +483,7 @@ function renderResults(query, results) {
   let html = `<div class="section-header">AI Analysis</div>
   <div id="ai-section">
     <div class="ai-card">
+      <div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>
       <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
@@ -555,7 +554,7 @@ async function doFollowup(question) {
   if (!thread) return;
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
-    <div class="chat-q-label">${question}</div>
+    <div class="chat-q-label">&ldquo;${question.replace(/"/g, '&quot;')}&rdquo;</div>
     <div class="chat-a-body"><div class="loading-row"><span class="spinner"></span>Searching...</div></div>
   </div>`;
   scrollToBottom();
