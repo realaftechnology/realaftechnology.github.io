@@ -31,12 +31,18 @@
   --sf-mono: 'SF Mono', 'Menlo', monospace;
 }
 
-html, body {
+html {
+  height: 100%;
+  overflow: hidden;
+}
+body {
   background: var(--bg-primary);
   color: var(--label);
   font-family: var(--sf);
   height: 100%;
   overflow: hidden;
+  position: fixed;
+  width: 100%;
   font-size: 17px;
   line-height: 1.47;
 }
@@ -884,15 +890,28 @@ function scrollToTop() {
 }
 
 // Keep input above iOS keyboard using visualViewport API
+const inputArea = document.querySelector('.input-area');
 if (window.visualViewport) {
   const onViewport = () => {
     const kbOffset = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
-    document.documentElement.style.setProperty('--kb-offset', kbOffset + 'px');
+    if (kbOffset > 50) {
+      // Keyboard open: push input up, drop safe-area padding so no gap
+      inputArea.style.marginBottom = kbOffset + 'px';
+      inputArea.style.paddingBottom = '12px';
+    } else {
+      // Keyboard closed: restore defaults
+      inputArea.style.marginBottom = '0';
+      inputArea.style.paddingBottom = '';
+    }
   };
   window.visualViewport.addEventListener('resize', onViewport);
   window.visualViewport.addEventListener('scroll', onViewport);
 }
-// Prevent body scroll — only scroll-area should scroll
+// Prevent iOS from scrolling the page to bring the input into view
+document.getElementById('search-input').addEventListener('focus', () => {
+  setTimeout(() => { window.scrollTo(0, 0); document.body.scrollTop = 0; }, 0);
+});
+// Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
   if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
 }, { passive: false });
