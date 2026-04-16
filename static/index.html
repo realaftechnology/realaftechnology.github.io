@@ -664,7 +664,12 @@ function renderEpisodeList(episodes) {
     list.innerHTML = '<div style="padding:20px;color:var(--label-tertiary);font-size:13px">No episodes.</div>';
     return;
   }
-  list.innerHTML = episodes.map(ep => {
+  const sorted = [...episodes].sort((a, b) => {
+    const na = parseInt(a.title.match(/(\d{3,4})/)?.[1] || '0', 10);
+    const nb = parseInt(b.title.match(/(\d{3,4})/)?.[1] || '0', 10);
+    return nb - na;
+  });
+  list.innerHTML = sorted.map(ep => {
     const num = ep.title.match(/(\d{3,4})/)?.[1] || '';
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
