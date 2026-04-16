@@ -164,12 +164,13 @@ def semantic_search(query, limit=50, episode_filter=None):
     conn = get_db()
     if not conn: return []
     if episode_filter:
-        rows = conn.execute("""
+        where, params = ep_filter_clauses(episode_filter)
+        rows = conn.execute(f"""
             SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
                    e.title AS episode_title, e.filename
             FROM segments s JOIN episodes e ON e.id = s.episode_id
-            WHERE s.embedding IS NOT NULL AND e.title LIKE ?
-        """, (f"%{episode_filter}%",)).fetchall()
+            WHERE s.embedding IS NOT NULL AND {where}
+        """, params).fetchall()
     else:
         rows = conn.execute("""
             SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
@@ -213,24 +214,42 @@ def keyword_search(query, limit=50):
     return [format_result(r, 0) for r in rows]
 
 
+def ep_filter_clauses(ep_number):
+    """Return (sql_fragment, params) that precisely matches an episode number.
+    Avoids 'Ep 1' matching 'Ep 10', 'Ep 100', 'Ep 1000' etc."""
+    try:
+        n = int(ep_number)
+        # Titles look like "Ep 01 - ..." or "Ep 979 - ..."
+        # Match number followed by space, dash, or dot — not another digit
+        patterns = [f"Ep {n} %", f"Ep {n}-%", f"Ep {n}.%"]
+        if n < 100:
+            p = f"{n:02d}"  # zero-padded: 1 -> 01
+            patterns += [f"Ep {p} %", f"Ep {p}-%", f"Ep {p}.%"]
+        sql = "(" + " OR ".join(["e.title LIKE ?"] * len(patterns)) + ")"
+        return sql, patterns
+    except ValueError:
+        return "e.title LIKE ?", [f"%{ep_number}%"]
+
+
 def episode_search(ep_number):
     """Return ALL chunks from a specific episode in chronological order."""
     conn = get_db()
     if not conn: return []
-    rows = conn.execute("""
+    where, params = ep_filter_clauses(ep_number)
+    rows = conn.execute(f"""
         SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
                e.title AS episode_title, e.filename, 0 AS rank
         FROM segments s JOIN episodes e ON e.id = s.episode_id
-        WHERE e.title LIKE ?
+        WHERE {where}
         ORDER BY s.start_secs ASC
-    """, (f"%{ep_number}%",)).fetchall()
+    """, params).fetchall()
     conn.close()
     return [format_result(r, 0) for r in rows]
 
 
 def clean_ep_label(episode_title):
     """Extract a short readable label from a filename-based episode title."""
-    m = re.search(r'(\d{3,4})', episode_title)
+    m = re.search(r'(\d+)', episode_title)
     return f"Ep {m.group(1)}" if m else episode_title
 
 
