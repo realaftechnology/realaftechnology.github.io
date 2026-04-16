@@ -444,13 +444,20 @@ body {
 /* ── BOTTOM INPUT AREA ── */
 .input-area {
   flex-shrink: 0;
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px 20px;
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
   width: 100%;
   max-width: 720px;
+}
+/* Home indicator spacer — only visible when keyboard is closed */
+.input-safe-bottom {
+  flex-shrink: 0;
+  height: env(safe-area-inset-bottom);
+  width: 100%;
+  background: rgba(0,0,0,0.92);
 }
 .input-bar {
   display: flex;
@@ -572,6 +579,7 @@ body {
       <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
     </div>
   </div>
+  <div class="input-safe-bottom" id="input-safe-bottom"></div>
 
 </div>
 
@@ -908,14 +916,14 @@ function scrollToTop() {
 
 // Keep input above iOS keyboard — resize main-screen to match visual viewport
 const mainScreen = document.getElementById('main-screen');
-const inputArea = document.querySelector('.input-area');
+const safePad = document.getElementById('input-safe-bottom');
 if (window.visualViewport) {
   const onViewport = () => {
     const vv = window.visualViewport;
     mainScreen.style.height = vv.height + 'px';
     mainScreen.style.top = vv.offsetTop + 'px';
-    // No safe-area padding needed when keyboard is open
-    inputArea.style.paddingBottom = vv.height < window.innerHeight - 100 ? '12px' : '';
+    // Hide home-indicator spacer when keyboard is open
+    safePad.style.display = vv.height < window.innerHeight - 100 ? 'none' : '';
   };
   window.visualViewport.addEventListener('resize', onViewport);
   window.visualViewport.addEventListener('scroll', onViewport);
