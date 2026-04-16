@@ -862,7 +862,6 @@ async function runAnalysis(query, results, stayAtTop = false) {
       el.innerHTML = data.error
         ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
         : marked.parse(data.analysis || '');
-      if (!stayAtTop) scrollToBottom();
       if (data.analysis) {
         chatHistory.push({q: query, a: data.analysis});
         addEpisodeButtons(el.parentElement, data.analysis);
