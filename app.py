@@ -481,10 +481,21 @@ def followup():
     if chat_history:
         ep_in_last_answer = extract_episode_filter(chat_history[-1].get("a", ""))
 
-    ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original or ep_in_last_answer
+    # Detect when user wants to expand search beyond the current episode
+    cross_episode_request = any(w in question.lower() for w in [
+        'subsequent', 'other episode', 'later episode', 'different episode',
+        'across episode', 'another episode', 'other show', 'expand', 'broader',
+        'elsewhere', 'any other', 'more episode'
+    ])
+
+    if cross_episode_request:
+        ep_filter = data.get("episode_filter", "") or ep_in_question
+    else:
+        ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original or ep_in_last_answer
 
     # Vague follow-up: no new episode introduced, and asking for another/different
     vague_followup = (
+        not cross_episode_request and
         (not ep_in_question or ep_in_question == ep_in_original) and
         any(w in question.lower() for w in ['another', 'different', 'more', 'else', 'new one'])
     )
