@@ -7,7 +7,7 @@ import os, re, sys, json, sqlite3, time, hashlib
 from docx import Document
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-DB_PATH = os.environ.get("DB_PATH", "/data/db.sqlite")
+DB_PATH = os.environ.get("DB_PATH", "/data/db.sqlite" if os.path.isdir("/data") else "db.sqlite")
 TRANSCRIPTS_DIR = os.environ.get("TRANSCRIPTS_DIR", "transcripts")
 CHUNK_SIZE = 400  # words per chunk
 

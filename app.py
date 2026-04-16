@@ -13,7 +13,7 @@ from functools import wraps
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 
-DB_PATH       = os.environ.get("DB_PATH", "/data/db.sqlite")
+DB_PATH       = os.environ.get("DB_PATH", "/data/db.sqlite" if os.path.isdir("/data") else "db.sqlite")
 OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "") # used for all AI text generation
 
