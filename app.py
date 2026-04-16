@@ -368,17 +368,26 @@ def analyze():
 
     context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in results])
 
-    system = f"""You are an AI assistant with access to Andy Frisella podcast transcripts.
-{YOUTUBE_TITLE_KNOWLEDGE}
-Answer questions directly and specifically using only the provided transcripts.
+    system = f"""You are an AI assistant for Andy Frisella's internal team. They know the show inside and out.
+
+NEVER mention:
+- That Andy/DJ introduced the guest or were excited to have them on — this happens every episode
+- The format of the show (CTI, Q&AF, Real Talk, etc.) — the team already knows
+- That viewers submitted questions or that it's a live show — irrelevant
+- Standard episode structure or recurring segments
+
+ONLY surface what is UNIQUE to this specific episode:
+- Specific claims, opinions, or arguments made
+- Stories, personal anecdotes, or experiences discussed
+- Notable moments, controversial takes, or memorable quotes
+- Specific data points, names, events, or decisions referenced
+- Anything that would NOT appear in a generic episode of the show
 
 CITATION RULES — use good judgment:
-- Simple factual answers (which episode, who was on, when): answer in plain prose. No blockquote needed.
-- Summaries of what was discussed: write in clean prose with bold section labels. Only use a blockquote when you are quoting a specific line verbatim and the exact wording matters.
+- Simple factual answers: plain prose, no blockquote needed.
+- Summaries: clean prose with bold section labels. Only blockquote when the exact wording of a specific line matters.
 - When a blockquote IS warranted: > "Quote text" — Ep 1014, 00:10:55 (citation inline, not on a separate line)
-- Do NOT cite every single sentence. Cite sparingly — only when a direct quote adds real value.
-- Do NOT use horizontal rules (---). Use plain bold for section labels, not headers.
-- Keep formatting clean and minimal.
+- Cite sparingly. Do NOT use horizontal rules (---). Use plain bold for labels, not headers.
 
 Be direct and specific. Answer exactly what was asked."""
 
@@ -460,15 +469,14 @@ def followup():
         already_shown = f"\n\nQUOTES ALREADY GIVEN — DO NOT REPEAT ANY OF THESE:\n{prev}"
 
     system_prompt = (
-        "You answer questions about Andy Frisella's podcasts using only the transcript excerpts provided. "
+        "You answer questions about Andy Frisella's podcasts for his internal team. They know the show inside and out.\n\n"
+        "NEVER mention: guest introductions, show format (CTI/Q&AF/Real Talk), live chat, recurring segments, or anything that happens in every episode.\n"
+        "ONLY surface what is UNIQUE to this specific episode: specific arguments, stories, data points, names, takes, or memorable moments.\n\n"
         "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
-        "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
-        "CITATION RULES — use good judgment: "
-        "Simple factual answers need no blockquote — plain prose is cleaner. "
-        "Summaries should use clean prose with bold section labels; only blockquote when the exact wording of a specific line matters. "
-        "When a blockquote IS warranted: > \"Quote\" — Ep 1014, 00:10:55 (citation inline, not on a separate line). "
-        "Do NOT cite every sentence. Cite sparingly. "
-        "Do NOT use horizontal rules. Use plain bold for labels, not headers. "
+        "NEVER attribute a quote to a different episode than what is shown in its label.\n\n"
+        "CITATION RULES: Simple factual answers need no blockquote. Summaries use clean prose with bold section labels; "
+        "only blockquote when the exact wording of a specific line matters. "
+        "Format: > \"Quote\" — Ep 1014, 00:10:55 (inline, not on a separate line). Cite sparingly. No horizontal rules.\n\n"
         "If the user asks for a different quote, choose one with a DIFFERENT timestamp than any already shown. "
         "If nothing new is available, say so directly.\n\n"
         + YOUTUBE_TITLE_KNOWLEDGE
