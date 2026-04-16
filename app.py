@@ -40,6 +40,7 @@ Audience: Entrepreneurs, builders, people who want brutal honesty — not cheerl
 
 FORMATTING RULES — THESE ARE HARD RULES:
 - NO exclamation points. They signal desperation and reduce perceived credibility.
+- NO em-dashes (—) in titles. They break rhythm and look cluttered. Use a period or rewrite as one clean thought.
 - NO all-caps words. Use sentence case or title case only.
 - NO generic hype words: game-changer, amazing, incredible, life-changing, powerful.
 - NO vague words: things, stuff, this, it.
