@@ -856,6 +856,13 @@ async function consumeStream(res, onChunk, onDone, onError) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullText = '';
+  let rafPending = false;
+  const scheduleRender = () => {
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => { onChunk(fullText); rafPending = false; });
+    }
+  };
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -870,7 +877,7 @@ async function consumeStream(res, onChunk, onDone, onError) {
         try {
           const parsed = JSON.parse(raw);
           if (parsed.error) { onError(parsed.error); return; }
-          if (parsed.text) { fullText += parsed.text; onChunk(fullText); }
+          if (parsed.text) { fullText += parsed.text; scheduleRender(); }
         } catch {}
       }
     }
