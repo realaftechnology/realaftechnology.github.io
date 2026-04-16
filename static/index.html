@@ -451,9 +451,6 @@ body {
   border-top: 0.5px solid var(--separator);
   width: 100%;
   max-width: 720px;
-  /* keyboard offset applied via JS */
-  margin-bottom: var(--kb-offset, 0px);
-  transition: margin-bottom 0.1s;
 }
 .input-bar {
   display: flex;
@@ -642,6 +639,25 @@ async function loadEpisodeList() {
   }
 }
 
+function formatEpSubtitle(title) {
+  // Strip "Ep 1016 - " or "Ep_1016_" prefix and file extension
+  let s = title
+    .replace(/^Ep[\s_]*\d{3,4}[\s_]*[-–]?[\s_]*/i, '')
+    .replace(/\.(mp3|mp4|m4a|docx|wav)$/i, '');
+  // Parse date MM.DD.YYYY or MM.DD.YY
+  const dm = s.match(/^(\d{2})\.(\d{2})\.(\d{2,4})[_\s]?/);
+  let dateStr = '';
+  if (dm) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const year = dm[3].length === 2 ? '20' + dm[3] : dm[3];
+    dateStr = `${months[parseInt(dm[1],10)-1]} ${parseInt(dm[2],10)}, ${year}`;
+    s = s.slice(dm[0].length);
+  }
+  // Identify show type
+  let show = /q&af/i.test(s) ? 'Q&AF' : /cti/i.test(s) ? 'CTI' : s.replace(/[_]/g,' ').split(/\s+/).slice(0,2).join(' ');
+  return dateStr ? `${show} · ${dateStr}` : show || title;
+}
+
 function renderEpisodeList(episodes) {
   const list = document.getElementById('episode-list');
   if (!episodes.length) {
@@ -650,11 +666,12 @@ function renderEpisodeList(episodes) {
   }
   list.innerHTML = episodes.map(ep => {
     const num = ep.title.match(/(\d{3,4})/)?.[1] || '';
+    const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
     const isActive = lockedEpisode === num;
     return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
       <div class="ep-item-num">Ep ${num}</div>
-      <div class="ep-item-title">${clean}</div>
+      <div class="ep-item-title">${subtitle}</div>
     </div>`;
   }).join('');
 }
@@ -889,28 +906,20 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keep input above iOS keyboard using visualViewport API
+// Keep input above iOS keyboard — resize main-screen to match visual viewport
+const mainScreen = document.getElementById('main-screen');
 const inputArea = document.querySelector('.input-area');
 if (window.visualViewport) {
   const onViewport = () => {
-    const kbOffset = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
-    if (kbOffset > 50) {
-      // Keyboard open: push input up, drop safe-area padding so no gap
-      inputArea.style.marginBottom = kbOffset + 'px';
-      inputArea.style.paddingBottom = '12px';
-    } else {
-      // Keyboard closed: restore defaults
-      inputArea.style.marginBottom = '0';
-      inputArea.style.paddingBottom = '';
-    }
+    const vv = window.visualViewport;
+    mainScreen.style.height = vv.height + 'px';
+    mainScreen.style.top = vv.offsetTop + 'px';
+    // No safe-area padding needed when keyboard is open
+    inputArea.style.paddingBottom = vv.height < window.innerHeight - 100 ? '12px' : '';
   };
   window.visualViewport.addEventListener('resize', onViewport);
   window.visualViewport.addEventListener('scroll', onViewport);
 }
-// Prevent iOS from scrolling the page to bring the input into view
-document.getElementById('search-input').addEventListener('focus', () => {
-  setTimeout(() => { window.scrollTo(0, 0); document.body.scrollTop = 0; }, 0);
-});
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
   if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
