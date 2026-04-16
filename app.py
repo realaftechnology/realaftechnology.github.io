@@ -233,10 +233,7 @@ def search_endpoint():
         return jsonify({"results": []})
 
     # Detect episode number reference — if found, return only that episode
-    ep_match = re.search(r'\b(ep|episode)[\s_-]*(\d{3,4})\b', query, re.IGNORECASE)
-    if not ep_match:
-        ep_match = re.search(r'\b(\d{4})\b', query)
-    ep_filter = ep_match.group(2) if ep_match and len(ep_match.groups()) > 1 else (ep_match.group(1) if ep_match else None)
+    ep_filter = extract_episode_filter(query)
 
     if ep_filter:
         results = episode_search(ep_filter)
@@ -290,18 +287,27 @@ Be direct and specific. Answer the question they actually asked.'''
         return jsonify({"error": str(e)})
 
 
+def extract_episode_filter(text):
+    """Extract a 3-4 digit episode number from text. Returns string or None."""
+    m = re.search(r'\b(?:ep|episode)[\s_-]*(\d{3,4})\b', text, re.IGNORECASE)
+    if m: return m.group(1)
+    m = re.search(r'\b(\d{4})\b', text)
+    if m: return m.group(1)
+    return None
+
+
 @app.route("/api/followup", methods=["POST"])
 @requires_auth
 def followup():
     if not OPENAI_KEY:
         return jsonify({"error": "No OpenAI key configured"})
-    data         = request.get_json()
-    question     = data.get("question", "")
-    chat_history = data.get("history", [])
+    data           = request.get_json()
+    question       = data.get("question", "")
+    chat_history   = data.get("history", [])
+    original_query = data.get("original_query", "")
 
-    # Check for episode reference in follow-up
-    ep_match = re.search(r'\b(ep|episode)[\s_-]*(\d{3,4})\b', question, re.IGNORECASE)
-    ep_filter = ep_match.group(2) if ep_match else None
+    # Try episode filter from current question first, then fall back to original query
+    ep_filter = extract_episode_filter(question) or extract_episode_filter(original_query)
 
     if ep_filter:
         fu_results = episode_search(ep_filter)
@@ -312,11 +318,19 @@ def followup():
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
-    messages = [{"role": "system", "content": "You answer questions about Andy Frisella's podcasts using only provided transcripts. Answer the specific question asked. Cite quotes and episodes. If nothing relevant, say so directly."}]
+    system_prompt = (
+        "You answer questions about Andy Frisella's podcasts using only the transcript excerpts provided. "
+        "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
+        "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
+        "Answer the specific question asked. If the user says 'find me a different one', pick a quote not already mentioned in the conversation history. "
+        "If nothing relevant is found, say so directly."
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
     for item in chat_history:
         messages.append({"role": "user", "content": item["q"]})
         messages.append({"role": "assistant", "content": item["a"]})
-    messages.append({"role": "user", "content": f'Question: "{question}"\n\nTranscripts:\n{context}\n\nAnswer the specific question asked. Cite quotes with episode and timestamp.'})
+    messages.append({"role": "user", "content": f'Question: "{question}"\n\nTranscripts:\n{context}\n\nAnswer the specific question asked. Cite quotes using ONLY the episode and timestamp shown in the transcript labels above.'})
 
     payload = json.dumps({"model": "gpt-4o-mini", "messages": messages, "max_tokens": 600, "temperature": 0.2}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})

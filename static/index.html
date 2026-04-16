@@ -560,7 +560,7 @@ async function doFollowup(question) {
   </div>`;
   scrollToBottom();
   try {
-    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
+    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question, history: chatHistory, original_query: currentQuery}) });
     const data = await res.json();
     const answer = data.answer || data.error || 'No response.';
     chatHistory.push({q: question, a: answer});

@@ -1,4 +1,8 @@
-db.sqlite
-__pycache__/
+.DS_Store
+**/.DS_Store
 *.pyc
+__pycache__/
+*.sqlite
+*.db
 .env
+transcripts/
