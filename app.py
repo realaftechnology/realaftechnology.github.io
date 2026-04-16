@@ -7,6 +7,7 @@ import json
 import sqlite3
 import re
 import urllib.request
+import urllib.error
 from flask import Flask, request, jsonify, session, send_from_directory, Response, stream_with_context
 from functools import wraps
 
@@ -319,10 +320,15 @@ def anthropic_stream(system, messages, model, max_tokens, temperature=0.3):
     )
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
-            for raw_line in resp:
-                line = raw_line.decode("utf-8").strip()
-                if line.startswith("event: ping"):
-                    yield ": ping\n\n"  # keepalive so proxy doesn't drop the connection
+            while True:
+                raw_line = resp.readline()
+                if not raw_line:
+                    break
+                line = raw_line.decode("utf-8").rstrip("\r\n")
+                if not line:
+                    continue
+                if line.startswith("event:") and "ping" in line:
+                    yield ": ping\n\n"
                     continue
                 if not line.startswith("data: "):
                     continue
@@ -337,6 +343,9 @@ def anthropic_stream(system, messages, model, max_tokens, temperature=0.3):
                             yield f"data: {json.dumps({'text': text})}\n\n"
                 except Exception:
                     pass
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:300]
+        yield f"data: {json.dumps({'error': f'API error {e.code}: {body}'})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
     yield "data: [DONE]\n\n"
@@ -461,7 +470,7 @@ CITATION RULES — use good judgment:
 {YOUTUBE_TITLE_KNOWLEDGE}
 Be direct. Do exactly what was asked."""
 
-    user_msg = f'The user asked: "{query}"\n\nTranscript excerpts:\n{context}'
+    user_msg = f'The user asked: "{query}"\n\nTranscript excerpts:\n{context}\n\nAnswer only from what the transcripts support. If they cover it, answer directly. If the evidence is thin or missing, say so in 1-2 sentences and suggest a better search term. Always produce a response — never return empty.'
 
     return Response(
         stream_with_context(anthropic_stream(
