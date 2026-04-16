@@ -888,7 +888,7 @@ async function runAnalysis(query, results) {
   try {
     const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results}) });
     await consumeStream(res,
-      (text) => { el.textContent = text; },
+      (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
         el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No response.</span>';
         if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); }
@@ -918,7 +918,7 @@ async function doFollowup(question) {
     const body = item.querySelector('.chat-a-body');
     body.innerHTML = '';
     await consumeStream(res,
-      (text) => { body.textContent = text; scrollToBottom(); },
+      (text) => { body.innerHTML = marked.parse(text); scrollToBottom(); },
       (text) => {
         body.innerHTML = marked.parse(text || 'No response.');
         if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); }
