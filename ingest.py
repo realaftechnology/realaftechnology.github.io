@@ -3,7 +3,7 @@ ingest.py - Parse Word doc transcripts and store in SQLite with OpenAI embedding
 Drop .docx files into the /transcripts folder and run this script.
 """
 
-import os, re, sys, json, sqlite3, time
+import os, re, sys, json, sqlite3, time, hashlib
 from docx import Document
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -18,9 +18,15 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS episodes (
             id          TEXT PRIMARY KEY,
             title       TEXT NOT NULL,
-            filename    TEXT
+            filename    TEXT,
+            file_hash   TEXT
         )
     """)
+    # Add file_hash column to existing databases that predate this change
+    try:
+        cur.execute("ALTER TABLE episodes ADD COLUMN file_hash TEXT")
+    except:
+        pass
     cur.execute("""
         CREATE TABLE IF NOT EXISTS segments (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,19 +186,33 @@ def get_embedding(text, retries=3):
                 return None
 
 
+def compute_hash(filepath):
+    md5 = hashlib.md5()
+    with open(filepath, "rb") as f:
+        md5.update(f.read())
+    return md5.hexdigest()
+
+
 def ingest_file(conn, filepath):
-    """Ingest a single .docx transcript file."""
+    """Ingest a single .docx transcript file. Re-ingests if the file has changed."""
     cur = conn.cursor()
     filename = os.path.basename(filepath)
     episode_id = filename.replace(".docx", "").replace(".DOCX", "")
+    fhash = compute_hash(filepath)
 
-    # Check if already ingested
+    # Check if already ingested with same content
     existing = cur.execute(
-        "SELECT id FROM episodes WHERE id = ?", (episode_id,)
+        "SELECT id, file_hash FROM episodes WHERE id = ?", (episode_id,)
     ).fetchone()
     if existing:
-        print(f"  ⏭️  Already ingested, skipping: {filename}")
-        return 0
+        if existing["file_hash"] == fhash:
+            print(f"  ⏭️  Unchanged, skipping: {filename}")
+            return 0
+        # File changed — wipe and re-ingest
+        print(f"  🔄  File changed, re-ingesting: {filename}")
+        cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
+        cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+        conn.commit()
 
     # Extract text
     raw_text = extract_docx_text(filepath)
@@ -215,8 +235,8 @@ def ingest_file(conn, filepath):
 
     # Store episode
     cur.execute(
-        "INSERT OR REPLACE INTO episodes (id, title, filename) VALUES (?, ?, ?)",
-        (episode_id, title, filename)
+        "INSERT OR REPLACE INTO episodes (id, title, filename, file_hash) VALUES (?, ?, ?, ?)",
+        (episode_id, title, filename, fhash)
     )
 
     # Store chunks with embeddings

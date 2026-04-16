@@ -739,8 +739,8 @@ function renderResults(query, results, autoExpand = false) {
   </div>`;
 
   area.innerHTML = html;
-  scrollToBottom();
-  runAnalysis(query, results);
+  if (autoExpand) scrollToTop(); else scrollToBottom();
+  runAnalysis(query, results, autoExpand);
 }
 
 function toggleTranscripts() {
@@ -774,7 +774,7 @@ function highlightText(text, query, maxChars=280) {
   return snippet;
 }
 
-async function runAnalysis(query, results) {
+async function runAnalysis(query, results, stayAtTop = false) {
   if (analyzing) return;
   analyzing = true;
   try {
@@ -785,7 +785,7 @@ async function runAnalysis(query, results) {
       el.innerHTML = data.error
         ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
         : marked.parse(data.analysis || '');
-      scrollToBottom();
+      if (!stayAtTop) scrollToBottom();
     }
   } catch(e) {
     const el = document.getElementById('ai-content');
@@ -822,6 +822,10 @@ async function doFollowup(question) {
 function scrollToBottom() {
   const s = document.getElementById('scroll-area');
   if (s) setTimeout(() => s.scrollTop = s.scrollHeight, 50);
+}
+function scrollToTop() {
+  const s = document.getElementById('scroll-area');
+  if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
 // Handle iOS keyboard — scroll area resizes naturally with dvh
