@@ -321,6 +321,9 @@ def anthropic_stream(system, messages, model, max_tokens, temperature=0.3):
         with urllib.request.urlopen(req, timeout=90) as resp:
             for raw_line in resp:
                 line = raw_line.decode("utf-8").strip()
+                if line.startswith("event: ping"):
+                    yield ": ping\n\n"  # keepalive so proxy doesn't drop the connection
+                    continue
                 if not line.startswith("data: "):
                     continue
                 data_str = line[6:]

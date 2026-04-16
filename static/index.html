@@ -929,7 +929,7 @@ async function runAnalysis(query, results) {
   const el = document.getElementById('ai-content');
   if (!el) { analyzing = false; return; }
   try {
-    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results}) });
+    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results: results.slice(0, 20)}) });
     await consumeStream(res,
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
