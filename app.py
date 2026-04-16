@@ -455,8 +455,8 @@ Be direct. Do exactly what was asked."""
 
 
 def extract_episode_filter(text):
-    """Extract a 3-4 digit episode number from text. Returns string or None."""
-    m = re.search(r'\b(?:ep|episode)[\s_-]*(\d{3,4})\b', text, re.IGNORECASE)
+    """Extract an episode number from text. Returns string or None."""
+    m = re.search(r'\b(?:ep|episode)[\s_-]*(\d+)\b', text, re.IGNORECASE)
     if m: return m.group(1)
     m = re.search(r'\b(\d{4})\b', text)
     if m: return m.group(1)
