@@ -500,14 +500,30 @@ def followup():
     if chat_history:
         ep_in_last_answer = extract_episode_filter(chat_history[-1].get("a", ""))
 
+    q_lower = question.lower()
+
+    # Detect "next episode" / "episode after" — advance from last known episode
+    next_ep_request = any(p in q_lower for p in ['next episode', 'episode after', 'following episode', 'episode 2' if not ep_in_question else ''])
+    prev_ep_request = any(p in q_lower for p in ['previous episode', 'episode before', 'last episode'])
+
     # Detect when user wants to expand search beyond the current episode
-    cross_episode_request = any(w in question.lower() for w in [
+    cross_episode_request = any(w in q_lower for w in [
         'subsequent', 'other episode', 'later episode', 'different episode',
         'across episode', 'another episode', 'other show', 'expand', 'broader',
         'elsewhere', 'any other', 'more episode'
     ])
 
-    if cross_episode_request:
+    if next_ep_request and ep_in_last_answer:
+        try:
+            ep_filter = str(int(ep_in_last_answer) + 1)
+        except:
+            ep_filter = ep_in_last_answer
+    elif prev_ep_request and ep_in_last_answer:
+        try:
+            ep_filter = str(max(1, int(ep_in_last_answer) - 1))
+        except:
+            ep_filter = ep_in_last_answer
+    elif cross_episode_request:
         ep_filter = data.get("episode_filter", "") or ep_in_question
     else:
         ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original or ep_in_last_answer
@@ -519,7 +535,10 @@ def followup():
         any(w in question.lower() for w in ['another', 'different', 'more', 'else', 'new one'])
     )
 
-    if vague_followup:
+    if next_ep_request or prev_ep_request:
+        # Navigating episodes — use original topic as search query in new episode
+        search_query = original_query or question
+    elif vague_followup:
         # "Give me another" — search original topic in same episode
         search_query = original_query or question
     elif ep_in_question and ep_in_question != ep_in_original and original_query:
