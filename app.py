@@ -318,19 +318,25 @@ def followup():
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
+    # Build an explicit blocklist from previous AI answers so the model can't repeat them
+    already_shown = ""
+    if chat_history:
+        prev = "\n\n".join([f"- {item['a']}" for item in chat_history])
+        already_shown = f"\n\nQUOTES ALREADY GIVEN IN THIS CONVERSATION — DO NOT REPEAT ANY OF THESE:\n{prev}"
+
     system_prompt = (
         "You answer questions about Andy Frisella's podcasts using only the transcript excerpts provided. "
         "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
         "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
-        "Answer the specific question asked. If the user says 'find me a different one', pick a quote not already mentioned in the conversation history. "
-        "If nothing relevant is found, say so directly."
+        "If the user asks for a different quote, you MUST choose one with a DIFFERENT timestamp than any quote already shown. "
+        "If nothing new is available, say so directly."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
     for item in chat_history:
         messages.append({"role": "user", "content": item["q"]})
         messages.append({"role": "assistant", "content": item["a"]})
-    messages.append({"role": "user", "content": f'Question: "{question}"\n\nTranscripts:\n{context}\n\nAnswer the specific question asked. Cite quotes using ONLY the episode and timestamp shown in the transcript labels above.'})
+    messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer using ONLY the episode and timestamp shown in the transcript labels. Do NOT repeat any quote listed above.'})
 
     payload = json.dumps({"model": "gpt-4o-mini", "messages": messages, "max_tokens": 600, "temperature": 0.2}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
