@@ -36,7 +36,6 @@ html, body {
   height: 100%;
   font-size: 17px;
   line-height: 1.47;
-  overflow: hidden;
 }
 
 /* ── LOGIN ── */
@@ -53,10 +52,9 @@ html, body {
   font-size: 64px;
   line-height: 1;
   letter-spacing: -1px;
-  margin-bottom: 8px;
+  margin-bottom: 40px;
 }
 .login-logo span { color: var(--red); }
-.login-tagline { font-size: 13px; color: var(--label-secondary); margin-bottom: 40px; }
 .login-field {
   background: var(--bg-secondary);
   border: none;
@@ -94,6 +92,7 @@ html, body {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  position: relative;
 }
 
 /* ── HEADER ── */
@@ -133,7 +132,13 @@ html, body {
 
 /* ── EMPTY ── */
 .empty-state { text-align: center; padding: 80px 20px; }
-.empty-title { font-size: 20px; font-weight: 600; color: var(--label-secondary); margin-bottom: 8px; }
+.empty-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 1px;
+  color: var(--label-secondary);
+  margin-bottom: 10px;
+}
 .empty-sub { font-size: 15px; color: var(--label-tertiary); line-height: 1.5; }
 
 /* ── SECTION HEADER ── */
@@ -203,14 +208,9 @@ html, body {
   -webkit-appearance: none;
 }
 .view-transcripts-btn:hover { background: #3a3a3c; }
-.view-transcripts-btn .chevron { font-size: 11px; transition: transform 0.2s; }
-.view-transcripts-btn.open .chevron { transform: rotate(180deg); }
 
 /* ── TRANSCRIPTS PANEL ── */
-.transcripts-panel {
-  display: none;
-  margin-bottom: 12px;
-}
+.transcripts-panel { display: none; margin-bottom: 12px; }
 .transcripts-panel.open { display: block; }
 
 /* ── CHAT ── */
@@ -274,36 +274,22 @@ html, body {
   letter-spacing: 0.3px;
   min-width: 0;
 }
-.result-ts {
-  font-family: var(--sf-mono);
-  font-size: 12px;
-  color: var(--red);
-  flex-shrink: 0;
-}
-.result-speaker {
-  font-size: 11px;
-  color: var(--label-quaternary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 6px;
-}
-.result-text {
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--label-secondary);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
+.result-ts { font-family: var(--sf-mono); font-size: 12px; color: var(--red); flex-shrink: 0; }
+.result-speaker { font-size: 11px; color: var(--label-quaternary); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
+.result-text { font-size: 15px; line-height: 1.55; color: var(--label-secondary); word-wrap: break-word; overflow-wrap: break-word; }
 .result-text mark { background: transparent; color: var(--orange); font-weight: 500; }
 
 /* ── BOTTOM INPUT AREA ── */
 .input-area {
   flex-shrink: 0;
   padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
+  /* Stays above keyboard on iOS */
+  position: sticky;
+  bottom: 0;
 }
 .input-bar {
   display: flex;
@@ -360,8 +346,6 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
-
-/* bottom padding inside scroll so content clears input bar */
 .scroll-bottom-pad { height: 20px; }
 </style>
 </head>
@@ -371,7 +355,6 @@ html, body {
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo"><span>AF</span>BRAIN</div>
-    <div class="login-tagline">Andy Frisella Podcast Search</div>
     <input class="login-field" type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" onclick="doLogin()">Continue</button>
     <div class="login-error" id="login-error"></div>
@@ -412,7 +395,6 @@ let currentQuery = '';
 let analyzing = false;
 let hasResults = false;
 
-// ── LOGIN ──
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 async function doLogin() {
@@ -423,8 +405,7 @@ async function doLogin() {
     const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
     if (res.ok) {
       document.getElementById('login-screen').style.display = 'none';
-      const ms = document.getElementById('main-screen');
-      ms.style.display = 'flex';
+      document.getElementById('main-screen').style.display = 'flex';
       loadStats();
       document.getElementById('search-input').focus();
     } else {
@@ -443,13 +424,8 @@ async function loadStats() {
   } catch(e) {}
 }
 
-// ── RESET ──
 function resetApp() {
-  currentResults = [];
-  chatHistory = [];
-  currentQuery = '';
-  analyzing = false;
-  hasResults = false;
+  currentResults = []; chatHistory = []; currentQuery = ''; analyzing = false; hasResults = false;
   document.getElementById('search-input').value = '';
   document.getElementById('results-area').innerHTML = `
     <div class="empty-state">
@@ -459,29 +435,19 @@ function resetApp() {
   document.getElementById('search-input').focus();
 }
 
-// ── INPUT HANDLER ──
 document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
 
 function handleSubmit() {
   const val = document.getElementById('search-input').value.trim();
   if (!val) return;
-  if (hasResults) {
-    doFollowup(val);
-  } else {
-    doSearch(val);
-  }
   document.getElementById('search-input').value = '';
+  if (hasResults) { doFollowup(val); } else { doSearch(val); }
 }
 
-// ── SEARCH ──
 async function doSearch(query) {
-  currentQuery = query;
-  chatHistory = [];
-  hasResults = false;
-
+  currentQuery = query; chatHistory = []; hasResults = false;
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="spinner"></span>Searching...</div>';
-
   try {
     const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query}) });
     if (!res.ok) return;
@@ -493,17 +459,14 @@ async function doSearch(query) {
   }
 }
 
-// ── RENDER ──
 function renderResults(query, results) {
   const area = document.getElementById('results-area');
   if (!results.length) {
     area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}".</div></div>`;
     return;
   }
-
   hasResults = true;
 
-  // Build transcript cards HTML (hidden initially)
   let transcriptHtml = '';
   results.forEach(r => {
     const epShort = r.episode_title.replace(/\.(mp3|mp4|m4a)$/i, '').substring(0, 60);
@@ -525,11 +488,9 @@ function renderResults(query, results) {
       <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
-      View Transcripts (${results.length}) <span class="chevron">&#8964;</span>
+      View Transcripts (${results.length}) &#8964;
     </button>
-    <div class="transcripts-panel" id="transcripts-panel">
-      ${transcriptHtml}
-    </div>
+    <div class="transcripts-panel" id="transcripts-panel">${transcriptHtml}</div>
     <div id="chat-thread"></div>
   </div>`;
 
@@ -542,15 +503,13 @@ function toggleTranscripts() {
   const panel = document.getElementById('transcripts-panel');
   const btn = document.getElementById('transcripts-toggle');
   panel.classList.toggle('open');
-  btn.classList.toggle('open');
   if (panel.classList.contains('open')) {
-    btn.innerHTML = `Hide Transcripts <span class="chevron" style="display:inline-block;transform:rotate(180deg)">&#8964;</span>`;
+    btn.innerHTML = `Hide Transcripts &#8963;`;
   } else {
-    btn.innerHTML = `View Transcripts (${currentResults.length}) <span class="chevron">&#8964;</span>`;
+    btn.innerHTML = `View Transcripts (${currentResults.length}) &#8964;`;
   }
 }
 
-// ── HIGHLIGHT ──
 function highlightText(text, query, maxChars=280) {
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   let bestPos = 0, bestScore = 0;
@@ -571,7 +530,6 @@ function highlightText(text, query, maxChars=280) {
   return snippet;
 }
 
-// ── AI ANALYSIS ──
 async function runAnalysis(query, results) {
   if (analyzing) return;
   analyzing = true;
@@ -592,18 +550,15 @@ async function runAnalysis(query, results) {
   analyzing = false;
 }
 
-// ── FOLLOW-UP ──
 async function doFollowup(question) {
   const thread = document.getElementById('chat-thread');
   if (!thread) return;
-
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
     <div class="chat-q-label">${question}</div>
     <div class="chat-a-body"><div class="loading-row"><span class="spinner"></span>Searching...</div></div>
   </div>`;
   scrollToBottom();
-
   try {
     const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
     const data = await res.json();
@@ -623,14 +578,18 @@ function scrollToBottom() {
   if (s) setTimeout(() => s.scrollTop = s.scrollHeight, 50);
 }
 
-// ── SESSION CHECK ──
+// Handle iOS keyboard — scroll area resizes naturally with dvh
+// Prevent body scroll so only scroll-area scrolls
+document.body.addEventListener('touchmove', function(e) {
+  if (!e.target.closest('.scroll-area')) e.preventDefault();
+}, { passive: false });
+
 (async function() {
   try {
     const res = await fetch('/api/stats');
     if (res.ok) {
       document.getElementById('login-screen').style.display = 'none';
-      const ms = document.getElementById('main-screen');
-      ms.style.display = 'flex';
+      document.getElementById('main-screen').style.display = 'flex';
       const data = await res.json();
       document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
       document.getElementById('search-input').focus();
