@@ -13,9 +13,8 @@ from functools import wraps
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 
-DB_PATH       = os.environ.get("DB_PATH", "db.sqlite")
-PASSWORD      = os.environ.get("AFBRAIN_PASSWORD", "CHANGEME")
-OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")
+DB_PATH    = os.environ.get("DB_PATH", "db.sqlite")
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -31,11 +30,17 @@ def requires_auth(f):
 
 @app.route("/api/login", methods=["POST"])
 def login():
+    password = os.environ.get("AFBRAIN_PASSWORD", "CHANGEME")
     data = request.get_json()
-    if data.get("password") == PASSWORD:
+    if data.get("password") == password:
         session["authenticated"] = True
         return jsonify({"ok": True})
     return jsonify({"error": "Invalid password"}), 403
+
+
+@app.route("/api/debug-pw")
+def debug_pw():
+    return jsonify({"pw": os.environ.get("AFBRAIN_PASSWORD"), "default": "CHANGEME"})
 
 
 @app.route("/api/logout", methods=["POST"])
