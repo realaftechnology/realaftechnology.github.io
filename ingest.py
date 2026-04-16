@@ -212,6 +212,8 @@ def ingest_file(conn, filepath):
         print(f"  🔄  File changed, re-ingesting: {filename}")
         cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
         cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+        # Rebuild FTS index to remove stale entries for this episode
+        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('rebuild')")
         conn.commit()
 
     # Extract text
