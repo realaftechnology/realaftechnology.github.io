@@ -33,9 +33,10 @@ html, body {
   background: var(--bg-primary);
   color: var(--label);
   font-family: var(--sf);
-  min-height: 100vh;
+  height: 100%;
   font-size: 17px;
   line-height: 1.47;
+  overflow: hidden;
 }
 
 /* ── LOGIN ── */
@@ -43,7 +44,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  height: 100vh;
   padding: 0 24px;
 }
 .login-box { width: 100%; max-width: 340px; text-align: center; }
@@ -87,81 +88,48 @@ html, body {
 .login-btn:active { opacity: 0.8; }
 .login-error { color: var(--red); font-size: 13px; margin-top: 12px; min-height: 18px; }
 
-/* ── MAIN ── */
-#main-screen { display: none; }
-.app-wrap { max-width: 700px; margin: 0 auto; padding: 0 0 100px; }
+/* ── MAIN LAYOUT ── */
+#main-screen {
+  display: none;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
 
 /* ── HEADER ── */
 .app-header {
+  flex-shrink: 0;
   padding: 52px 20px 14px;
-  position: sticky;
-  top: 0;
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  z-index: 100;
   border-bottom: 0.5px solid var(--separator);
-}
-.header-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 .app-title {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 42px;
   line-height: 1;
   letter-spacing: -0.5px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
+.app-title:active { opacity: 0.7; }
 .app-title span { color: var(--red); }
 .ep-badge { font-size: 13px; color: var(--label-secondary); }
 .ep-badge strong { color: var(--red); font-weight: 600; }
 
-/* ── SEARCH BAR ── */
-.search-bar {
-  display: flex;
-  align-items: center;
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  padding: 0 12px;
-  gap: 8px;
-  height: 44px;
-}
-.search-icon { color: var(--label-tertiary); font-size: 15px; flex-shrink: 0; }
-.search-bar input {
+/* ── SCROLL AREA ── */
+.scroll-area {
   flex: 1;
-  background: none;
-  border: none;
-  color: var(--label);
-  font-family: var(--sf);
-  font-size: 17px;
-  outline: none;
-  -webkit-appearance: none;
-  min-width: 0;
+  overflow-y: auto;
+  padding: 20px 20px 0;
+  -webkit-overflow-scrolling: touch;
 }
-.search-bar input::placeholder { color: var(--label-tertiary); }
-.search-submit {
-  background: var(--red);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  font-size: 18px;
-  line-height: 1;
-  transition: opacity 0.15s;
-  -webkit-appearance: none;
-}
-.search-submit:active { opacity: 0.7; }
-
-/* ── CONTENT ── */
-.content { padding: 0 20px; }
+.scroll-area::-webkit-scrollbar { width: 0; }
 
 /* ── EMPTY ── */
 .empty-state { text-align: center; padding: 80px 20px; }
@@ -175,7 +143,7 @@ html, body {
   color: var(--label-secondary);
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  padding: 20px 0 8px;
+  padding: 4px 0 8px;
 }
 
 /* ── AI CARD ── */
@@ -191,7 +159,7 @@ html, body {
 .ai-body {
   font-size: 15px;
   line-height: 1.65;
-  color: var(--label-secondary);
+  color: var(--label);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -204,7 +172,7 @@ html, body {
   margin: 14px 0 6px;
 }
 .ai-body ul, .ai-body ol { padding-left: 20px; }
-.ai-body li { margin-bottom: 6px; color: var(--label-secondary); }
+.ai-body li { margin-bottom: 6px; color: var(--label); }
 .ai-body blockquote {
   border-left: 3px solid var(--red);
   padding-left: 12px;
@@ -214,6 +182,36 @@ html, body {
 }
 .ai-body p { margin-bottom: 8px; }
 .ai-body strong { color: var(--label); font-weight: 600; }
+
+/* ── VIEW TRANSCRIPTS BUTTON ── */
+.view-transcripts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 20px;
+  color: var(--label-secondary);
+  font-family: var(--sf);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  transition: background 0.15s;
+  -webkit-appearance: none;
+}
+.view-transcripts-btn:hover { background: #3a3a3c; }
+.view-transcripts-btn .chevron { font-size: 11px; transition: transform 0.2s; }
+.view-transcripts-btn.open .chevron { transform: rotate(180deg); }
+
+/* ── TRANSCRIPTS PANEL ── */
+.transcripts-panel {
+  display: none;
+  margin-bottom: 12px;
+}
+.transcripts-panel.open { display: block; }
 
 /* ── CHAT ── */
 .chat-item {
@@ -236,58 +234,15 @@ html, body {
 .chat-a-body {
   font-size: 15px;
   line-height: 1.65;
-  color: var(--label-secondary);
+  color: var(--label);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
-.chat-a-body blockquote { border-left: 3px solid var(--red); padding-left: 12px; margin: 8px 0; font-style: italic; }
+.chat-a-body blockquote { border-left: 3px solid var(--red); padding-left: 12px; margin: 8px 0; font-style: italic; color: var(--label-secondary); }
 .chat-a-body p { margin-bottom: 6px; }
 .chat-a-body strong { color: var(--label); }
 .chat-a-body ul, .chat-a-body ol { padding-left: 20px; }
 .chat-a-body li { margin-bottom: 4px; }
-
-/* ── FOLLOW-UP ── */
-.followup-bar {
-  display: flex;
-  align-items: center;
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  padding: 0 12px;
-  gap: 8px;
-  height: 44px;
-  margin-top: 8px;
-}
-.followup-bar input {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--label);
-  font-family: var(--sf);
-  font-size: 15px;
-  outline: none;
-  -webkit-appearance: none;
-  min-width: 0;
-}
-.followup-bar input::placeholder { color: var(--label-tertiary); }
-.followup-submit {
-  background: var(--fill);
-  border: none;
-  border-radius: 8px;
-  color: var(--label-secondary);
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  font-size: 16px;
-  line-height: 1;
-  transition: opacity 0.15s, background 0.15s;
-  -webkit-appearance: none;
-}
-.followup-submit:not(:disabled):hover { background: var(--red); color: #fff; }
-.followup-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── RESULT CARDS ── */
 .result-card {
@@ -341,6 +296,57 @@ html, body {
 }
 .result-text mark { background: transparent; color: var(--orange); font-weight: 500; }
 
+/* ── BOTTOM INPUT AREA ── */
+.input-area {
+  flex-shrink: 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--separator);
+}
+.input-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 22px;
+  padding: 0 6px 0 16px;
+  gap: 8px;
+  min-height: 44px;
+}
+.input-bar input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 17px;
+  outline: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  padding: 10px 0;
+}
+.input-bar input::placeholder { color: var(--label-tertiary); }
+.input-submit {
+  background: var(--red);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+  transition: opacity 0.15s;
+  -webkit-appearance: none;
+}
+.input-submit:active { opacity: 0.7; }
+.input-submit:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* ── SPINNER ── */
 .spinner {
   display: inline-block;
@@ -355,7 +361,8 @@ html, body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
 
-::-webkit-scrollbar { width: 0; }
+/* bottom padding inside scroll so content clears input bar */
+.scroll-bottom-pad { height: 20px; }
 </style>
 </head>
 <body>
@@ -373,30 +380,29 @@ html, body {
 
 <!-- MAIN -->
 <div id="main-screen">
-  <div class="app-wrap">
 
-    <div class="app-header">
-      <div class="header-top">
-        <div class="app-title"><span>AF</span>BRAIN</div>
-        <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
-      </div>
-      <div class="search-bar">
-        <span class="search-icon">&#9906;</span>
-        <input type="text" id="search-input" placeholder="Ask anything...">
-        <button class="search-submit" onclick="doSearch()">&#8593;</button>
-      </div>
-    </div>
-
-    <div class="content">
-      <div id="results-area">
-        <div class="empty-state">
-          <div class="empty-title">Search Andy's Mind</div>
-          <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
-        </div>
-      </div>
-    </div>
-
+  <div class="app-header">
+    <div class="app-title" onclick="resetApp()"><span>AF</span>BRAIN</div>
+    <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
   </div>
+
+  <div class="scroll-area" id="scroll-area">
+    <div id="results-area">
+      <div class="empty-state">
+        <div class="empty-title">Search Andy's Mind</div>
+        <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
+      </div>
+    </div>
+    <div class="scroll-bottom-pad"></div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-bar">
+      <input type="text" id="search-input" placeholder="Ask anything...">
+      <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -404,7 +410,9 @@ let currentResults = [];
 let chatHistory = [];
 let currentQuery = '';
 let analyzing = false;
+let hasResults = false;
 
+// ── LOGIN ──
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 async function doLogin() {
@@ -412,10 +420,11 @@ async function doLogin() {
   const err = document.getElementById('login-error');
   err.textContent = '';
   try {
-    const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: pw}) });
+    const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
     if (res.ok) {
       document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('main-screen').style.display = 'block';
+      const ms = document.getElementById('main-screen');
+      ms.style.display = 'flex';
       loadStats();
       document.getElementById('search-input').focus();
     } else {
@@ -434,16 +443,47 @@ async function loadStats() {
   } catch(e) {}
 }
 
-document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+// ── RESET ──
+function resetApp() {
+  currentResults = [];
+  chatHistory = [];
+  currentQuery = '';
+  analyzing = false;
+  hasResults = false;
+  document.getElementById('search-input').value = '';
+  document.getElementById('results-area').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-title">Search Andy's Mind</div>
+      <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
+    </div>`;
+  document.getElementById('search-input').focus();
+}
 
-async function doSearch() {
-  const query = document.getElementById('search-input').value.trim();
-  if (!query) return;
-  if (query !== currentQuery) { currentQuery = query; chatHistory = []; }
+// ── INPUT HANDLER ──
+document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+
+function handleSubmit() {
+  const val = document.getElementById('search-input').value.trim();
+  if (!val) return;
+  if (hasResults) {
+    doFollowup(val);
+  } else {
+    doSearch(val);
+  }
+  document.getElementById('search-input').value = '';
+}
+
+// ── SEARCH ──
+async function doSearch(query) {
+  currentQuery = query;
+  chatHistory = [];
+  hasResults = false;
+
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="spinner"></span>Searching...</div>';
+
   try {
-    const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query}) });
+    const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query}) });
     if (!res.ok) return;
     const data = await res.json();
     currentResults = data.results || [];
@@ -453,32 +493,23 @@ async function doSearch() {
   }
 }
 
+// ── RENDER ──
 function renderResults(query, results) {
   const area = document.getElementById('results-area');
   if (!results.length) {
-    area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}". Try different keywords.</div></div>`;
+    area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}".</div></div>`;
     return;
   }
 
-  let html = `<div class="section-header">AI Analysis</div>
-  <div id="ai-section">
-    <div class="ai-card">
-      <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
-    </div>
-    <div id="chat-thread"></div>
-    <div class="followup-bar">
-      <input type="text" id="followup-input" placeholder="Ask a follow-up..." onkeydown="if(event.key==='Enter')doFollowup()">
-      <button class="followup-submit" id="ask-btn" onclick="doFollowup()">&#8593;</button>
-    </div>
-  </div>`;
+  hasResults = true;
 
-  html += `<div class="section-header" style="margin-top:24px">Transcript Results <span style="font-weight:400;color:var(--label-quaternary)">(${results.length})</span></div>`;
-
+  // Build transcript cards HTML (hidden initially)
+  let transcriptHtml = '';
   results.forEach(r => {
     const epShort = r.episode_title.replace(/\.(mp3|mp4|m4a)$/i, '').substring(0, 60);
     const snippet = highlightText(r.text, query);
     const speaker = r.speaker ? `<div class="result-speaker">${r.speaker}</div>` : '';
-    html += `<div class="result-card">
+    transcriptHtml += `<div class="result-card">
       <div class="result-meta-row">
         <span class="result-ep">${epShort}</span>
         <span class="result-ts">${r.timestamp}</span>
@@ -488,10 +519,38 @@ function renderResults(query, results) {
     </div>`;
   });
 
+  let html = `<div class="section-header">AI Analysis</div>
+  <div id="ai-section">
+    <div class="ai-card">
+      <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
+    </div>
+    <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
+      View Transcripts (${results.length}) <span class="chevron">&#8964;</span>
+    </button>
+    <div class="transcripts-panel" id="transcripts-panel">
+      ${transcriptHtml}
+    </div>
+    <div id="chat-thread"></div>
+  </div>`;
+
   area.innerHTML = html;
+  scrollToBottom();
   runAnalysis(query, results);
 }
 
+function toggleTranscripts() {
+  const panel = document.getElementById('transcripts-panel');
+  const btn = document.getElementById('transcripts-toggle');
+  panel.classList.toggle('open');
+  btn.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    btn.innerHTML = `Hide Transcripts <span class="chevron" style="display:inline-block;transform:rotate(180deg)">&#8964;</span>`;
+  } else {
+    btn.innerHTML = `View Transcripts (${currentResults.length}) <span class="chevron">&#8964;</span>`;
+  }
+}
+
+// ── HIGHLIGHT ──
 function highlightText(text, query, maxChars=280) {
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   let bestPos = 0, bestScore = 0;
@@ -512,16 +571,20 @@ function highlightText(text, query, maxChars=280) {
   return snippet;
 }
 
+// ── AI ANALYSIS ──
 async function runAnalysis(query, results) {
   if (analyzing) return;
   analyzing = true;
   try {
-    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, results}) });
+    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results}) });
     const data = await res.json();
     const el = document.getElementById('ai-content');
-    if (el) el.innerHTML = data.error
-      ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
-      : marked.parse(data.analysis || '');
+    if (el) {
+      el.innerHTML = data.error
+        ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
+        : marked.parse(data.analysis || '');
+      scrollToBottom();
+    }
   } catch(e) {
     const el = document.getElementById('ai-content');
     if (el) el.innerHTML = '<span style="color:var(--label-tertiary)">Analysis unavailable.</span>';
@@ -529,41 +592,45 @@ async function runAnalysis(query, results) {
   analyzing = false;
 }
 
-async function doFollowup() {
-  const input = document.getElementById('followup-input');
-  const btn = document.getElementById('ask-btn');
-  const question = input.value.trim();
-  if (!question || btn.disabled) return;
-  btn.disabled = true;
-  input.value = '';
+// ── FOLLOW-UP ──
+async function doFollowup(question) {
   const thread = document.getElementById('chat-thread');
+  if (!thread) return;
+
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
     <div class="chat-q-label">${question}</div>
     <div class="chat-a-body"><div class="loading-row"><span class="spinner"></span>Searching...</div></div>
   </div>`;
-  document.getElementById(itemId).scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  scrollToBottom();
+
   try {
-    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
+    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
     const data = await res.json();
     const answer = data.answer || data.error || 'No response.';
     chatHistory.push({q: question, a: answer});
     const item = document.getElementById(itemId);
     if (item) item.querySelector('.chat-a-body').innerHTML = marked.parse(answer);
+    scrollToBottom();
   } catch(e) {
     const item = document.getElementById(itemId);
     if (item) item.querySelector('.chat-a-body').textContent = 'Request failed.';
   }
-  btn.disabled = false;
-  document.getElementById('followup-input').focus();
 }
 
+function scrollToBottom() {
+  const s = document.getElementById('scroll-area');
+  if (s) setTimeout(() => s.scrollTop = s.scrollHeight, 50);
+}
+
+// ── SESSION CHECK ──
 (async function() {
   try {
     const res = await fetch('/api/stats');
     if (res.ok) {
       document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('main-screen').style.display = 'block';
+      const ms = document.getElementById('main-screen');
+      ms.style.display = 'flex';
       const data = await res.json();
       document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
       document.getElementById('search-input').focus();
