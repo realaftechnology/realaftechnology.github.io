@@ -5,4 +5,4 @@ __pycache__/
 *.sqlite
 *.db
 .env
-transcripts/
+# transcripts are committed to the repo so Railway can ingest them on deploy

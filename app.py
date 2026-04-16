@@ -475,18 +475,6 @@ def followup():
 
 # ── SERVE FRONTEND ────────────────────────────────────────────────────────────
 
-@app.route("/api/upload-db", methods=["POST"])
-def upload_db():
-    """One-time endpoint to push a new db.sqlite to the Railway volume."""
-    token = request.headers.get("X-Upload-Token", "")
-    if token != os.environ.get("UPLOAD_TOKEN", ""):
-        return jsonify({"error": "unauthorized"}), 401
-    f = request.files.get("db")
-    if not f:
-        return jsonify({"error": "no file"}), 400
-    f.save(DB_PATH)
-    return jsonify({"ok": True, "path": DB_PATH})
-
 
 @app.route("/")
 def index():
