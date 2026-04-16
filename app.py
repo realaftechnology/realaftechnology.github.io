@@ -475,7 +475,13 @@ def followup():
 
     ep_in_question = extract_episode_filter(question)
     ep_in_original = extract_episode_filter(original_query)
-    ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original
+
+    # If the last AI answer mentioned a specific episode, treat it as context for follow-ups
+    ep_in_last_answer = None
+    if chat_history:
+        ep_in_last_answer = extract_episode_filter(chat_history[-1].get("a", ""))
+
+    ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original or ep_in_last_answer
 
     # Vague follow-up: no new episode introduced, and asking for another/different
     vague_followup = (
