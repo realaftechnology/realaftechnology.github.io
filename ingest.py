@@ -152,16 +152,19 @@ def chunk_segments(segments, chunk_size=CHUNK_SIZE):
     return chunks
 
 
-def get_embedding(text, retries=3):
-    """Get OpenAI embedding for a text chunk."""
-    if not OPENAI_API_KEY:
-        return None
+def get_embeddings_batch(texts, retries=3):
+    """Get OpenAI embeddings for a list of texts in a single API call."""
+    if not OPENAI_API_KEY or not texts:
+        return [None] * len(texts)
 
     import urllib.request, json as jsonlib
 
+    # Truncate each text to 8000 chars (well within token limit)
+    inputs = [t[:8000] for t in texts]
+
     payload = jsonlib.dumps({
         "model": "text-embedding-3-small",
-        "input": text[:8000]
+        "input": inputs
     }).encode()
 
     req = urllib.request.Request(
@@ -175,15 +178,17 @@ def get_embedding(text, retries=3):
 
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 data = jsonlib.loads(resp.read())
-                return data["data"][0]["embedding"]
+                # API returns results sorted by index
+                ordered = sorted(data["data"], key=lambda x: x["index"])
+                return [item["embedding"] for item in ordered]
         except Exception as e:
             if attempt < retries - 1:
                 time.sleep(2 ** attempt)
             else:
-                print(f"    ⚠️  Embedding failed: {e}")
-                return None
+                print(f"    ⚠️  Batch embedding failed: {e}")
+                return [None] * len(texts)
 
 
 def compute_hash(filepath):
@@ -239,30 +244,29 @@ def ingest_file(conn, filepath):
         (episode_id, title, filename, fhash)
     )
 
-    # Store chunks with embeddings
+    # Fetch all embeddings in one batch API call
+    if OPENAI_API_KEY:
+        print(f"    Embedding {len(chunks)} chunks in one batch call...")
+        embeddings = get_embeddings_batch([c["text"] for c in chunks])
+    else:
+        embeddings = [None] * len(chunks)
+
+    # Store chunks
     stored = 0
-    for i, chunk in enumerate(chunks):
-        # Get embedding if API key available
-        embedding = None
-        if OPENAI_API_KEY:
-            embedding = get_embedding(chunk["text"])
-            if embedding:
-                embedding = json.dumps(embedding)
+    for chunk, embedding in zip(chunks, embeddings):
+        emb_str = json.dumps(embedding) if embedding else None
 
         cur.execute("""
             INSERT INTO segments (episode_id, speaker, timestamp, start_secs, text, embedding)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (episode_id, chunk["speaker"], chunk["timestamp"],
-              chunk["start_secs"], chunk["text"], embedding))
+              chunk["start_secs"], chunk["text"], emb_str))
 
         cur.execute(
             "INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)",
             (episode_id, chunk["text"])
         )
         stored += 1
-
-        if OPENAI_API_KEY and (i + 1) % 10 == 0:
-            print(f"    ... {i+1}/{len(chunks)} chunks embedded")
 
     conn.commit()
     return stored
