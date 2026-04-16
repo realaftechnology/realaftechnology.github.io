@@ -428,6 +428,9 @@ ONLY surface what is UNIQUE to this specific episode:
 - Specific claims, opinions, arguments, stories, data points, or takes
 - Anything that would NOT appear in a generic episode
 
+EVIDENCE RULE — this is absolute:
+Every statement you make must be supported by the transcript excerpts provided. Do not infer, speculate, or fill gaps from general knowledge. If the transcripts don't contain enough to answer confidently, say so clearly and specifically — e.g. "The transcripts pulled don't cover this directly. Try searching [more specific term]." Never go silent or return an empty response.
+
 CITATION RULES — use good judgment:
 - Simple factual answers: plain prose, no blockquote needed.
 - Summaries: clean prose with bold section labels. Only blockquote when the exact wording matters.
@@ -534,7 +537,7 @@ def followup():
     for item in chat_history:
         messages.append({"role": "user", "content": item["q"]})
         messages.append({"role": "assistant", "content": item["a"]})
-    messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nUse the transcript excerpts as your evidence base. If they directly support the answer, cite them. If the context is thin but you can synthesize a reasonable answer from what\'s there, do it. If there\'s genuinely not enough to answer, say so in one sentence. Do NOT repeat any quote listed above.'})
+    messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer only from what the transcripts support. If they cover it, answer directly. If the evidence is thin or missing, say so clearly and suggest a better search term. Never return an empty response. Do NOT repeat any quote listed above.'})
 
     return Response(
         stream_with_context(anthropic_stream(
