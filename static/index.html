@@ -458,14 +458,14 @@ body {
 }
 .input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   background: var(--bg-secondary);
   border-radius: 22px;
-  padding: 0 6px 0 16px;
+  padding: 6px 6px 6px 16px;
   gap: 8px;
   min-height: 44px;
 }
-.input-bar input {
+.input-bar textarea {
   flex: 1;
   background: none;
   border: none;
@@ -475,9 +475,14 @@ body {
   outline: none;
   -webkit-appearance: none;
   min-width: 0;
-  padding: 10px 0;
+  padding: 5px 0;
+  resize: none;
+  overflow-y: hidden;
+  line-height: 1.4;
+  max-height: 160px;
+  overflow-y: auto;
 }
-.input-bar input::placeholder { color: var(--label-tertiary); }
+.input-bar textarea::placeholder { color: var(--label-tertiary); }
 .input-submit {
   background: var(--red);
   border: none;
@@ -572,7 +577,7 @@ body {
       </div>
     </div>
     <div class="input-bar">
-      <input type="text" id="search-input" placeholder="Ask anything...">
+      <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
       <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
     </div>
   </div>
@@ -750,7 +755,7 @@ function resetApp(clearLock = true, focusInput = true) {
     document.getElementById('locked-pill').style.display = 'none';
     document.getElementById('search-input').placeholder = 'Ask anything...';
   }
-  document.getElementById('search-input').value = '';
+  searchInput.value = ''; searchInput.style.height = 'auto';
   document.getElementById('results-area').innerHTML = `
     <div class="empty-state">
       <div class="empty-title">Search Andy's Mind</div>
@@ -759,12 +764,20 @@ function resetApp(clearLock = true, focusInput = true) {
   if (focusInput) document.getElementById('search-input').focus();
 }
 
-document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+const searchInput = document.getElementById('search-input');
+function autoResizeInput() {
+  searchInput.style.height = 'auto';
+  searchInput.style.height = Math.min(searchInput.scrollHeight, 160) + 'px';
+}
+searchInput.addEventListener('input', autoResizeInput);
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
+});
 
 function handleSubmit() {
   const val = document.getElementById('search-input').value.trim();
   if (!val) return;
-  document.getElementById('search-input').value = '';
+  searchInput.value = ''; searchInput.style.height = 'auto';
   if (hasResults) { doFollowup(val); } else { doSearch(val); }
 }
 
