@@ -664,8 +664,8 @@ function formatEpSubtitle(title) {
     s = s.slice(dm[0].length);
   }
   // Identify show type
-  let show = /q&af/i.test(s) ? 'Q&AF' : /cti/i.test(s) ? 'CTI' : s.replace(/[_]/g,' ').split(/\s+/).slice(0,2).join(' ');
-  return dateStr ? `${show} · ${dateStr}` : show || title;
+  let show = /q&af/i.test(s) ? 'Q&AF' : /cti/i.test(s) ? 'CTI' : '';
+  return dateStr ? (show ? `${show} · ${dateStr}` : dateStr) : show || title;
 }
 
 function renderEpisodeList(episodes) {
