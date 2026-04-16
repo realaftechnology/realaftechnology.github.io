@@ -4,7 +4,7 @@ Drop .docx files into the /transcripts folder and run this script.
 """
 
 import os, re, sys, json, sqlite3, time
-import subprocess
+from docx import Document
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 DB_PATH = os.environ.get("DB_PATH", "db.sqlite")
@@ -41,12 +41,19 @@ def init_db(conn):
 
 
 def extract_docx_text(filepath):
-    """Use extract-text to get content from docx."""
-    result = subprocess.run(
-        ["extract-text", filepath],
-        capture_output=True, text=True
-    )
-    return result.stdout
+    """Extract text from docx, preserving bold markers as **text** for the parser."""
+    doc = Document(filepath)
+    lines = []
+    for para in doc.paragraphs:
+        if not para.text.strip():
+            continue
+        line = "".join(
+            f"**{run.text}**" if run.bold else run.text
+            for run in para.runs
+        )
+        if line.strip():
+            lines.append(line)
+    return "\n".join(lines)
 
 
 def parse_timestamp(ts_str):
