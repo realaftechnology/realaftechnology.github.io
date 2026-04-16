@@ -816,7 +816,7 @@ function renderResults(query, results, autoExpand = false) {
   </div>`;
 
   area.innerHTML = html;
-  if (autoExpand) scrollToTop(); else scrollToBottom();
+  scrollToTop();
   runAnalysis(query, results, autoExpand);
 }
 
