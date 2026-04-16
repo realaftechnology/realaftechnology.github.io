@@ -690,7 +690,7 @@ function loadEpisode(epNum, title) {
   document.getElementById('locked-pill').style.display = 'block';
   document.getElementById('locked-label').textContent = `Ep ${epNum}`;
   document.getElementById('search-input').placeholder = `Search in Ep ${epNum}...`;
-  resetApp(false);
+  resetApp(false, false);
   doSearch(`episode ${epNum}`, epNum);
 }
 
@@ -699,7 +699,7 @@ function openEpisode(epNum) {
   document.getElementById('locked-pill').style.display = 'block';
   document.getElementById('locked-label').textContent = `Ep ${epNum}`;
   document.getElementById('search-input').placeholder = `Search in Ep ${epNum}...`;
-  resetApp(false);
+  resetApp(false, false);
   doSearch(`episode ${epNum}`, epNum);
 }
 
@@ -723,12 +723,12 @@ function clearLockedEpisode() {
   lockedEpisode = null;
   document.getElementById('locked-pill').style.display = 'none';
   document.getElementById('search-input').placeholder = 'Ask anything...';
-  resetApp(false);
+  resetApp(false, false);
 }
 
 // ── RESET ─────────────────────────────────────────────────────────────────────
 
-function resetApp(clearLock = true) {
+function resetApp(clearLock = true, focusInput = true) {
   currentResults = []; chatHistory = []; currentQuery = ''; analyzing = false; hasResults = false;
   if (clearLock) {
     lockedEpisode = null;
@@ -741,7 +741,7 @@ function resetApp(clearLock = true) {
       <div class="empty-title">Search Andy's Mind</div>
       <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
     </div>`;
-  document.getElementById('search-input').focus();
+  if (focusInput) document.getElementById('search-input').focus();
 }
 
 document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
