@@ -155,6 +155,21 @@ def keyword_search(query, limit=50):
     return [format_result(r, 0) for r in rows]
 
 
+def episode_search(ep_number):
+    """Return ALL chunks from a specific episode in chronological order."""
+    conn = get_db()
+    if not conn: return []
+    rows = conn.execute("""
+        SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
+               e.title AS episode_title, e.filename, 0 AS rank
+        FROM segments s JOIN episodes e ON e.id = s.episode_id
+        WHERE e.title LIKE ?
+        ORDER BY s.start_secs ASC
+    """, (f"%{ep_number}%",)).fetchall()
+    conn.close()
+    return [format_result(r, 0) for r in rows]
+
+
 def format_result(row, score):
     return {
         "episode_title": row["episode_title"],
@@ -217,7 +232,15 @@ def search_endpoint():
     if not query:
         return jsonify({"results": []})
 
-    if has_embeddings() and OPENAI_KEY:
+    # Detect episode number reference — if found, return only that episode
+    ep_match = re.search(r'\b(ep|episode)[\s_-]*(\d{3,4})\b', query, re.IGNORECASE)
+    if not ep_match:
+        ep_match = re.search(r'\b(\d{4})\b', query)
+    ep_filter = ep_match.group(2) if ep_match and len(ep_match.groups()) > 1 else (ep_match.group(1) if ep_match else None)
+
+    if ep_filter:
+        results = episode_search(ep_filter)
+    elif has_embeddings() and OPENAI_KEY:
         results = semantic_search(query, limit=100)
         if not results:
             results = keyword_search(query, limit=100)
@@ -237,14 +260,14 @@ def analyze():
         return jsonify({"error": "No OpenAI key configured"})
     data = request.get_json()
     query   = data.get("query", "")
-    results = data.get("results", [])[:20]
+    results = data.get("results", [])  # No limit — use all results passed
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in results])
     prompt = f'''You are an AI assistant with access to Andy Frisella podcast transcripts.
 
 The user asked: "{query}"
 
-Here are the most relevant transcript excerpts:
+Here are the relevant transcript excerpts:
 {context}
 
 Answer the user's question directly and specifically using only these transcripts.
@@ -257,10 +280,10 @@ Answer the user's question directly and specifically using only these transcript
 
 Be direct and specific. Answer the question they actually asked.'''
 
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.2}).encode()
+    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1500, "temperature": 0.2}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             text = json.loads(resp.read())["choices"][0]["message"]["content"]
             return jsonify({"analysis": text})
     except Exception as e:
@@ -276,7 +299,13 @@ def followup():
     question     = data.get("question", "")
     chat_history = data.get("history", [])
 
-    if has_embeddings() and OPENAI_KEY:
+    # Check for episode reference in follow-up
+    ep_match = re.search(r'\b(ep|episode)[\s_-]*(\d{3,4})\b', question, re.IGNORECASE)
+    ep_filter = ep_match.group(2) if ep_match else None
+
+    if ep_filter:
+        fu_results = episode_search(ep_filter)
+    elif has_embeddings() and OPENAI_KEY:
         fu_results = semantic_search(question, limit=20)
     else:
         fu_results = keyword_search(question, limit=20)
