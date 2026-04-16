@@ -301,6 +301,23 @@ def ai_rerank(query, candidates, top_n=20):
 
 # ── API ENDPOINTS ─────────────────────────────────────────────────────────────
 
+@app.route("/api/episodes")
+@requires_auth
+def episodes_list():
+    conn = get_db()
+    if not conn: return jsonify({"episodes": []})
+    rows = conn.execute("""
+        SELECT e.id, e.title, COUNT(s.id) as segment_count
+        FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
+        GROUP BY e.id ORDER BY e.id DESC
+    """).fetchall()
+    conn.close()
+    return jsonify({"episodes": [
+        {"id": r["id"], "title": r["title"], "segments": r["segment_count"]}
+        for r in rows
+    ]})
+
+
 @app.route("/api/stats")
 @requires_auth
 def stats():
@@ -322,8 +339,8 @@ def search_endpoint():
     if not query:
         return jsonify({"results": []})
 
-    # Detect episode number reference — if found, return only that episode
-    ep_filter = extract_episode_filter(query)
+    # Explicit episode filter from UI (sidebar) takes priority over query detection
+    ep_filter = data.get("episode_filter", "") or extract_episode_filter(query)
 
     if ep_filter:
         results = episode_search(ep_filter)
@@ -402,7 +419,7 @@ def followup():
 
     ep_in_question = extract_episode_filter(question)
     ep_in_original = extract_episode_filter(original_query)
-    ep_filter = ep_in_question or ep_in_original
+    ep_filter = data.get("episode_filter", "") or ep_in_question or ep_in_original
 
     # Vague follow-up: no new episode introduced, and asking for another/different
     vague_followup = (

@@ -92,26 +92,152 @@ html, body {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
-  position: relative;
   align-items: center;
 }
-#main-screen > * {
-  width: 100%;
-  max-width: 720px;
-}
 
-/* ── HEADER ── */
+/* ── HEADER — full bleed, inner content capped ── */
 .app-header {
+  width: 100%;
   flex-shrink: 0;
-  padding: 52px 20px 14px;
+  padding: 52px 0 14px;
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 0.5px solid var(--separator);
+}
+.header-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  color: var(--label-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.sidebar-btn:hover { color: var(--label); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  position: fixed;
+  top: 0; left: -300px;
+  width: 280px;
+  height: 100%;
+  background: #111;
+  border-right: 0.5px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  transition: left 0.25s ease;
+}
+.sidebar.open { left: 0; }
+.sidebar-head {
+  padding: 52px 16px 12px;
+  border-bottom: 0.5px solid var(--separator);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
+.sidebar-head-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sidebar-close {
+  background: none;
+  border: none;
+  color: var(--label-tertiary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+.sidebar-search {
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--separator);
+  flex-shrink: 0;
+}
+.sidebar-search input {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: 8px;
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 14px;
+  padding: 8px 10px;
+  outline: none;
+}
+.sidebar-search input::placeholder { color: var(--label-tertiary); }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.sidebar-list::-webkit-scrollbar { width: 0; }
+.ep-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 2px 8px;
+  transition: background 0.1s;
+}
+.ep-item:hover { background: var(--bg-secondary); }
+.ep-item.active { background: rgba(255,69,58,0.15); }
+.ep-item-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 2px;
+}
+.ep-item-title {
+  font-size: 12px;
+  color: var(--label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 199;
+}
+#sidebar-backdrop.visible { display: block; }
+
+/* ── LOCKED EPISODE PILL ── */
+.locked-ep-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,69,58,0.15);
+  border-radius: 20px;
+  padding: 5px 10px 5px 12px;
+  font-size: 13px;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+.locked-ep-pill button {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+}
+.locked-ep-pill button:hover { opacity: 1; }
 .app-title {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 42px;
@@ -132,6 +258,8 @@ html, body {
   overflow-y: auto;
   padding: 20px 20px 0;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 720px;
 }
 .scroll-area::-webkit-scrollbar { width: 0; }
 
@@ -292,9 +420,10 @@ html, body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
-  /* Stays above keyboard on iOS */
   position: sticky;
   bottom: 0;
+  width: 100%;
+  max-width: 720px;
 }
 .input-bar {
   display: flex;
@@ -369,9 +498,29 @@ html, body {
 <!-- MAIN -->
 <div id="main-screen">
 
+  <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-head-title">Episodes</span>
+      <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
+    </div>
+    <div class="sidebar-list" id="episode-list">
+      <div style="padding:20px;color:var(--label-tertiary);font-size:13px">Loading...</div>
+    </div>
+  </div>
+  <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
   <div class="app-header">
-    <div class="app-title" onclick="resetApp()"><span>AF</span>BRAIN</div>
-    <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
+    <div class="header-inner">
+      <button class="sidebar-btn" onclick="toggleSidebar()">
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
+      </button>
+      <div class="app-title" style="flex:1" onclick="resetApp()"><span>AF</span>BRAIN</div>
+      <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
+    </div>
   </div>
 
   <div class="scroll-area" id="scroll-area">
@@ -385,6 +534,12 @@ html, body {
   </div>
 
   <div class="input-area">
+    <div id="locked-pill" style="display:none">
+      <div class="locked-ep-pill">
+        <span id="locked-label"></span>
+        <button onclick="clearLockedEpisode()">✕</button>
+      </div>
+    </div>
     <div class="input-bar">
       <input type="text" id="search-input" placeholder="Ask anything...">
       <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
@@ -399,6 +554,8 @@ let chatHistory = [];
 let currentQuery = '';
 let analyzing = false;
 let hasResults = false;
+let lockedEpisode = null;   // episode number string when browsing a specific episode
+let allEpisodes = [];        // cached episode list for sidebar filtering
 
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
@@ -429,8 +586,83 @@ async function loadStats() {
   } catch(e) {}
 }
 
-function resetApp() {
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const opening = !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open');
+  backdrop.classList.toggle('visible');
+  if (opening) {
+    loadEpisodeList();
+    document.getElementById('sidebar-search-input').value = '';
+  }
+}
+
+async function loadEpisodeList() {
+  try {
+    const res = await fetch('/api/episodes');
+    const data = await res.json();
+    allEpisodes = data.episodes || [];
+    renderEpisodeList(allEpisodes);
+  } catch(e) {
+    document.getElementById('episode-list').innerHTML =
+      '<div style="padding:20px;color:var(--label-tertiary);font-size:13px">Failed to load.</div>';
+  }
+}
+
+function renderEpisodeList(episodes) {
+  const list = document.getElementById('episode-list');
+  if (!episodes.length) {
+    list.innerHTML = '<div style="padding:20px;color:var(--label-tertiary);font-size:13px">No episodes.</div>';
+    return;
+  }
+  list.innerHTML = episodes.map(ep => {
+    const num = ep.title.match(/(\d{3,4})/)?.[1] || '';
+    const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
+    const isActive = lockedEpisode === num;
+    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
+      <div class="ep-item-num">Ep ${num}</div>
+      <div class="ep-item-title">${clean}</div>
+    </div>`;
+  }).join('');
+}
+
+function filterEpisodes(query) {
+  const q = query.toLowerCase();
+  const filtered = q ? allEpisodes.filter(ep =>
+    ep.title.toLowerCase().includes(q)
+  ) : allEpisodes;
+  renderEpisodeList(filtered);
+}
+
+function loadEpisode(epNum, title) {
+  toggleSidebar();
+  lockedEpisode = epNum;
+  document.getElementById('locked-pill').style.display = 'block';
+  document.getElementById('locked-label').textContent = `Ep ${epNum}`;
+  document.getElementById('search-input').placeholder = `Search in Ep ${epNum}...`;
+  resetApp(false);
+  doSearch(`episode ${epNum}`, epNum);
+}
+
+function clearLockedEpisode() {
+  lockedEpisode = null;
+  document.getElementById('locked-pill').style.display = 'none';
+  document.getElementById('search-input').placeholder = 'Ask anything...';
+  resetApp(false);
+}
+
+// ── RESET ─────────────────────────────────────────────────────────────────────
+
+function resetApp(clearLock = true) {
   currentResults = []; chatHistory = []; currentQuery = ''; analyzing = false; hasResults = false;
+  if (clearLock) {
+    lockedEpisode = null;
+    document.getElementById('locked-pill').style.display = 'none';
+    document.getElementById('search-input').placeholder = 'Ask anything...';
+  }
   document.getElementById('search-input').value = '';
   document.getElementById('results-area').innerHTML = `
     <div class="empty-state">
@@ -449,22 +681,25 @@ function handleSubmit() {
   if (hasResults) { doFollowup(val); } else { doSearch(val); }
 }
 
-async function doSearch(query) {
+async function doSearch(query, episodeFilter) {
   currentQuery = query; chatHistory = []; hasResults = false;
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="spinner"></span>Searching...</div>';
   try {
-    const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query}) });
+    const body = { query };
+    const ep = episodeFilter || lockedEpisode;
+    if (ep) body.episode_filter = ep;
+    const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!res.ok) return;
     const data = await res.json();
     currentResults = data.results || [];
-    renderResults(query, currentResults);
+    renderResults(query, currentResults, !!ep);
   } catch(e) {
     area.innerHTML = '<div class="loading-row">Search failed. Try again.</div>';
   }
 }
 
-function renderResults(query, results) {
+function renderResults(query, results, autoExpand = false) {
   const area = document.getElementById('results-area');
   if (!results.length) {
     area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}".</div></div>`;
@@ -487,6 +722,9 @@ function renderResults(query, results) {
     </div>`;
   });
 
+  const panelOpen = autoExpand ? ' open' : '';
+  const btnLabel = autoExpand ? `Hide Transcripts &#8963;` : `View Transcripts (${results.length}) &#8964;`;
+
   let html = `<div class="section-header">AI Analysis</div>
   <div id="ai-section">
     <div class="ai-card">
@@ -494,9 +732,9 @@ function renderResults(query, results) {
       <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
-      View Transcripts (${results.length}) &#8964;
+      ${btnLabel}
     </button>
-    <div class="transcripts-panel" id="transcripts-panel">${transcriptHtml}</div>
+    <div class="transcripts-panel${panelOpen}" id="transcripts-panel">${transcriptHtml}</div>
     <div id="chat-thread"></div>
   </div>`;
 
@@ -566,7 +804,9 @@ async function doFollowup(question) {
   </div>`;
   scrollToBottom();
   try {
-    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question, history: chatHistory, original_query: currentQuery}) });
+    const followupBody = {question, history: chatHistory, original_query: currentQuery};
+    if (lockedEpisode) followupBody.episode_filter = lockedEpisode;
+    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(followupBody) });
     const data = await res.json();
     const answer = data.answer || data.error || 'No response.';
     chatHistory.push({q: question, a: answer});
