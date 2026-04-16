@@ -6,38 +6,26 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AFBrain</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
 :root {
-  /* Apple Dark Mode System Colors */
   --bg-primary: #000000;
   --bg-secondary: #1c1c1e;
   --bg-tertiary: #2c2c2e;
-  --bg-grouped: #000000;
-  --bg-grouped-secondary: #1c1c1e;
   --separator: rgba(84,84,88,0.65);
-  --separator-opaque: #38383a;
-
+  --red: #ff453a;
+  --orange: #ff9f0a;
   --label: #ffffff;
   --label-secondary: rgba(235,235,245,0.6);
   --label-tertiary: rgba(235,235,245,0.3);
   --label-quaternary: rgba(235,235,245,0.16);
-
-  --red: #ff453a;
-  --blue: #0a84ff;
-  --orange: #ff9f0a;
-
   --fill: rgba(120,120,128,0.36);
-  --fill-secondary: rgba(120,120,128,0.32);
-
-  --radius-sm: 10px;
   --radius: 12px;
   --radius-lg: 16px;
-  --radius-xl: 20px;
-
-  --sf: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  --sf: -apple-system, 'Helvetica Neue', sans-serif;
   --sf-mono: 'SF Mono', 'Menlo', monospace;
 }
 
@@ -57,29 +45,17 @@ html, body {
   justify-content: center;
   min-height: 100vh;
   padding: 0 24px;
-  background: var(--bg-primary);
 }
-
-.login-box {
-  width: 100%;
-  max-width: 340px;
-  text-align: center;
-}
-
+.login-box { width: 100%; max-width: 340px; text-align: center; }
 .login-logo {
-  font-size: 48px;
-  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 64px;
+  line-height: 1;
   letter-spacing: -1px;
   margin-bottom: 8px;
 }
 .login-logo span { color: var(--red); }
-.login-tagline {
-  font-size: 13px;
-  color: var(--label-secondary);
-  letter-spacing: 0.3px;
-  margin-bottom: 40px;
-}
-
+.login-tagline { font-size: 13px; color: var(--label-secondary); margin-bottom: 40px; }
 .login-field {
   background: var(--bg-secondary);
   border: none;
@@ -94,7 +70,6 @@ html, body {
   -webkit-appearance: none;
 }
 .login-field::placeholder { color: var(--label-tertiary); }
-
 .login-btn {
   width: 100%;
   height: 50px;
@@ -114,16 +89,11 @@ html, body {
 
 /* ── MAIN ── */
 #main-screen { display: none; }
-
-.app-wrap {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 0 0 100px;
-}
+.app-wrap { max-width: 700px; margin: 0 auto; padding: 0 0 100px; }
 
 /* ── HEADER ── */
 .app-header {
-  padding: 56px 20px 16px;
+  padding: 52px 20px 14px;
   position: sticky;
   top: 0;
   background: rgba(0,0,0,0.85);
@@ -132,26 +102,20 @@ html, body {
   z-index: 100;
   border-bottom: 0.5px solid var(--separator);
 }
-
 .header-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: 12px;
 }
-
 .app-title {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: 0.37px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: -0.5px;
 }
 .app-title span { color: var(--red); }
-
-.ep-badge {
-  font-size: 13px;
-  color: var(--label-secondary);
-  font-weight: 400;
-}
+.ep-badge { font-size: 13px; color: var(--label-secondary); }
 .ep-badge strong { color: var(--red); font-weight: 600; }
 
 /* ── SEARCH BAR ── */
@@ -164,13 +128,7 @@ html, body {
   gap: 8px;
   height: 44px;
 }
-
-.search-icon {
-  color: var(--label-tertiary);
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
+.search-icon { color: var(--label-tertiary); font-size: 15px; flex-shrink: 0; }
 .search-bar input {
   flex: 1;
   background: none;
@@ -180,9 +138,9 @@ html, body {
   font-size: 17px;
   outline: none;
   -webkit-appearance: none;
+  min-width: 0;
 }
 .search-bar input::placeholder { color: var(--label-tertiary); }
-
 .search-submit {
   background: var(--red);
   border: none;
@@ -195,8 +153,8 @@ html, body {
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  line-height: 1;
   transition: opacity 0.15s;
   -webkit-appearance: none;
 }
@@ -205,27 +163,10 @@ html, body {
 /* ── CONTENT ── */
 .content { padding: 0 20px; }
 
-/* ── EMPTY STATE ── */
-.empty-state {
-  text-align: center;
-  padding: 80px 20px;
-}
-.empty-icon {
-  font-size: 56px;
-  margin-bottom: 16px;
-  opacity: 0.15;
-}
-.empty-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--label-secondary);
-  margin-bottom: 8px;
-}
-.empty-sub {
-  font-size: 15px;
-  color: var(--label-tertiary);
-  line-height: 1.5;
-}
+/* ── EMPTY ── */
+.empty-state { text-align: center; padding: 80px 20px; }
+.empty-title { font-size: 20px; font-weight: 600; color: var(--label-secondary); margin-bottom: 8px; }
+.empty-sub { font-size: 15px; color: var(--label-tertiary); line-height: 1.5; }
 
 /* ── SECTION HEADER ── */
 .section-header {
@@ -243,40 +184,26 @@ html, body {
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 8px;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
-
-.ai-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.ai-badge {
-  background: var(--red);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-}
-
 .ai-body {
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--label-secondary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .ai-body h3 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--label-tertiary);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   margin: 14px 0 6px;
 }
-.ai-body ul { padding-left: 18px; }
+.ai-body ul, .ai-body ol { padding-left: 20px; }
 .ai-body li { margin-bottom: 6px; color: var(--label-secondary); }
 .ai-body blockquote {
   border-left: 3px solid var(--red);
@@ -288,12 +215,15 @@ html, body {
 .ai-body p { margin-bottom: 8px; }
 .ai-body strong { color: var(--label); font-weight: 600; }
 
-/* ── CHAT THREAD ── */
+/* ── CHAT ── */
 .chat-item {
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin-top: 8px;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .chat-q-label {
   font-size: 12px;
@@ -305,14 +235,18 @@ html, body {
 }
 .chat-a-body {
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--label-secondary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .chat-a-body blockquote { border-left: 3px solid var(--red); padding-left: 12px; margin: 8px 0; font-style: italic; }
 .chat-a-body p { margin-bottom: 6px; }
 .chat-a-body strong { color: var(--label); }
+.chat-a-body ul, .chat-a-body ol { padding-left: 20px; }
+.chat-a-body li { margin-bottom: 4px; }
 
-/* ── FOLLOW-UP BAR ── */
+/* ── FOLLOW-UP ── */
 .followup-bar {
   display: flex;
   align-items: center;
@@ -332,6 +266,7 @@ html, body {
   font-size: 15px;
   outline: none;
   -webkit-appearance: none;
+  min-width: 0;
 }
 .followup-bar input::placeholder { color: var(--label-tertiary); }
 .followup-submit {
@@ -346,7 +281,8 @@ html, body {
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1;
   transition: opacity 0.15s, background 0.15s;
   -webkit-appearance: none;
 }
@@ -354,25 +290,25 @@ html, body {
 .followup-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── RESULT CARDS ── */
-.results-list { margin-top: 0; }
-
 .result-card {
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin-bottom: 8px;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
-
 .result-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
   gap: 8px;
+  flex-wrap: wrap;
 }
-
 .result-ep {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--label-tertiary);
   flex: 1;
@@ -381,37 +317,34 @@ html, body {
   text-overflow: ellipsis;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  min-width: 0;
 }
-
 .result-ts {
   font-family: var(--sf-mono);
   font-size: 12px;
   color: var(--red);
   flex-shrink: 0;
 }
-
 .result-speaker {
   font-size: 11px;
   color: var(--label-quaternary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  margin-bottom: 6px;
 }
-
 .result-text {
   font-size: 15px;
   line-height: 1.55;
   color: var(--label-secondary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
-.result-text mark {
-  background: transparent;
-  color: var(--orange);
-  font-weight: 500;
-}
+.result-text mark { background: transparent; color: var(--orange); font-weight: 500; }
 
 /* ── SPINNER ── */
 .spinner {
   display: inline-block;
-  width: 16px; height: 16px;
+  width: 14px; height: 14px;
   border: 2px solid var(--fill);
   border-top-color: var(--red);
   border-radius: 50%;
@@ -420,21 +353,7 @@ html, body {
   margin-right: 8px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-.loading-row {
-  display: flex;
-  align-items: center;
-  padding: 16px 0;
-  font-size: 14px;
-  color: var(--label-tertiary);
-}
-
-/* ── RESULT COUNT ── */
-.result-count {
-  font-size: 13px;
-  color: var(--label-tertiary);
-  padding: 8px 0 4px;
-}
+.loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
 
 ::-webkit-scrollbar { width: 0; }
 </style>
@@ -462,7 +381,7 @@ html, body {
         <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
       </div>
       <div class="search-bar">
-        <span class="search-icon">&#x1F50D;</span>
+        <span class="search-icon">&#9906;</span>
         <input type="text" id="search-input" placeholder="Ask anything...">
         <button class="search-submit" onclick="doSearch()">&#8593;</button>
       </div>
@@ -471,7 +390,6 @@ html, body {
     <div class="content">
       <div id="results-area">
         <div class="empty-state">
-          <div class="empty-icon">&#x1F9E0;</div>
           <div class="empty-title">Search Andy's Mind</div>
           <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
         </div>
@@ -522,10 +440,8 @@ async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
   if (query !== currentQuery) { currentQuery = query; chatHistory = []; }
-
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="spinner"></span>Searching...</div>';
-
   try {
     const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query}) });
     if (!res.ok) return;
@@ -540,14 +456,11 @@ async function doSearch() {
 function renderResults(query, results) {
   const area = document.getElementById('results-area');
   if (!results.length) {
-    area.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x1F50D;</div><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}". Try different keywords.</div></div>`;
+    area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}". Try different keywords.</div></div>`;
     return;
   }
 
-  let html = '';
-
-  // AI section
-  html += `<div class="section-header">AI Analysis</div>
+  let html = `<div class="section-header">AI Analysis</div>
   <div id="ai-section">
     <div class="ai-card">
       <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
@@ -559,23 +472,21 @@ function renderResults(query, results) {
     </div>
   </div>`;
 
-  // Results
   html += `<div class="section-header" style="margin-top:24px">Transcript Results <span style="font-weight:400;color:var(--label-quaternary)">(${results.length})</span></div>`;
-  html += `<div class="results-list">`;
+
   results.forEach(r => {
     const epShort = r.episode_title.replace(/\.(mp3|mp4|m4a)$/i, '').substring(0, 60);
     const snippet = highlightText(r.text, query);
-    const speaker = r.speaker ? `<span class="result-speaker">${r.speaker}</span>` : '';
+    const speaker = r.speaker ? `<div class="result-speaker">${r.speaker}</div>` : '';
     html += `<div class="result-card">
       <div class="result-meta-row">
         <span class="result-ep">${epShort}</span>
         <span class="result-ts">${r.timestamp}</span>
       </div>
-      ${speaker ? `<div style="margin-bottom:6px">${speaker}</div>` : ''}
+      ${speaker}
       <div class="result-text">${snippet}</div>
     </div>`;
   });
-  html += `</div>`;
 
   area.innerHTML = html;
   runAnalysis(query, results);
@@ -625,15 +536,13 @@ async function doFollowup() {
   if (!question || btn.disabled) return;
   btn.disabled = true;
   input.value = '';
-
   const thread = document.getElementById('chat-thread');
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
-    <div class="chat-q-label">&#8617; ${question}</div>
+    <div class="chat-q-label">${question}</div>
     <div class="chat-a-body"><div class="loading-row"><span class="spinner"></span>Searching...</div></div>
   </div>`;
   document.getElementById(itemId).scrollIntoView({behavior: 'smooth', block: 'nearest'});
-
   try {
     const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
     const data = await res.json();
@@ -645,7 +554,6 @@ async function doFollowup() {
     const item = document.getElementById(itemId);
     if (item) item.querySelector('.chat-a-body').textContent = 'Request failed.';
   }
-
   btn.disabled = false;
   document.getElementById('followup-input').focus();
 }
