@@ -315,15 +315,21 @@ def followup():
     chat_history   = data.get("history", [])
     original_query = data.get("original_query", "")
 
-    # Try episode filter from current question first, then fall back to original query
-    ep_filter = extract_episode_filter(question) or extract_episode_filter(original_query)
+    ep_in_question = extract_episode_filter(question)
+    ep_in_original = extract_episode_filter(original_query)
+    ep_filter = ep_in_question or ep_in_original
 
-    # For vague follow-ups ("give me another", "different one"), search using original query
-    vague_followup = any(w in question.lower() for w in ['another', 'different', 'other', 'more', 'else', 'new one'])
-    search_query = (original_query or question) if vague_followup else question
+    # Vague follow-up: no new episode introduced, and asking for another/different
+    vague_followup = (
+        (not ep_in_question or ep_in_question == ep_in_original) and
+        any(w in question.lower() for w in ['another', 'different', 'more', 'else', 'new one'])
+    )
+
+    # New episode in question ("what about 1016?"): use original query's topic for relevance
+    topic_query = original_query if (ep_in_question and ep_in_question != ep_in_original and original_query) else question
+    search_query = (original_query or question) if vague_followup else topic_query
 
     if ep_filter and has_embeddings() and OPENAI_KEY:
-        # Semantic search scoped to the episode — avoids flooding context with all chunks
         fu_results = semantic_search(search_query, limit=25, episode_filter=ep_filter)
         if not fu_results:
             fu_results = episode_search(ep_filter)[:25]
@@ -336,11 +342,11 @@ def followup():
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
-    # Build an explicit blocklist from previous AI answers so the model can't repeat them
+    # Only inject blocklist for vague "give me another" requests — not when switching topics/episodes
     already_shown = ""
-    if chat_history:
+    if chat_history and vague_followup:
         prev = "\n\n".join([f"- {item['a']}" for item in chat_history])
-        already_shown = f"\n\nQUOTES ALREADY GIVEN IN THIS CONVERSATION — DO NOT REPEAT ANY OF THESE:\n{prev}"
+        already_shown = f"\n\nQUOTES ALREADY GIVEN — DO NOT REPEAT ANY OF THESE:\n{prev}"
 
     system_prompt = (
         "You answer questions about Andy Frisella's podcasts using only the transcript excerpts provided. "
