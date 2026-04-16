@@ -932,7 +932,7 @@ async function runAnalysis(query, results) {
     await consumeStream(res,
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
-        el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No response.</span>';
+        el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No answer — try rephrasing or adding more context.</span>';
         if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
@@ -962,7 +962,7 @@ async function doFollowup(question) {
     await consumeStream(res,
       (text) => { body.innerHTML = marked.parse(text); scrollToBottom(); },
       (text) => {
-        body.innerHTML = marked.parse(text || 'No response.');
+        body.innerHTML = marked.parse(text || 'No answer — try rephrasing or adding more context.');
         if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); }
         scrollToBottom();
       },

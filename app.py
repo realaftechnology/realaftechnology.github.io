@@ -534,7 +534,7 @@ def followup():
     for item in chat_history:
         messages.append({"role": "user", "content": item["q"]})
         messages.append({"role": "assistant", "content": item["a"]})
-    messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer using ONLY the episode and timestamp shown in the transcript labels. Do NOT repeat any quote listed above.'})
+    messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nUse the transcript excerpts as your evidence base. If they directly support the answer, cite them. If the context is thin but you can synthesize a reasonable answer from what\'s there, do it. If there\'s genuinely not enough to answer, say so in one sentence. Do NOT repeat any quote listed above.'})
 
     return Response(
         stream_with_context(anthropic_stream(
