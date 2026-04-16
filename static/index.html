@@ -36,6 +36,7 @@ html, body {
   color: var(--label);
   font-family: var(--sf);
   height: 100%;
+  overflow: hidden;
   font-size: 17px;
   line-height: 1.47;
 }
@@ -92,8 +93,8 @@ html, body {
 #main-screen {
   display: none;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
   align-items: center;
 }
 
@@ -101,7 +102,7 @@ html, body {
 .app-header {
   width: 100%;
   flex-shrink: 0;
-  padding: 52px 0 14px;
+  padding: calc(env(safe-area-inset-top) + 14px) 0 14px;
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -144,7 +145,7 @@ html, body {
 }
 .sidebar.open { left: 0; }
 .sidebar-head {
-  padding: 52px 16px 12px;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
   border-bottom: 0.5px solid var(--separator);
   display: flex;
   align-items: center;
@@ -442,10 +443,11 @@ html, body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
-  position: sticky;
-  bottom: 0;
   width: 100%;
   max-width: 720px;
+  /* keyboard offset applied via JS */
+  margin-bottom: var(--kb-offset, 0px);
+  transition: margin-bottom 0.1s;
 }
 .input-bar {
   display: flex;
@@ -881,10 +883,18 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Handle iOS keyboard — scroll area resizes naturally with dvh
-// Prevent body scroll so only scroll-area scrolls
+// Keep input above iOS keyboard using visualViewport API
+if (window.visualViewport) {
+  const onViewport = () => {
+    const kbOffset = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
+    document.documentElement.style.setProperty('--kb-offset', kbOffset + 'px');
+  };
+  window.visualViewport.addEventListener('resize', onViewport);
+  window.visualViewport.addEventListener('scroll', onViewport);
+}
+// Prevent body scroll — only scroll-area should scroll
 document.body.addEventListener('touchmove', function(e) {
-  if (!e.target.closest('.scroll-area')) e.preventDefault();
+  if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
 }, { passive: false });
 
 (async function() {
