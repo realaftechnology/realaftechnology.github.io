@@ -13,8 +13,9 @@ from functools import wraps
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 
-DB_PATH    = os.environ.get("DB_PATH", "db.sqlite")
-OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
+DB_PATH       = os.environ.get("DB_PATH", "db.sqlite")
+OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "") # used for all AI text generation
 
 YOUTUBE_TITLE_KNOWLEDGE = """
 YOUTUBE TITLE GENERATION EXPERTISE:
@@ -249,19 +250,44 @@ def sort_by_episode(results):
     return sorted(results, key=ep_num, reverse=True)
 
 
+def anthropic_call(system, messages, model, max_tokens, temperature=0.3):
+    """Call the Anthropic Messages API. Returns response text or raises on error."""
+    payload = json.dumps({
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "system": system,
+        "messages": messages,
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": ANTHROPIC_KEY,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+    )
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        return json.loads(resp.read())["content"][0]["text"]
+
+
 def ai_rerank(query, candidates, top_n=20):
-    if not OPENAI_KEY or not candidates: return candidates[:top_n]
+    if not ANTHROPIC_KEY or not candidates: return candidates[:top_n]
     context = ""
     for i, c in enumerate(candidates[:30]):
         context += f"[{i}] {c['episode_title']} | {c['timestamp']}\n{c['text'][:200]}\n\n"
-    prompt = f'Search: "{query}"\n\nCandidates:\n{context}\nReturn a JSON array of the {top_n} most relevant indices, ordered by relevance. Only the array, nothing else.'
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 0}).encode()
-    req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
+    user_msg = f'Search: "{query}"\n\nCandidates:\n{context}\nReturn a JSON array of the {top_n} most relevant indices, ordered by relevance. Only the array, nothing else.'
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            text = json.loads(resp.read())["choices"][0]["message"]["content"].strip()
-            indices = json.loads(text)
-            return [candidates[i] for i in indices if i < len(candidates)]
+        text = anthropic_call(
+            system="You are a search relevance ranker. Return only a valid JSON array of integers. No explanation.",
+            messages=[{"role": "user", "content": user_msg}],
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            temperature=0,
+        )
+        indices = json.loads(text.strip())
+        return [candidates[i] for i in indices if i < len(candidates)]
     except:
         return candidates[:top_n]
 
@@ -276,6 +302,7 @@ def stats():
         "segments": get_segment_count(),
         "has_embeddings": has_embeddings(),
         "has_openai": bool(OPENAI_KEY),
+        "has_claude": bool(ANTHROPIC_KEY),
         "mode": "semantic" if (has_embeddings() and OPENAI_KEY) else "keyword"
     })
 
@@ -297,7 +324,7 @@ def search_endpoint():
         results = semantic_search(query, limit=100)
         if not results:
             results = keyword_search(query, limit=100)
-        if OPENAI_KEY:
+        if ANTHROPIC_KEY:
             results = ai_rerank(query, results, top_n=50)
     else:
         results = keyword_search(query, limit=100)
@@ -309,38 +336,39 @@ def search_endpoint():
 @app.route("/api/analyze", methods=["POST"])
 @requires_auth
 def analyze():
-    if not OPENAI_KEY:
-        return jsonify({"error": "No OpenAI key configured"})
-    data = request.get_json()
+    if not ANTHROPIC_KEY:
+        return jsonify({"error": "No Anthropic API key configured"})
+    data    = request.get_json()
     query   = data.get("query", "")
-    results = data.get("results", [])  # No limit — use all results passed
+    results = data.get("results", [])
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in results])
-    prompt = f'''You are an AI assistant with access to Andy Frisella podcast transcripts.
+
+    system = f"""You are an AI assistant with access to Andy Frisella podcast transcripts.
 {YOUTUBE_TITLE_KNOWLEDGE}
-The user asked: "{query}"
+Answer questions directly and specifically using only the provided transcripts.
 
-Here are the relevant transcript excerpts:
-{context}
-
-Answer the user's question directly and specifically using only these transcripts.
-
-- If they ask what happened in a specific episode or segment, summarize it clearly
-- If they ask Andy to tell a story, piece together the narrative from all mentions across episodes
-- If they ask for specific content (headline 3, prediction, story), find and summarize it
-- If they ask for YouTube titles, follow the YOUTUBE TITLE GENERATION EXPERTISE above exactly
-- Always cite the episode and timestamp for each key point
+- Summarize episodes or segments clearly when asked
+- Piece together stories or narratives from all relevant mentions across episodes
+- Find and summarize specific content (predictions, stories, frameworks, quotes)
+- If asked for YouTube titles, follow the YOUTUBE TITLE GENERATION EXPERTISE above exactly
+- Always cite episode and timestamp for each key point
 - When quoting directly from a transcript, format the quoted text in **bold**
-- If the transcripts don't contain enough information to answer, say so clearly
+- If the transcripts don't contain enough information, say so clearly
 
-Be direct and specific. Answer the question they actually asked.'''
+Be direct and specific. Answer exactly what was asked."""
 
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 2000, "temperature": 0.4}).encode()
-    req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
+    user_msg = f'The user asked: "{query}"\n\nTranscript excerpts:\n{context}'
+
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            text = json.loads(resp.read())["choices"][0]["message"]["content"]
-            return jsonify({"analysis": text})
+        text = anthropic_call(
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
+            model="claude-sonnet-4-6",
+            max_tokens=2000,
+            temperature=0.4,
+        )
+        return jsonify({"analysis": text})
     except Exception as e:
         return jsonify({"error": str(e)})
 
@@ -357,8 +385,8 @@ def extract_episode_filter(text):
 @app.route("/api/followup", methods=["POST"])
 @requires_auth
 def followup():
-    if not OPENAI_KEY:
-        return jsonify({"error": "No OpenAI key configured"})
+    if not ANTHROPIC_KEY:
+        return jsonify({"error": "No Anthropic API key configured"})
     data           = request.get_json()
     question       = data.get("question", "")
     chat_history   = data.get("history", [])
@@ -397,6 +425,8 @@ def followup():
     else:
         fu_results = keyword_search(search_query, limit=20)
 
+    # Note: semantic search still uses OpenAI embeddings; only text generation uses Claude
+
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
 
     # Only inject blocklist for vague "give me another" requests — not when switching topics/episodes
@@ -415,18 +445,21 @@ def followup():
         + YOUTUBE_TITLE_KNOWLEDGE
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = []
     for item in chat_history:
         messages.append({"role": "user", "content": item["q"]})
         messages.append({"role": "assistant", "content": item["a"]})
     messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer using ONLY the episode and timestamp shown in the transcript labels. Do NOT repeat any quote listed above.'})
 
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": messages, "max_tokens": 1500, "temperature": 0.4}).encode()
-    req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            text = json.loads(resp.read())["choices"][0]["message"]["content"]
-            return jsonify({"answer": text})
+        text = anthropic_call(
+            system=system_prompt,
+            messages=messages,
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            temperature=0.4,
+        )
+        return jsonify({"answer": text})
     except Exception as e:
         return jsonify({"error": str(e)})
 
