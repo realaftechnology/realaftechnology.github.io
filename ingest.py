@@ -210,7 +210,7 @@ def ingest_file(conn, filepath):
         "SELECT id, file_hash FROM episodes WHERE id = ?", (episode_id,)
     ).fetchone()
     if existing:
-        if existing["file_hash"] == fhash:
+        if existing[1] == fhash:  # existing[1] = file_hash column
             print(f"  ⏭️  Unchanged, skipping: {filename}")
             return 0
         # File changed — wipe and re-ingest
