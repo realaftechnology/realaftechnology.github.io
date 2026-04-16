@@ -16,6 +16,46 @@ app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 DB_PATH    = os.environ.get("DB_PATH", "db.sqlite")
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 
+YOUTUBE_TITLE_KNOWLEDGE = """
+YOUTUBE TITLE GENERATION EXPERTISE:
+
+When asked to generate YouTube titles, apply the following framework:
+
+STEP 1 — IDENTIFY HIGH-VALUE MOMENTS
+Scan the transcript for these high-click-potential content types:
+- Counterintuitive truths ("most people believe X, but actually Y")
+- Hard personal stories or failures Andy shares
+- Controversial or polarizing opinions he states directly
+- Specific tactical advice that challenges conventional wisdom
+- Emotional peaks: anger, vulnerability, passion, certainty
+- Named frameworks, concepts, or rules Andy introduces
+- Any moment where Andy says what others won't
+
+STEP 2 — APPLY TITLE PRINCIPLES
+Structure: Front-load the strongest word or concept. Put the hook in the first 4 words.
+Length: 60 characters ideal, 70 max. Every word must earn its place.
+Voice: Match Andy's tone — direct, no-BS, zero corporate speak, anti-victim, pro-accountability.
+Audience: Ambitious people (entrepreneurs, builders, high-achievers) who want real talk, not motivation fluff.
+Avoid: Vague words (things, stuff, this), weak hedges (might, could, maybe), generic phrases (life-changing, amazing).
+
+STEP 3 — TITLE FORMULAS (use the best fit for the content)
+Brutal truth:     "The Brutal Truth About [Common Belief]"
+Counterintuitive: "Why [Conventional Wisdom] Is Keeping You Poor/Weak/Stuck"
+Direct statement: "[Strong Claim]. Here's Why."
+Failure reframe:  "I Was Wrong About [Topic] For [X] Years"
+Challenge:        "Stop [Comfortable Behavior]. Start [Hard Thing]."
+Hard question:    "Are You Actually [Positive Identity] Or Just Pretending?"
+Specific result:  "How to [Specific Outcome] When [Obstacle/Context]"
+Named concept:    "The [Andy's Framework Name]: Why Most People Never [Goal]"
+Pattern break:    "[Everyone Says X]. I'm Telling You It's Wrong."
+Status threat:    "The #1 Reason [Target Audience] Never [Desired Outcome]"
+
+STEP 4 — OUTPUT FORMAT
+Generate 8–10 title options. Group them by style (e.g., Brutal Truth, Challenge, Counterintuitive).
+After the titles, note the 2–3 BEST options with a one-line reason why they'll perform.
+Titles must be based only on what is actually in the transcript — no fabricating topics.
+"""
+
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
@@ -269,7 +309,7 @@ def analyze():
 
     context = "\n\n---\n\n".join([f"[{r['episode_title']} @ {r['timestamp']}]\n{r['text']}" for r in results])
     prompt = f'''You are an AI assistant with access to Andy Frisella podcast transcripts.
-
+{YOUTUBE_TITLE_KNOWLEDGE}
 The user asked: "{query}"
 
 Here are the relevant transcript excerpts:
@@ -280,13 +320,14 @@ Answer the user's question directly and specifically using only these transcript
 - If they ask what happened in a specific episode or segment, summarize it clearly
 - If they ask Andy to tell a story, piece together the narrative from all mentions across episodes
 - If they ask for specific content (headline 3, prediction, story), find and summarize it
+- If they ask for YouTube titles, follow the YOUTUBE TITLE GENERATION EXPERTISE above exactly
 - Always cite the episode and timestamp for each key point
 - When quoting directly from a transcript, format the quoted text in **bold**
 - If the transcripts don't contain enough information to answer, say so clearly
 
 Be direct and specific. Answer the question they actually asked.'''
 
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1500, "temperature": 0.2}).encode()
+    payload = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": 2000, "temperature": 0.4}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -354,7 +395,8 @@ def followup():
         "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
         "If the user asks for a different quote, you MUST choose one with a DIFFERENT timestamp than any quote already shown. "
         "When quoting directly from a transcript, format the quoted text in **bold**. "
-        "If nothing new is available, say so directly."
+        "If nothing new is available, say so directly.\n\n"
+        + YOUTUBE_TITLE_KNOWLEDGE
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -363,7 +405,7 @@ def followup():
         messages.append({"role": "assistant", "content": item["a"]})
     messages.append({"role": "user", "content": f'Question: "{question}"{already_shown}\n\nTranscripts:\n{context}\n\nAnswer using ONLY the episode and timestamp shown in the transcript labels. Do NOT repeat any quote listed above.'})
 
-    payload = json.dumps({"model": "gpt-4o-mini", "messages": messages, "max_tokens": 600, "temperature": 0.2}).encode()
+    payload = json.dumps({"model": "gpt-4o-mini", "messages": messages, "max_tokens": 1500, "temperature": 0.4}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=payload, headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
