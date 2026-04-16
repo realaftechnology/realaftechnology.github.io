@@ -54,6 +54,8 @@ body {
   justify-content: center;
   height: 100vh;
   padding: 0 24px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 .login-box { width: 100%; max-width: 340px; text-align: center; }
 .login-logo {
@@ -102,6 +104,8 @@ body {
   position: fixed;
   inset: 0;
   align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 /* ── HEADER — full bleed, inner content capped ── */
@@ -593,8 +597,14 @@ async function doLogin() {
   try {
     const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
     if (res.ok) {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('main-screen').style.display = 'flex';
+      const login = document.getElementById('login-screen');
+      const main  = document.getElementById('main-screen');
+      login.style.opacity = '0';
+      setTimeout(() => {
+        login.style.display = 'none';
+        main.style.display = 'flex';
+        requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
+      }, 200);
       loadStats();
       document.getElementById('search-input').focus();
     } else {
@@ -854,35 +864,47 @@ function highlightText(text, query, maxChars=280) {
 async function consumeStream(res, onChunk, onDone, onError) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let sseBuffer = '';
   let fullText = '';
-  let rafPending = false;
-  const scheduleRender = () => {
-    if (!rafPending) {
-      rafPending = true;
-      requestAnimationFrame(() => { onChunk(fullText); rafPending = false; });
+  let displayedLen = 0;
+  let streamDone = false;
+
+  const tick = () => {
+    if (displayedLen < fullText.length) {
+      const behind = fullText.length - displayedLen;
+      const speed = behind > 60 ? Math.ceil(behind / 10) : 3;
+      displayedLen = Math.min(displayedLen + speed, fullText.length);
+      onChunk(fullText.slice(0, displayedLen));
+    }
+    if (!streamDone || displayedLen < fullText.length) {
+      requestAnimationFrame(tick);
+    } else {
+      onDone(fullText);
     }
   };
+  requestAnimationFrame(tick);
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop();
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6);
-        if (raw === '[DONE]') { onDone(fullText); return; }
+        if (raw === '[DONE]') { streamDone = true; return; }
         try {
           const parsed = JSON.parse(raw);
-          if (parsed.error) { onError(parsed.error); return; }
-          if (parsed.text) { fullText += parsed.text; scheduleRender(); }
+          if (parsed.error) { streamDone = true; onError(parsed.error); return; }
+          if (parsed.text) fullText += parsed.text;
         } catch {}
       }
     }
-    onDone(fullText);
+    streamDone = true;
   } catch(e) {
+    streamDone = true;
     onError(e.message);
   }
 }
@@ -968,13 +990,21 @@ document.body.addEventListener('touchmove', function(e) {
   try {
     const res = await fetch('/api/stats');
     if (res.ok) {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('main-screen').style.display = 'flex';
       const data = await res.json();
+      const login = document.getElementById('login-screen');
+      const main  = document.getElementById('main-screen');
+      login.style.display = 'none';
+      main.style.display = 'flex';
+      requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
       document.getElementById('search-input').focus();
+    } else {
+      const login = document.getElementById('login-screen');
+      login.style.opacity = '1';
     }
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('login-screen').style.opacity = '1';
+  }
 })();
 </script>
 </body>
