@@ -372,14 +372,13 @@ def analyze():
 {YOUTUBE_TITLE_KNOWLEDGE}
 Answer questions directly and specifically using only the provided transcripts.
 
-- Summarize episodes or segments clearly when asked
-- Piece together stories or narratives from all relevant mentions across episodes
-- Find and summarize specific content (predictions, stories, frameworks, quotes)
-- If asked for YouTube titles, follow the YOUTUBE TITLE GENERATION EXPERTISE above exactly
-- When quoting directly, use a blockquote and put the citation inline after: > "Quote text" — Ep 1014, 00:10:55
-- Do NOT put citations on a separate line and do NOT use horizontal rules (---) between sections
-- Use plain bold for section labels, not headers
-- Keep formatting minimal and clean
+CITATION RULES — use good judgment:
+- Simple factual answers (which episode, who was on, when): answer in plain prose. No blockquote needed.
+- Summaries of what was discussed: write in clean prose with bold section labels. Only use a blockquote when you are quoting a specific line verbatim and the exact wording matters.
+- When a blockquote IS warranted: > "Quote text" — Ep 1014, 00:10:55 (citation inline, not on a separate line)
+- Do NOT cite every single sentence. Cite sparingly — only when a direct quote adds real value.
+- Do NOT use horizontal rules (---). Use plain bold for section labels, not headers.
+- Keep formatting clean and minimal.
 
 Be direct and specific. Answer exactly what was asked."""
 
@@ -464,9 +463,13 @@ def followup():
         "You answer questions about Andy Frisella's podcasts using only the transcript excerpts provided. "
         "CRITICAL: Each excerpt is labeled [Episode Title @ Timestamp]. "
         "You MUST use exactly that label when citing — never attribute a quote to a different episode than what is shown in its label. "
-        "If the user asks for a different quote, you MUST choose one with a DIFFERENT timestamp than any quote already shown. "
-        "When quoting, use a blockquote with the citation inline: > \"Quote\" — Ep 1014, 00:10:55. "
-        "Do NOT put citations on a separate line. Do NOT use horizontal rules. Use plain bold for labels, not headers. "
+        "CITATION RULES — use good judgment: "
+        "Simple factual answers need no blockquote — plain prose is cleaner. "
+        "Summaries should use clean prose with bold section labels; only blockquote when the exact wording of a specific line matters. "
+        "When a blockquote IS warranted: > \"Quote\" — Ep 1014, 00:10:55 (citation inline, not on a separate line). "
+        "Do NOT cite every sentence. Cite sparingly. "
+        "Do NOT use horizontal rules. Use plain bold for labels, not headers. "
+        "If the user asks for a different quote, choose one with a DIFFERENT timestamp than any already shown. "
         "If nothing new is available, say so directly.\n\n"
         + YOUTUBE_TITLE_KNOWLEDGE
     )

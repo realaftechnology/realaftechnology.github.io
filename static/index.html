@@ -379,6 +379,26 @@ html, body {
 .chat-a-body ul, .chat-a-body ol { padding-left: 20px; }
 .chat-a-body li { margin-bottom: 4px; }
 
+/* ── VIEW EPISODE BUTTON ── */
+.view-ep-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 20px;
+  color: var(--label-secondary);
+  font-family: var(--sf);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-appearance: none;
+}
+.view-ep-btn:hover { background: #3a3a3c; }
+.ep-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
 /* ── RESULT CARDS ── */
 .result-card {
   background: var(--bg-secondary);
@@ -649,6 +669,31 @@ function loadEpisode(epNum, title) {
   doSearch(`episode ${epNum}`, epNum);
 }
 
+function openEpisode(epNum) {
+  lockedEpisode = epNum;
+  document.getElementById('locked-pill').style.display = 'block';
+  document.getElementById('locked-label').textContent = `Ep ${epNum}`;
+  document.getElementById('search-input').placeholder = `Search in Ep ${epNum}...`;
+  resetApp(false);
+  doSearch(`episode ${epNum}`, epNum);
+}
+
+function addEpisodeButtons(container, text) {
+  const matches = [...text.matchAll(/\bEp\s+(\d{3,4})\b/g)];
+  const nums = [...new Set(matches.map(m => m[1]))];
+  if (!nums.length) return;
+  const row = document.createElement('div');
+  row.className = 'ep-btn-row';
+  nums.forEach(num => {
+    const btn = document.createElement('button');
+    btn.className = 'view-ep-btn';
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4L7.5 6L4.5 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> View Ep ${num}`;
+    btn.onclick = () => openEpisode(num);
+    row.appendChild(btn);
+  });
+  container.appendChild(row);
+}
+
 function clearLockedEpisode() {
   lockedEpisode = null;
   document.getElementById('locked-pill').style.display = 'none';
@@ -788,7 +833,10 @@ async function runAnalysis(query, results, stayAtTop = false) {
         ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
         : marked.parse(data.analysis || '');
       if (!stayAtTop) scrollToBottom();
-      if (data.analysis) chatHistory.push({q: query, a: data.analysis});
+      if (data.analysis) {
+        chatHistory.push({q: query, a: data.analysis});
+        addEpisodeButtons(el.parentElement, data.analysis);
+      }
     }
   } catch(e) {
     const el = document.getElementById('ai-content');
@@ -814,7 +862,9 @@ async function doFollowup(question) {
     const answer = data.answer || data.error || 'No response.';
     chatHistory.push({q: question, a: answer});
     const item = document.getElementById(itemId);
-    if (item) item.querySelector('.chat-a-body').innerHTML = marked.parse(answer);
+    const body = item.querySelector('.chat-a-body');
+    body.innerHTML = marked.parse(answer);
+    addEpisodeButtons(item, answer);
     scrollToBottom();
   } catch(e) {
     const item = document.getElementById(itemId);
