@@ -788,6 +788,7 @@ async function runAnalysis(query, results, stayAtTop = false) {
         ? `<span style="color:var(--label-tertiary)">${data.error}</span>`
         : marked.parse(data.analysis || '');
       if (!stayAtTop) scrollToBottom();
+      if (data.analysis) chatHistory.push({q: query, a: data.analysis});
     }
   } catch(e) {
     const el = document.getElementById('ai-content');
