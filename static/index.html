@@ -8,162 +8,52 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  --bg: #080808;
-  --bg2: #0d0d0d;
-  --bg3: #111;
-  --border: #1e1e1e;
-  --border2: #2a2a2a;
-  --red: #ff3c00;
-  --red2: #ff6b35;
-  --text: #e0e0e0;
-  --text2: #888;
-  --text3: #555;
-  --text4: #333;
+  --bg: #080808; --bg2: #0d0d0d; --bg3: #111;
+  --border: #1e1e1e; --border2: #2a2a2a;
+  --red: #ff3c00; --red2: #ff6b35;
+  --text: #e0e0e0; --text2: #888; --text3: #555; --text4: #333;
 }
-
-html, body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
-  font-size: 15px;
-}
-
+html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 15px; }
 .wrap { max-width: 960px; margin: 0 auto; padding: 0 2rem 6rem; }
 
-/* ── LOGIN ── */
-#login-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-}
-.login-box {
-  width: 340px;
-  text-align: center;
-}
+/* LOGIN */
+#login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-box { width: 340px; text-align: center; }
 .login-logo { font-family: 'Bebas Neue', sans-serif; font-size: 52px; line-height: 1; margin-bottom: 2rem; }
 .login-logo span { color: var(--red); }
-.login-box input {
-  width: 100%;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 2px;
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  padding: 0 16px;
-  height: 48px;
-  outline: none;
-  margin-bottom: 10px;
-  transition: border-color 0.2s;
-}
+.login-box input { width: 100%; background: var(--bg2); border: 1px solid var(--border2); border-radius: 2px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; padding: 0 16px; height: 48px; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
 .login-box input:focus { border-color: var(--red); }
 .login-box input::placeholder { color: var(--text4); }
-.login-btn {
-  width: 100%;
-  height: 48px;
-  background: var(--red);
-  border: none;
-  border-radius: 2px;
-  color: #fff;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s;
-}
+.login-btn { width: 100%; height: 48px; background: var(--red); border: none; border-radius: 2px; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; transition: background 0.15s; }
 .login-btn:hover { background: #e03500; }
 .login-error { color: var(--red); font-size: 12px; margin-top: 10px; min-height: 18px; }
 
-/* ── MAIN ── */
+/* MAIN */
 #main-screen { display: none; }
 
-/* ── HEADER ── */
-header {
-  padding: 2.5rem 0 2rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 2rem;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-}
+/* HEADER */
+header { padding: 2.5rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; display: flex; align-items: flex-end; justify-content: space-between; }
 .logo { font-family: 'Bebas Neue', sans-serif; font-size: 54px; line-height: 1; letter-spacing: -1px; }
 .logo span { color: var(--red); }
 .tagline { font-size: 10px; color: var(--text3); letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
 .stat-num { font-family: 'DM Mono', monospace; font-size: 20px; color: var(--red); font-weight: 500; text-align: right; }
 .stat-label { font-size: 10px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; text-align: right; }
 
-/* ── SEARCH ROW ── */
-.search-row {
-  display: flex;
-  height: 50px;
-  gap: 0;
-  margin-bottom: 0;
-}
-.search-row input {
-  flex: 1;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-right: none;
-  border-radius: 2px 0 0 2px;
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  padding: 0 18px;
-  height: 50px;
-  outline: none;
-  transition: border-color 0.2s;
-}
+/* SEARCH ROW */
+.search-row { display: flex; height: 50px; gap: 0; margin-bottom: 0; }
+.search-row input { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-right: none; border-radius: 2px 0 0 2px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; padding: 0 18px; height: 50px; outline: none; transition: border-color 0.2s; }
 .search-row input:focus { border-color: var(--red); }
 .search-row input::placeholder { color: var(--text4); }
-.summary-btn {
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 0 2px 2px 0;
-  color: var(--text3);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 0 24px;
-  height: 50px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
-}
-.summary-btn:hover { color: var(--text); border-color: var(--border2); }
-.summary-btn.active { color: var(--red); border-color: var(--red); }
+.submit-btn { background: var(--red); border: 1px solid var(--red); border-radius: 0 2px 2px 0; color: #fff; font-size: 22px; width: 54px; height: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+.submit-btn:hover { background: #e03500; }
 
-/* ── RESULT META ── */
-.result-meta {
-  font-size: 10px;
-  color: var(--text3);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  padding: 1.2rem 0 0.8rem;
-  border-top: 1px solid var(--border);
-  margin-top: 1rem;
-}
+/* RESULT META */
+.result-meta { font-size: 10px; color: var(--text3); letter-spacing: 3px; text-transform: uppercase; padding: 1.2rem 0 0.8rem; border-top: 1px solid var(--border); margin-top: 1rem; }
 
-/* ── AI SECTION ── */
-.ai-section {
-  padding: 1.5rem 0 1rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
-}
-.ai-label {
-  font-size: 10px;
-  color: var(--red);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  margin-bottom: 1rem;
-}
+/* AI SECTION */
+.ai-section { padding: 1.5rem 0 0; }
+.ai-label { font-size: 10px; color: var(--red); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 1rem; }
 .ai-content { font-size: 14px; line-height: 1.8; color: #ccc; }
 .ai-content h3 { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 1.2rem 0 0.6rem; font-family: 'DM Sans', sans-serif; font-weight: 500; }
 .ai-content ul { padding-left: 1.2rem; }
@@ -171,7 +61,7 @@ header {
 .ai-content blockquote { border-left: 2px solid var(--red); padding-left: 1rem; margin: 0.8rem 0; color: var(--text2); font-style: italic; }
 .ai-content p { margin-bottom: 0.6rem; }
 
-/* ── CHAT THREAD ── */
+/* CHAT */
 .chat-item { padding: 1rem 0; border-top: 1px solid var(--border); }
 .chat-q { font-size: 10px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem; }
 .chat-a { font-size: 14px; line-height: 1.8; color: #ccc; }
@@ -179,125 +69,35 @@ header {
 .chat-a blockquote { border-left: 2px solid var(--red); padding-left: 1rem; margin: 0.6rem 0; color: var(--text2); font-style: italic; }
 .chat-a p { margin-bottom: 0.5rem; }
 
-/* ── FOLLOW-UP INPUT ── */
-.followup-row {
-  display: flex;
-  height: 44px;
-  gap: 0;
-  margin-top: 1.2rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1.2rem;
-}
-.followup-row input {
-  flex: 1;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-right: none;
-  border-radius: 2px 0 0 2px;
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  padding: 0 16px;
-  height: 44px;
-  outline: none;
-  transition: border-color 0.2s;
-}
+/* FOLLOW-UP */
+.followup-row { display: flex; height: 44px; gap: 0; margin-top: 1.2rem; border-top: 1px solid var(--border); padding-top: 1.2rem; }
+.followup-row input { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-right: none; border-radius: 2px 0 0 2px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 0 16px; height: 44px; outline: none; transition: border-color 0.2s; }
 .followup-row input:focus { border-color: var(--red); }
 .followup-row input::placeholder { color: var(--text4); }
-.ask-btn {
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 0 2px 2px 0;
-  color: var(--text3);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 0 20px;
-  height: 44px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.15s;
-}
-.ask-btn:hover { color: var(--text); }
+.ask-btn { background: var(--bg3); border: 1px solid var(--border2); border-radius: 0 2px 2px 0; color: var(--text3); font-size: 20px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
+.ask-btn:hover { color: var(--text); background: #161616; }
 .ask-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── RESULT CARDS ── */
-.af-card {
-  border-top: 1px solid var(--border);
-  padding: 1.4rem 0 1.2rem;
-}
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.card-ep {
-  font-size: 10px;
-  color: var(--text3);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-ts {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: var(--red);
-  white-space: nowrap;
-}
-.card-speaker {
-  font-size: 10px;
-  color: var(--text3);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-.card-quote {
-  font-size: 15px;
-  line-height: 1.9;
-  color: var(--text);
-  font-weight: 300;
-}
-.card-quote mark {
-  background: transparent;
-  color: var(--red2);
-  font-style: italic;
-}
+/* DIVIDER */
+.section-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0 0.5rem; }
+.results-label { font-size: 10px; color: var(--text3); letter-spacing: 3px; text-transform: uppercase; padding-bottom: 0.5rem; }
 
-/* ── EMPTY STATE ── */
-.empty {
-  text-align: center;
-  padding: 6rem 0;
-}
-.empty-word {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 32px;
-  color: #1e1e1e;
-  letter-spacing: 4px;
-  margin-bottom: 1rem;
-}
-.empty-hints {
-  font-size: 11px;
-  color: #1a1a1a;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
+/* CARDS */
+.af-card { border-top: 1px solid var(--border); padding: 1.4rem 0 1.2rem; }
+.card-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.card-ep { font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-ts { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--red); white-space: nowrap; }
+.card-speaker { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+.card-quote { font-size: 15px; line-height: 1.9; color: var(--text); font-weight: 300; }
+.card-quote mark { background: transparent; color: var(--red2); font-style: italic; }
 
-/* ── LOADING ── */
-.spinner {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid var(--border2);
-  border-top-color: var(--red);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  vertical-align: middle;
-  margin-right: 6px;
-}
+/* EMPTY */
+.empty { text-align: center; padding: 6rem 0; }
+.empty-word { font-family: 'Bebas Neue', sans-serif; font-size: 32px; color: #1e1e1e; letter-spacing: 4px; margin-bottom: 1rem; }
+.empty-hints { font-size: 11px; color: #1a1a1a; letter-spacing: 2px; text-transform: uppercase; }
+
+/* SPINNER */
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--red); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-msg { font-size: 11px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; padding: 1rem 0; }
 
@@ -308,7 +108,6 @@ header {
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo"><span>AF</span>BRAIN</div>
@@ -318,10 +117,8 @@ header {
   </div>
 </div>
 
-<!-- MAIN APP -->
 <div id="main-screen">
   <div class="wrap">
-
     <header>
       <div>
         <div class="logo"><span>AF</span>BRAIN</div>
@@ -334,8 +131,8 @@ header {
     </header>
 
     <div class="search-row">
-      <input type="text" id="search-input" placeholder="Search by concept, topic, quote, or question..." autofocus>
-      <button class="summary-btn" id="summary-btn" onclick="toggleSummary()">Summary</button>
+      <input type="text" id="search-input" placeholder="Ask anything about Andy's content..." autofocus>
+      <button class="submit-btn" onclick="doSearch()">&#8594;</button>
     </div>
 
     <div id="results-area">
@@ -344,33 +141,23 @@ header {
         <div class="empty-hints">discipline &nbsp;·&nbsp; failure &nbsp;·&nbsp; winning &nbsp;·&nbsp; building teams &nbsp;·&nbsp; mental toughness</div>
       </div>
     </div>
-
   </div>
 </div>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────────────────
-let showSummary = false;
 let currentResults = [];
 let chatHistory = [];
 let currentQuery = '';
 let analyzing = false;
 
-// ── LOGIN ──────────────────────────────────────────────────────────────────
-document.getElementById('pw-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
+document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 async function doLogin() {
   const pw = document.getElementById('pw-input').value;
   const err = document.getElementById('login-error');
   err.textContent = '';
   try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({password: pw})
-    });
+    const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: pw}) });
     if (res.ok) {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-screen').style.display = 'block';
@@ -380,12 +167,9 @@ async function doLogin() {
       err.textContent = 'Incorrect password.';
       document.getElementById('pw-input').value = '';
     }
-  } catch(e) {
-    err.textContent = 'Connection error.';
-  }
+  } catch(e) { err.textContent = 'Connection error.'; }
 }
 
-// ── STATS ──────────────────────────────────────────────────────────────────
 async function loadStats() {
   try {
     const res = await fetch('/api/stats');
@@ -396,30 +180,17 @@ async function loadStats() {
   } catch(e) {}
 }
 
-// ── SEARCH ─────────────────────────────────────────────────────────────────
-document.getElementById('search-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
-});
+document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
 async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
-
-  if (query !== currentQuery) {
-    currentQuery = query;
-    chatHistory = [];
-  }
-
+  if (query !== currentQuery) { currentQuery = query; chatHistory = []; }
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-msg"><span class="spinner"></span>Searching...</div>';
-
   try {
-    const res = await fetch('/api/search', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query})
-    });
-    if (res.status === 401) { showLogin(); return; }
+    const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query}) });
+    if (res.status === 401) return;
     const data = await res.json();
     currentResults = data.results || [];
     renderResults(query, currentResults);
@@ -428,10 +199,8 @@ async function doSearch() {
   }
 }
 
-// ── RENDER RESULTS ─────────────────────────────────────────────────────────
 function renderResults(query, results) {
   const area = document.getElementById('results-area');
-
   if (!results.length) {
     area.innerHTML = `<div class="result-meta">NO RESULTS FOR "${query.toUpperCase()}"</div>`;
     return;
@@ -439,20 +208,19 @@ function renderResults(query, results) {
 
   let html = `<div class="result-meta">${results.length} RESULTS &nbsp;·&nbsp; ${query.toUpperCase()}</div>`;
 
-  // AI section placeholder
-  if (showSummary) {
-    html += `<div id="ai-section" class="ai-section">
-      <div class="ai-label">AI Analysis</div>
-      <div id="ai-content" class="ai-content"><div class="loading-msg"><span class="spinner"></span>Analyzing...</div></div>
-      <div id="chat-thread"></div>
-      <div class="followup-row">
-        <input type="text" id="followup-input" placeholder="Ask a follow-up..." onkeydown="if(event.key==='Enter')doFollowup()">
-        <button class="ask-btn" id="ask-btn" onclick="doFollowup()">Ask</button>
-      </div>
-    </div>`;
-  }
+  // AI section always first
+  html += `<div id="ai-section" class="ai-section">
+    <div class="ai-label">AI Analysis</div>
+    <div id="ai-content" class="ai-content"><div class="loading-msg"><span class="spinner"></span>Analyzing...</div></div>
+    <div id="chat-thread"></div>
+    <div class="followup-row">
+      <input type="text" id="followup-input" placeholder="Ask a follow-up..." onkeydown="if(event.key==='Enter')doFollowup()">
+      <button class="ask-btn" id="ask-btn" onclick="doFollowup()">&#8594;</button>
+    </div>
+  </div>`;
 
-  // Cards
+  // Raw results below
+  html += `<hr class="section-divider"><div class="results-label">Transcript Results</div>`;
   results.forEach(r => {
     const epShort = r.episode_title.replace(/\.(mp3|mp4|m4a)$/i, '').substring(0, 55);
     const snippet = highlightText(r.text, query);
@@ -468,29 +236,22 @@ function renderResults(query, results) {
   });
 
   area.innerHTML = html;
-
-  // Trigger AI analysis
-  if (showSummary) {
-    runAnalysis(query, results);
-  }
+  runAnalysis(query, results);
 }
 
-// ── HIGHLIGHT ──────────────────────────────────────────────────────────────
 function highlightText(text, query, maxChars=260) {
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   let bestPos = 0, bestScore = 0;
   const tLower = text.toLowerCase();
   for (let i = 0; i < Math.max(1, text.length - 50); i += 15) {
-    const window = tLower.substring(i, i + 200);
-    const score = words.filter(w => window.includes(w)).length;
+    const w = tLower.substring(i, i + 200);
+    const score = words.filter(w2 => w.includes(w2)).length;
     if (score > bestScore) { bestScore = score; bestPos = i; }
   }
   const start = Math.max(0, bestPos - 30);
   const end = Math.min(text.length, start + maxChars);
   let snippet = (start > 0 ? '…' : '') + text.substring(start, end) + (end < text.length ? '…' : '');
-  // Escape HTML
   snippet = snippet.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  // Highlight
   words.forEach(word => {
     const re = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     snippet = snippet.replace(re, m => `<mark>${m}</mark>`);
@@ -498,51 +259,37 @@ function highlightText(text, query, maxChars=260) {
   return snippet;
 }
 
-// ── AI ANALYSIS ────────────────────────────────────────────────────────────
 async function runAnalysis(query, results) {
   if (analyzing) return;
   analyzing = true;
   try {
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query, results: results.slice(0, 20)})
-    });
+    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, results}) });
     const data = await res.json();
     const el = document.getElementById('ai-content');
-    if (el) el.innerHTML = data.error ? `<span style="color:#666">${data.error}</span>` : marked.parse(data.analysis || '');
+    if (el) el.innerHTML = data.error ? `<span style="color:var(--text3)">${data.error}</span>` : marked.parse(data.analysis || '');
   } catch(e) {
     const el = document.getElementById('ai-content');
-    if (el) el.innerHTML = '<span style="color:#666">Analysis failed.</span>';
+    if (el) el.innerHTML = '<span style="color:var(--text3)">Analysis failed.</span>';
   }
   analyzing = false;
 }
 
-// ── FOLLOW-UP ──────────────────────────────────────────────────────────────
 async function doFollowup() {
   const input = document.getElementById('followup-input');
   const btn = document.getElementById('ask-btn');
   const question = input.value.trim();
   if (!question || btn.disabled) return;
-
   btn.disabled = true;
   input.value = '';
-
-  // Add to thread immediately
   const thread = document.getElementById('chat-thread');
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
-    <div class="chat-q">↳ ${question}</div>
+    <div class="chat-q">&#8617; ${question}</div>
     <div class="chat-a"><div class="loading-msg"><span class="spinner"></span>Searching transcripts...</div></div>
   </div>`;
   thread.scrollIntoView({behavior: 'smooth', block: 'end'});
-
   try {
-    const res = await fetch('/api/followup', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({question, history: chatHistory})
-    });
+    const res = await fetch('/api/followup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question, history: chatHistory}) });
     const data = await res.json();
     const answer = data.answer || data.error || 'No response.';
     chatHistory.push({q: question, a: answer});
@@ -552,24 +299,10 @@ async function doFollowup() {
     const item = document.getElementById(itemId);
     if (item) item.querySelector('.chat-a').textContent = 'Request failed.';
   }
-
   btn.disabled = false;
   document.getElementById('followup-input').focus();
 }
 
-// ── SUMMARY TOGGLE ─────────────────────────────────────────────────────────
-function toggleSummary() {
-  showSummary = !showSummary;
-  const btn = document.getElementById('summary-btn');
-  btn.classList.toggle('active', showSummary);
-  // Re-render if we have results
-  if (currentQuery && currentResults.length) {
-    chatHistory = [];
-    renderResults(currentQuery, currentResults);
-  }
-}
-
-// ── CHECK SESSION ON LOAD ──────────────────────────────────────────────────
 (async function() {
   try {
     const res = await fetch('/api/stats');
