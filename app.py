@@ -23,37 +23,45 @@ When asked to generate YouTube titles, apply the following framework:
 
 STEP 1 — IDENTIFY HIGH-VALUE MOMENTS
 Scan the transcript for these high-click-potential content types:
-- Counterintuitive truths ("most people believe X, but actually Y")
-- Hard personal stories or failures Andy shares
-- Controversial or polarizing opinions he states directly
-- Specific tactical advice that challenges conventional wisdom
-- Emotional peaks: anger, vulnerability, passion, certainty
-- Named frameworks, concepts, or rules Andy introduces
-- Any moment where Andy says what others won't
+- Counterintuitive truths: Andy says something that flips a common belief
+- Hard personal stories: failure, loss, conflict, turning points
+- Polarizing opinions: things he says that will make some people uncomfortable
+- Specific tactical advice that challenges what most people do
+- Named frameworks, rules, or concepts Andy introduces
+- Emotional peaks: raw anger, vulnerability, certainty, urgency
+- Any moment where Andy says what other people in the space won't say
 
-STEP 2 — APPLY TITLE PRINCIPLES
-Structure: Front-load the strongest word or concept. Put the hook in the first 4 words.
-Length: 60 characters ideal, 70 max. Every word must earn its place.
-Voice: Match Andy's tone — direct, no-BS, zero corporate speak, anti-victim, pro-accountability.
-Audience: Ambitious people (entrepreneurs, builders, high-achievers) who want real talk, not motivation fluff.
-Avoid: Vague words (things, stuff, this), weak hedges (might, could, maybe), generic phrases (life-changing, amazing).
+STEP 2 — TITLE PRINCIPLES
+Structure: Front-load the hook. The first 3–4 words decide if anyone reads the rest.
+Length: 50–65 characters ideal. Cut every word that doesn't earn its place.
+Voice: Andy's tone is direct, blunt, anti-excuse, pro-accountability. Zero corporate speak.
+Audience: Entrepreneurs, builders, people who want brutal honesty — not cheerleading.
 
-STEP 3 — TITLE FORMULAS (use the best fit for the content)
-Brutal truth:     "The Brutal Truth About [Common Belief]"
-Counterintuitive: "Why [Conventional Wisdom] Is Keeping You Poor/Weak/Stuck"
-Direct statement: "[Strong Claim]. Here's Why."
-Failure reframe:  "I Was Wrong About [Topic] For [X] Years"
-Challenge:        "Stop [Comfortable Behavior]. Start [Hard Thing]."
-Hard question:    "Are You Actually [Positive Identity] Or Just Pretending?"
-Specific result:  "How to [Specific Outcome] When [Obstacle/Context]"
-Named concept:    "The [Andy's Framework Name]: Why Most People Never [Goal]"
-Pattern break:    "[Everyone Says X]. I'm Telling You It's Wrong."
-Status threat:    "The #1 Reason [Target Audience] Never [Desired Outcome]"
+FORMATTING RULES — THESE ARE HARD RULES:
+- NO exclamation points. They signal desperation and reduce perceived credibility.
+- NO all-caps words. Use sentence case or title case only.
+- NO generic hype words: game-changer, amazing, incredible, life-changing, powerful.
+- NO vague words: things, stuff, this, it.
+- Use present tense — creates immediacy.
+- Use "you" or implied second person — makes it personal.
+- Specificity always beats vagueness. Name the exact topic, belief, or mistake.
+
+STEP 3 — TITLE FORMULAS (pick the best fit for the content)
+Tension/stakes:      "The Mistake That Almost [Serious Consequence]"
+Blunt reframe:       "[Positive-Sounding Thing] Is Actually Holding You Back"
+Direct challenge:    "You're Not [Positive Identity]. You're [Uncomfortable Truth]."
+Counterintuitive:    "Why [Common Advice] Keeps Most People [Stuck/Broke/Weak]"
+Uncomfortable truth: "Nobody Talks About [Uncomfortable Side of Topic]"
+Specific experience: "What [X Years / Specific Event] Taught Me About [Topic]"
+Named concept:       "The [Andy's Term]: Why [Most People] Never [Goal]"
+Hard question:       "Are You Building [Thing] or Just Telling Yourself You Are"
+Stated truth:        "[Contrarian Claim]. Here's the Proof."
+Pattern break:       "I Was [Common Belief] For [X] Years. I Was Wrong."
 
 STEP 4 — OUTPUT FORMAT
-Generate 8–10 title options. Group them by style (e.g., Brutal Truth, Challenge, Counterintuitive).
-After the titles, note the 2–3 BEST options with a one-line reason why they'll perform.
-Titles must be based only on what is actually in the transcript — no fabricating topics.
+Generate 8–10 title options. Group by style (e.g., Tension, Reframe, Direct Challenge).
+After the list, call out the 2–3 BEST picks with one sentence on why each will perform.
+Every title must be grounded in what is actually in the transcript — no fabricated topics.
 """
 
 
@@ -366,9 +374,17 @@ def followup():
         any(w in question.lower() for w in ['another', 'different', 'more', 'else', 'new one'])
     )
 
-    # New episode in question ("what about 1016?"): use original query's topic for relevance
-    topic_query = original_query if (ep_in_question and ep_in_question != ep_in_original and original_query) else question
-    search_query = (original_query or question) if vague_followup else topic_query
+    if vague_followup:
+        # "Give me another" — search original topic in same episode
+        search_query = original_query or question
+    elif ep_in_question and ep_in_question != ep_in_original and original_query:
+        # New episode introduced ("what about 1016?") — use original topic in new episode
+        search_query = original_query
+    elif original_query:
+        # Clarifying/pushback follow-up — combine original topic + new specifics for best coverage
+        search_query = f"{original_query} {question}"
+    else:
+        search_query = question
 
     if ep_filter and has_embeddings() and OPENAI_KEY:
         fu_results = semantic_search(search_query, limit=25, episode_filter=ep_filter)
