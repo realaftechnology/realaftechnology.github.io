@@ -1051,12 +1051,34 @@ def _list_gdrive_folder(url):
     folder_id = m.group(1)
     errors = []
 
-    # ── Attempt 1: gdown skip_download (gdown ≥5.x proper API) ──────────────
-    # download_folder(skip_download=True) returns List[GoogleDriveFileToDownload]
-    # namedtuples with fields (id, path, local_path) — no files are written to disk.
+    # ── Attempt 1: direct HTTP fetch + HTML parse ────────────────────────────
+    try:
+        folder_html_url = f"https://drive.google.com/drive/folders/{folder_id}"
+        req = urllib.request.Request(
+            folder_html_url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+        result = _parse_drive_html(html)
+        if result:
+            return result
+        errors.append("HTTP scrape: folder page loaded but no video files found in HTML")
+    except Exception as e:
+        errors.append(f"HTTP scrape: {e}")
+
+    # ── Attempt 2: gdown skip_download (no remaining_ok — removed in 5.x) ───
     try:
         import gdown as _gdown
-        files = _gdown.download_folder(url, skip_download=True, quiet=True, remaining_ok=True)
+        files = _gdown.download_folder(url, skip_download=True, quiet=True)
         if files is not None:
             result = []
             for f in files:
@@ -1067,72 +1089,14 @@ def _list_gdrive_folder(url):
                     result.append({"id": str(fid), "name": name})
             if result:
                 return result
-            if files:
-                errors.append(
-                    f"gdown skip_download: found {len(files)} file(s) but none matched "
-                    f"video extensions {_VIDEO_EXTS}"
-                )
-            else:
-                errors.append("gdown skip_download: folder appears empty")
+            errors.append(
+                f"gdown skip_download: found {len(files)} file(s) but none matched video extensions"
+                if files else "gdown skip_download: folder appears empty"
+            )
         else:
             errors.append("gdown skip_download: returned None — folder may be private or rate-limited")
-    except TypeError as e:
-        # skip_download not available in this gdown build — fall through
-        errors.append(f"gdown skip_download not supported by installed version: {e}")
     except Exception as e:
         errors.append(f"gdown skip_download: {e}")
-
-    # ── Attempt 2: monkey-patch gdown's per-file download function ───────────
-    # gdown/download_folder.py imports `download` at module level; replacing it
-    # temporarily lets us capture file IDs/names without downloading anything.
-    try:
-        import gdown as _gdown2
-        import gdown.download_folder as _gdf
-
-        if hasattr(_gdf, "download"):
-            _orig_dl = _gdf.download
-            _found = []
-
-            def _mock_dl(url=None, output=None, **kwargs):
-                _url = url or kwargs.get("url", "")
-                fid = re.search(r'[?&]id=([a-zA-Z0-9_-]{25,})', _url or "")
-                fid = fid.group(1) if fid else None
-                fname = os.path.basename(output) if output else None
-                if fid and fname:
-                    _found.append({"id": fid, "name": fname})
-                if output:
-                    try:
-                        os.makedirs(
-                            os.path.dirname(os.path.abspath(output)), exist_ok=True
-                        )
-                        open(output, "wb").close()
-                    except Exception:
-                        pass
-                return output
-
-            _gdf.download = _mock_dl
-            _tmp = os.path.join(tempfile.gettempdir(), f"gd_list_{folder_id}")
-            try:
-                _gdown2.download_folder(url, output=_tmp, quiet=True, remaining_ok=True)
-            except Exception as e:
-                errors.append(f"gdown intercept download_folder: {e}")
-            finally:
-                _gdf.download = _orig_dl
-                shutil.rmtree(_tmp, ignore_errors=True)
-
-            result = [f for f in _found if f["name"].lower().endswith(_VIDEO_EXTS)]
-            if result:
-                return result
-            if _found:
-                errors.append(
-                    f"gdown intercept: found {len(_found)} file(s) but none matched video extensions"
-                )
-            else:
-                errors.append("gdown intercept: no files captured — gdown may have errored silently")
-        else:
-            errors.append("gdown.download_folder has no 'download' attribute in this build")
-    except Exception as e:
-        errors.append(f"gdown intercept: {e}")
 
     raise RuntimeError(
         "Could not list folder contents — all methods failed.\n"
@@ -1151,40 +1115,50 @@ def _parse_drive_html(html):
     result = []
 
     def _add(fid, fname):
+        fname = fname.strip()
         key = (fid, fname)
         if key not in seen and fname.lower().endswith(_VIDEO_EXTS):
             seen.add(key)
             result.append({"id": fid, "name": fname})
 
     fid_re = r'[a-zA-Z0-9_-]{25,}'
-    ext_re = r'[^"\'\\]{1,200}\.[a-zA-Z0-9]{2,4}'
+    # filename: at least one char, a dot, 2-5 char extension, no quotes/backslashes
+    fname_re = r'[^"\'\\]{1,200}\.[a-zA-Z0-9]{2,5}'
 
     # Pattern A: ["FILE_ID","FILENAME",...] — array literal in data blob
-    for fid, fname in re.findall(
-        rf'\["({fid_re})",\s*"({ext_re})"', html
-    ):
+    for fid, fname in re.findall(rf'\["({fid_re})",\s*"({fname_re})"', html):
         _add(fid, fname)
 
     # Pattern B: "id":"FILE_ID","name":"FILENAME" — JSON object keys
     for fid, fname in re.findall(
-        rf'"id"\s*:\s*"({fid_re})"[^}}]{{0,200}}"name"\s*:\s*"({ext_re})"',
-        html,
+        rf'"id"\s*:\s*"({fid_re})"[^}}]{{0,200}}"name"\s*:\s*"({fname_re})"', html
     ):
         _add(fid, fname)
 
     # Pattern C: data-id="FILE_ID" title="FILENAME" — HTML attributes
     for fid, fname in re.findall(
-        rf'data-id="({fid_re})"[^>]{{0,200}}title="({ext_re})"',
-        html,
+        rf'data-id="({fid_re})"[^>]{{0,200}}title="({fname_re})"', html
     ):
         _add(fid, fname)
 
     # Pattern D: reversed — name before id in JSON
     for fname, fid in re.findall(
-        rf'"name"\s*:\s*"({ext_re})"[^}}]{{0,200}}"id"\s*:\s*"({fid_re})"',
-        html,
+        rf'"name"\s*:\s*"({fname_re})"[^}}]{{0,200}}"id"\s*:\s*"({fid_re})"', html
     ):
         _add(fid, fname)
+
+    # Pattern E: Google's JS data arrays — ["ID",["mimeType",...],["NAME",...]]
+    for fid, fname in re.findall(
+        rf'"({fid_re})"[^]{{0,300}}"([^"\'\\]{{1,200}}\.[a-zA-Z0-9]{{2,5}})"', html
+    ):
+        _add(fid, fname)
+
+    # Pattern F: plain filename near an ID anywhere on the same line
+    for line in html.splitlines():
+        fids = re.findall(rf'\b({fid_re})\b', line)
+        fnames = re.findall(rf'([^\s"\'<>\\]{{1,120}}\.[a-zA-Z0-9]{{2,5}})', line)
+        if len(fids) == 1 and len(fnames) == 1:
+            _add(fids[0], fnames[0])
 
     return result
 
