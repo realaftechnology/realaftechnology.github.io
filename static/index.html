@@ -2575,39 +2575,38 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keyboard handling: ONLY the input bar moves — nothing else shifts.
-// .input-area is position:fixed and lives outside #main-screen entirely.
-// When the keyboard opens, translateY it up by the keyboard height.
+// Keyboard: only the input bar moves, nothing else.
 //
-// Key formula: kh = innerHeight - vv.height  (NOT minus offsetTop).
-// iOS scrolls the visual viewport up by ~keyboard height when an input
-// is focused, making offsetTop ≈ keyboard height. Subtracting it made
-// kh ≈ 0, so no transform was applied — the bar stayed under the keyboard.
+// #main-screen is pinned to an explicit px height = window.innerHeight.
+// This is the layout viewport height and never changes when the keyboard
+// opens, so the flex layout inside never reflows or shifts.
 //
-// We also call window.scrollTo(0,0) on the scroll event to reset the
-// iOS visual viewport scroll that makes the rest of the screen appear
-// to jump upward.
-const _inputArea = document.getElementById('input-area');
+// .input-area lives outside #main-screen (position:fixed, bottom:0).
+// On visualViewport resize we translateY it up by the keyboard height.
+//
+// NO scroll listener, NO window.scrollTo reset — those were causing a
+// second resize event that zeroed out the transform (bar behind keyboard)
+// and then the bar double-shifted when the user scrolled.
+const _mainScreen = document.getElementById('main-screen');
+const _inputArea  = document.getElementById('input-area');
+
+function _pinHeight() {
+  _mainScreen.style.height = window.innerHeight + 'px';
+}
+_pinHeight();
+// Re-pin on real resize (device rotation etc.) — keyboard open/close
+// does NOT change window.innerHeight so this won't thrash during typing.
+window.addEventListener('resize', _pinHeight, { passive: true });
+
 if (window.visualViewport) {
   let _kbRaf = null;
-  const _syncKeyboard = () => {
-    if (_kbRaf) return;
+  window.visualViewport.addEventListener('resize', () => {
+    if (_kbRaf) cancelAnimationFrame(_kbRaf);
     _kbRaf = requestAnimationFrame(() => {
       _kbRaf = null;
-      // True keyboard height — do NOT subtract offsetTop here
       const kh = window.innerHeight - window.visualViewport.height;
       _inputArea.style.transform = kh > 50 ? `translateY(${-kh}px)` : '';
     });
-  };
-  const _resetScroll = () => {
-    // iOS scrolls the visual viewport when an input is focused;
-    // this resets it so the rest of the layout doesn't appear to jump.
-    if (window.visualViewport.offsetTop !== 0) window.scrollTo(0, 0);
-  };
-  window.visualViewport.addEventListener('resize', _syncKeyboard);
-  window.visualViewport.addEventListener('scroll', () => {
-    _resetScroll();
-    _syncKeyboard();
   });
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
