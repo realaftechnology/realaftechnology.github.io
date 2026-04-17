@@ -726,11 +726,12 @@ body {
     <!-- Form view -->
     <div id="upload-form-view">
       <div class="modal-title">Upload Video</div>
-      <input class="modal-field" type="text" id="upload-title" placeholder="Episode title (optional)">
+      <input class="modal-field" type="text" id="upload-title" placeholder="Title (auto-detected from filename)">
       <div class="file-drop" id="file-drop" onclick="document.getElementById('video-file-input').click()">
-        <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4</strong> or drag and drop</div>
-        <input type="file" id="video-file-input" accept=".mp4" style="display:none" onchange="onFileSelected(this)">
+        <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4(s)</strong> or drag and drop</div>
+        <input type="file" id="video-file-input" accept=".mp4" multiple style="display:none" onchange="onFileSelected(this)">
       </div>
+      <div id="upload-queue-list" style="display:none;margin-bottom:10px;max-height:110px;overflow-y:auto"></div>
       <div class="upload-progress" id="upload-progress">
         <div class="upload-progress-fill" id="upload-progress-fill"></div>
       </div>
@@ -1241,12 +1242,12 @@ async function doFollowup(question) {
 
 // ── UPLOAD ───────────────────────────────────────────────────────────────────
 
-let selectedVideoFile = null;
+let uploadQueue = [];
 
 function openUploadModal() {
-  selectedVideoFile = null;
+  uploadQueue = [];
   document.getElementById('upload-title').value = '';
-  document.getElementById('file-drop-label').innerHTML = '<strong>Choose MP4</strong> or drag and drop';
+  document.getElementById('file-drop-label').innerHTML = '<strong>Choose MP4(s)</strong> or drag and drop';
   document.getElementById('file-drop').classList.remove('has-file');
   document.getElementById('upload-submit-btn').disabled = true;
   document.getElementById('upload-cancel-btn').disabled = false;
@@ -1254,6 +1255,8 @@ function openUploadModal() {
   document.getElementById('upload-status').style.color = '';
   document.getElementById('upload-progress').classList.remove('visible');
   document.getElementById('upload-progress-fill').style.width = '0%';
+  document.getElementById('upload-queue-list').style.display = 'none';
+  document.getElementById('upload-queue-list').innerHTML = '';
   document.getElementById('upload-form-view').style.display = '';
   document.getElementById('upload-success-view').style.display = 'none';
   document.getElementById('upload-modal').classList.add('open');
@@ -1264,15 +1267,41 @@ function closeUploadModal() {
 }
 
 function onFileSelected(input) {
-  const file = input.files[0];
-  if (!file) return;
-  selectedVideoFile = file;
-  document.getElementById('file-drop-label').innerHTML = `<strong>${file.name}</strong><br><span style="font-size:12px">${(file.size/1024/1024).toFixed(1)} MB</span>`;
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  uploadQueue = files;
+  const totalMB = (files.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1);
+  if (files.length === 1) {
+    document.getElementById('file-drop-label').innerHTML = `<strong>${files[0].name}</strong><br><span style="font-size:12px">${(files[0].size/1024/1024).toFixed(1)} MB</span>`;
+    if (!document.getElementById('upload-title').value)
+      document.getElementById('upload-title').value = files[0].name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    document.getElementById('upload-title').style.display = '';
+  } else {
+    document.getElementById('file-drop-label').innerHTML = `<strong>${files.length} videos selected</strong><br><span style="font-size:12px">${totalMB} MB total</span>`;
+    document.getElementById('upload-title').style.display = 'none'; // titles auto-derived for bulk
+  }
   document.getElementById('file-drop').classList.add('has-file');
   document.getElementById('upload-submit-btn').disabled = false;
-  if (!document.getElementById('upload-title').value) {
-    document.getElementById('upload-title').value = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
-  }
+  document.getElementById('upload-submit-btn').textContent = files.length > 1 ? `Upload ${files.length} Videos` : 'Upload';
+  renderQueueList();
+}
+
+function renderQueueList(statuses = {}) {
+  const el = document.getElementById('upload-queue-list');
+  if (uploadQueue.length <= 1) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = uploadQueue.map((f, i) => {
+    const s = statuses[i];
+    const icon = s === 'done' ? '<span style="color:#34c759">✓</span>'
+                : s === 'uploading' ? '<span style="color:var(--red)">↑</span>'
+                : s === 'error' ? '<span style="color:var(--red)">✕</span>'
+                : '<span style="color:var(--label-quaternary)">○</span>';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;color:${s==='done'?'var(--label-tertiary)':'var(--label-secondary)'}">
+      ${icon}
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <span style="color:var(--label-quaternary);flex-shrink:0">${(f.size/1024/1024).toFixed(0)}MB</span>
+    </div>`;
+  }).join('');
 }
 
 // Drag and drop
@@ -1282,15 +1311,39 @@ fileDrop.addEventListener('dragleave', () => { fileDrop.style.borderColor = ''; 
 fileDrop.addEventListener('drop', e => {
   e.preventDefault();
   fileDrop.style.borderColor = '';
-  const file = e.dataTransfer.files[0];
-  if (file && file.name.toLowerCase().endsWith('.mp4')) {
-    document.getElementById('video-file-input').files = e.dataTransfer.files;
+  const mp4s = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.mp4'));
+  if (mp4s.length) {
+    const dt = new DataTransfer();
+    mp4s.forEach(f => dt.items.add(f));
+    document.getElementById('video-file-input').files = dt.files;
     onFileSelected(document.getElementById('video-file-input'));
   }
 });
 
-function submitUpload() {
-  if (!selectedVideoFile) return;
+function uploadOneFile(file, title, onProgress) {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (title) form.append('title', title);
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+    });
+    xhr.addEventListener('load', () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && !data.error) resolve(data);
+        else reject(new Error(data.error || 'Upload failed'));
+      } catch { reject(new Error('Upload failed')); }
+    });
+    xhr.addEventListener('error', () => reject(new Error('Network error')));
+    xhr.open('POST', '/api/upload-video');
+    xhr.send(form);
+  });
+}
+
+async function submitUpload() {
+  if (!uploadQueue.length) return;
   const btn = document.getElementById('upload-submit-btn');
   const cancelBtn = document.getElementById('upload-cancel-btn');
   const status = document.getElementById('upload-status');
@@ -1300,55 +1353,49 @@ function submitUpload() {
   btn.disabled = true;
   cancelBtn.disabled = true;
   progressBar.classList.add('visible');
-  status.textContent = 'Uploading...';
 
-  const title = document.getElementById('upload-title').value.trim();
-  const form = new FormData();
-  form.append('file', selectedVideoFile);
-  if (title) form.append('title', title);
+  const statuses = {};
+  const singleTitle = uploadQueue.length === 1 ? document.getElementById('upload-title').value.trim() : '';
+  let hadError = false;
 
-  const xhr = new XMLHttpRequest();
-
-  xhr.upload.addEventListener('progress', e => {
-    if (e.lengthComputable) {
-      const pct = Math.round(e.loaded / e.total * 100);
-      progressFill.style.width = pct + '%';
-      status.textContent = pct < 100 ? `Uploading... ${pct}%` : 'Transcribing...';
-    }
-  });
-
-  xhr.addEventListener('load', () => {
+  for (let i = 0; i < uploadQueue.length; i++) {
+    const file = uploadQueue[i];
+    const title = singleTitle || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    statuses[i] = 'uploading';
+    renderQueueList(statuses);
+    const label = uploadQueue.length > 1 ? `File ${i+1} of ${uploadQueue.length}: ` : '';
     try {
-      const data = JSON.parse(xhr.responseText);
-      if (xhr.status >= 200 && xhr.status < 300 && !data.error) {
-        document.getElementById('upload-form-view').style.display = 'none';
-        document.getElementById('upload-success-view').style.display = '';
-        loadStats();
-      } else {
-        showUploadError(data.error || 'Upload failed');
-        cancelBtn.disabled = false;
-      }
-    } catch {
-      showUploadError('Upload failed');
-      cancelBtn.disabled = false;
+      await uploadOneFile(file, title, pct => {
+        progressFill.style.width = pct + '%';
+        status.textContent = pct < 100 ? `${label}Uploading... ${pct}%` : `${label}Transcribing...`;
+      });
+      statuses[i] = 'done';
+      renderQueueList(statuses);
+      loadStats();
+    } catch(e) {
+      statuses[i] = 'error';
+      renderQueueList(statuses);
+      status.style.color = 'var(--red)';
+      status.textContent = `${file.name}: ${e.message}`;
+      hadError = true;
+      // Continue with remaining files
     }
-  });
+    progressFill.style.width = '0%';
+  }
 
-  xhr.addEventListener('error', () => {
-    showUploadError('Network error');
+  if (!hadError) {
+    document.getElementById('upload-form-view').style.display = 'none';
+    document.getElementById('upload-success-view').style.display = '';
+  } else {
     cancelBtn.disabled = false;
-  });
-
-  xhr.open('POST', '/api/upload-video');
-  xhr.send(form);
+    progressBar.classList.remove('visible');
+  }
 }
 
 function showUploadError(msg) {
-  const btn = document.getElementById('upload-submit-btn');
+  document.getElementById('upload-submit-btn').disabled = false;
+  document.getElementById('upload-progress').classList.remove('visible');
   const status = document.getElementById('upload-status');
-  const progressBar = document.getElementById('upload-progress');
-  btn.disabled = false;
-  progressBar.classList.remove('visible');
   status.style.color = 'var(--red)';
   status.textContent = msg;
 }

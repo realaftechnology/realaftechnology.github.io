@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
-app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB max upload
 
 DB_PATH       = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "db.sqlite"))
 OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
@@ -662,7 +662,7 @@ def extract_audio(video_path, audio_path):
 
 
 def whisper_transcribe(audio_path):
-    """Transcribe audio via OpenAI Whisper API. Returns verbose_json dict."""
+    """Transcribe a single audio file via OpenAI Whisper API. Must be ≤25MB."""
     with open(audio_path, "rb") as f:
         audio_data = f.read()
     boundary = "Boundary" + os.urandom(8).hex()
@@ -684,8 +684,55 @@ def whisper_transcribe(audio_path):
         data=body,
         headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=300) as resp:
         return json.loads(resp.read())
+
+
+def whisper_transcribe_chunked(audio_path):
+    """Transcribe audio, automatically splitting into chunks if it exceeds Whisper's 25MB limit."""
+    file_size = os.path.getsize(audio_path)
+    if file_size <= 24 * 1024 * 1024:
+        return whisper_transcribe(audio_path)
+
+    # Get total duration via ffprobe
+    probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", audio_path],
+        capture_output=True, timeout=30
+    )
+    info = json.loads(probe.stdout)
+    total_duration = float(info["format"]["duration"])
+
+    # Split into ~22MB chunks (≈45 min at 64kbps)
+    chunk_secs = 2700.0  # 45 minutes
+    num_chunks = int(total_duration / chunk_secs) + 1
+
+    all_segments = []
+    chunk_paths = []
+    try:
+        for i in range(num_chunks):
+            start = i * chunk_secs
+            if start >= total_duration:
+                break
+            chunk_path = audio_path.replace(".mp3", f"_c{i}.mp3")
+            chunk_paths.append(chunk_path)
+            subprocess.run(
+                ["ffmpeg", "-i", audio_path, "-ss", str(start), "-t", str(chunk_secs),
+                 "-c", "copy", "-y", chunk_path],
+                capture_output=True, timeout=120
+            )
+            result = whisper_transcribe(chunk_path)
+            for seg in result.get("segments", []):
+                adjusted = dict(seg)
+                adjusted["start"] = float(seg["start"]) + start
+                all_segments.append(adjusted)
+    finally:
+        for cp in chunk_paths:
+            try:
+                os.remove(cp)
+            except Exception:
+                pass
+
+    return {"segments": all_segments}
 
 
 def get_embeddings_batch_local(texts):
@@ -769,14 +816,14 @@ def upload_video():
     audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
     try:
         ffmpeg_ok = extract_audio(video_path, audio_path)
-        transcribe_path = audio_path if ffmpeg_ok else video_path
-        # Check file size — Whisper limit is 25MB
-        if os.path.getsize(transcribe_path) > 24 * 1024 * 1024:
-            raise RuntimeError(
-                "File too large for direct transcription (>24MB) and ffmpeg is not available to extract audio. "
-                "Please install ffmpeg on the server."
-            )
-        result = whisper_transcribe(transcribe_path)
+        if not ffmpeg_ok:
+            # ffmpeg unavailable — only allow small files
+            if os.path.getsize(video_path) > 24 * 1024 * 1024:
+                raise RuntimeError("ffmpeg is required to process files larger than 24MB.")
+            result = whisper_transcribe(video_path)
+        else:
+            # Chunked transcription handles any length
+            result = whisper_transcribe_chunked(audio_path)
         episode_id = filename.rsplit(".", 1)[0]
         title = request.form.get("title", "").strip() or episode_id
         conn = get_db()
