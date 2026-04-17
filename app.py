@@ -7,6 +7,7 @@ import json
 import sqlite3
 import re
 import subprocess
+import shutil
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -640,6 +641,10 @@ def videos_dir():
     return os.path.join(os.path.dirname(DB_PATH), "videos")
 
 
+def temp_uploads_dir():
+    return os.path.join(os.path.dirname(DB_PATH), "temp_uploads")
+
+
 def secs_to_timestamp(secs):
     secs = int(secs)
     h, rem = divmod(secs, 3600)
@@ -794,6 +799,81 @@ def ingest_video_episode(conn, episode_id, title, video_path, whisper_result):
         cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", (episode_id, chunk["text"]))
     conn.commit()
     return len(chunks)
+
+
+@app.route("/api/upload-chunk", methods=["POST"])
+@requires_auth
+def upload_chunk():
+    """Receive one chunk of a multipart upload. Stored in temp_uploads/<upload_id>/chunk_NNNNN."""
+    upload_id = secure_filename(request.form.get("upload_id", ""))
+    chunk_index = request.form.get("chunk_index", "0")
+    chunk_file = request.files.get("chunk")
+    if not upload_id or not chunk_file:
+        return jsonify({"error": "Missing data"}), 400
+    upload_dir = os.path.join(temp_uploads_dir(), upload_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    chunk_file.save(os.path.join(upload_dir, f"chunk_{int(chunk_index):05d}"))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/finalize-upload", methods=["POST"])
+@requires_auth
+def finalize_upload():
+    """Assemble chunks, extract audio, transcribe, and ingest the episode."""
+    if not OPENAI_KEY:
+        return jsonify({"error": "OpenAI API key required for transcription"}), 400
+    data = request.get_json()
+    upload_id = secure_filename(data.get("upload_id", ""))
+    filename = secure_filename(data.get("filename", "video.mp4"))
+    title = data.get("title", "").strip()
+    total_chunks = int(data.get("total_chunks", 0))
+
+    upload_dir = os.path.join(temp_uploads_dir(), upload_id)
+    if not os.path.isdir(upload_dir):
+        return jsonify({"error": "Upload session not found"}), 404
+
+    vdir = videos_dir()
+    os.makedirs(vdir, exist_ok=True)
+    video_path = os.path.join(vdir, filename)
+
+    # Assemble chunks in order
+    try:
+        with open(video_path, "wb") as out:
+            for i in range(total_chunks):
+                chunk_path = os.path.join(upload_dir, f"chunk_{i:05d}")
+                with open(chunk_path, "rb") as cp:
+                    out.write(cp.read())
+    finally:
+        shutil.rmtree(upload_dir, ignore_errors=True)
+
+    audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
+    try:
+        ffmpeg_ok = extract_audio(video_path, audio_path)
+        if not ffmpeg_ok:
+            if os.path.getsize(video_path) > 24 * 1024 * 1024:
+                raise RuntimeError("ffmpeg is required to process files larger than 24MB.")
+            result = whisper_transcribe(video_path)
+        else:
+            result = whisper_transcribe_chunked(audio_path)
+
+        episode_id = filename.rsplit(".", 1)[0]
+        title = title or episode_id.replace("_", " ").replace("-", " ")
+        conn = get_db()
+        count = ingest_video_episode(conn, episode_id, title, video_path, result)
+        cur = conn.cursor()
+        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
+            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "episode_id": episode_id, "chunks": count, "title": title})
+    except Exception as e:
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
 
 
 @app.route("/api/upload-video", methods=["POST"])

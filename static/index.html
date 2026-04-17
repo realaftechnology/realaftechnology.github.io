@@ -1320,26 +1320,47 @@ fileDrop.addEventListener('drop', e => {
   }
 });
 
-function uploadOneFile(file, title, onProgress) {
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — safely under Railway's proxy limit
+
+function uploadChunk(uploadId, index, chunk) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
-    form.append('file', file);
-    if (title) form.append('title', title);
+    form.append('upload_id', uploadId);
+    form.append('chunk_index', index);
+    form.append('chunk', chunk);
     const xhr = new XMLHttpRequest();
-    xhr.upload.addEventListener('progress', e => {
-      if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
-    });
     xhr.addEventListener('load', () => {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300 && !data.error) resolve(data);
-        else reject(new Error(data.error || 'Upload failed'));
-      } catch { reject(new Error('Upload failed')); }
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Chunk ${index} failed (${xhr.status})`));
     });
-    xhr.addEventListener('error', () => reject(new Error('Network error')));
-    xhr.open('POST', '/api/upload-video');
+    xhr.addEventListener('error', () => reject(new Error('Network error on chunk ' + index)));
+    xhr.open('POST', '/api/upload-chunk');
     xhr.send(form);
   });
+}
+
+async function uploadOneFile(file, title, onProgress) {
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  let bytesUploaded = 0;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    await uploadChunk(uploadId, i, file.slice(start, end));
+    bytesUploaded += (end - start);
+    onProgress(Math.round(bytesUploaded / file.size * 100), false);
+  }
+
+  onProgress(100, true); // signal "transcribing" phase
+  const res = await fetch('/api/finalize-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ upload_id: uploadId, filename: file.name, title, total_chunks: totalChunks })
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || 'Finalization failed');
+  return data;
 }
 
 async function submitUpload() {
@@ -1365,9 +1386,9 @@ async function submitUpload() {
     renderQueueList(statuses);
     const label = uploadQueue.length > 1 ? `File ${i+1} of ${uploadQueue.length}: ` : '';
     try {
-      await uploadOneFile(file, title, pct => {
-        progressFill.style.width = pct + '%';
-        status.textContent = pct < 100 ? `${label}Uploading... ${pct}%` : `${label}Transcribing...`;
+      await uploadOneFile(file, title, (pct, transcribing) => {
+        progressFill.style.width = transcribing ? '100%' : pct + '%';
+        status.textContent = transcribing ? `${label}Transcribing...` : `${label}Uploading... ${pct}%`;
       });
       statuses[i] = 'done';
       renderQueueList(statuses);
