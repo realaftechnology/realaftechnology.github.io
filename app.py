@@ -976,12 +976,32 @@ def download_clip(filename):
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".mp4")
     os.close(tmp_fd)
 
+    preview = request.args.get("preview") == "1"
+
     try:
-        result = subprocess.run(
-            ["ffmpeg", "-ss", str(start), "-i", video_path, "-t", str(duration),
-             "-c", "copy", "-y", tmp_path],
-            capture_output=True, timeout=120
-        )
+        if preview:
+            # Small 720p preview blob for the clip viewer (~8-15 MB, instant seeking)
+            cmd = [
+                "ffmpeg", "-threads", "0",
+                "-ss", str(start), "-i", video_path, "-t", str(duration),
+                "-vf", "scale=1280:-2",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
+                "-c:a", "aac", "-b:a", "64k",
+                "-movflags", "+faststart",
+                "-y", tmp_path
+            ]
+            timeout = 300
+        else:
+            # Full-quality copy for the final Save
+            cmd = [
+                "ffmpeg",
+                "-ss", str(start), "-i", video_path, "-t", str(duration),
+                "-c", "copy", "-movflags", "+faststart",
+                "-y", tmp_path
+            ]
+            timeout = 120
+
+        result = subprocess.run(cmd, capture_output=True, timeout=timeout)
         if result.returncode != 0:
             return jsonify({"error": "Clip extraction failed"}), 500
 
