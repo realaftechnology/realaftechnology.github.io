@@ -595,6 +595,20 @@ body {
 }
 .upload-tab.active { background: var(--bg-secondary); color: var(--label-primary); font-weight: 600; }
 #drive-urls-input::placeholder { color: var(--label-tertiary); }
+.drive-source-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-tertiary); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 6px; font-size: 12px;
+}
+.drive-source-url {
+  flex: 1; color: var(--label-secondary); font-family: var(--sf-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.drive-source-del {
+  background: none; border: none; color: var(--label-tertiary);
+  font-size: 15px; cursor: pointer; padding: 0 2px; line-height: 1;
+  flex-shrink: 0; -webkit-appearance: none;
+}
 #drive-log .log-line-done { color: #30d158; }
 #drive-log .log-line-error { color: #ff453a; }
 #drive-log .log-line-info { color: var(--label-secondary); }
@@ -1029,12 +1043,26 @@ body {
 
     <!-- Drive import view -->
     <div id="drive-form-view" style="display:none">
-      <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;line-height:1.5">
-        Paste one Google Drive link per line. Files must be shared as <strong style="color:var(--label-primary)">"Anyone with the link"</strong>. You can paste individual file links or a folder link.
+
+      <!-- Saved sources section (hidden until sources exist) -->
+      <div id="drive-saved-section" style="display:none;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--label-tertiary);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Saved Sources</div>
+        <div id="drive-saved-list"></div>
+        <button class="modal-btn modal-btn-primary" id="drive-scan-btn" onclick="scanSavedSources()" style="width:100%;margin-top:8px">Scan for New Episodes</button>
+        <div style="height:1px;background:var(--separator);margin:14px 0"></div>
       </div>
-      <textarea id="drive-urls-input" placeholder="https://drive.google.com/file/d/…&#10;https://drive.google.com/drive/folders/…" style="width:100%;box-sizing:border-box;height:110px;background:var(--bg-tertiary);border:1.5px solid var(--separator);border-radius:10px;color:var(--label-primary);font-family:var(--sf-mono);font-size:13px;padding:10px 12px;resize:none;outline:none;-webkit-appearance:none"></textarea>
-      <div id="drive-log" style="display:none;margin-top:10px;background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;max-height:160px;overflow-y:auto;font-family:var(--sf-mono);font-size:12px;line-height:1.6;color:var(--label-secondary)"></div>
-      <div class="modal-row" style="margin-top:14px">
+
+      <!-- Add new source -->
+      <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;line-height:1.5">
+        Paste a Google Drive folder or file link. Must be shared as <strong style="color:var(--label-primary)">"Anyone with the link"</strong>.
+      </div>
+      <textarea id="drive-urls-input" placeholder="https://drive.google.com/drive/folders/…" style="width:100%;box-sizing:border-box;height:80px;background:var(--bg-tertiary);border:1.5px solid var(--separator);border-radius:10px;color:var(--label-primary);font-family:var(--sf-mono);font-size:13px;padding:10px 12px;resize:none;outline:none;-webkit-appearance:none"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--label-secondary);cursor:pointer">
+        <input type="checkbox" id="drive-save-checkbox" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
+        Save this link for future scans
+      </label>
+      <div id="drive-log" style="display:none;margin-top:10px;background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;max-height:150px;overflow-y:auto;font-family:var(--sf-mono);font-size:12px;line-height:1.6;color:var(--label-secondary)"></div>
+      <div class="modal-row" style="margin-top:12px">
         <button class="modal-btn modal-btn-cancel" id="drive-cancel-btn" onclick="closeUploadModal()">Cancel</button>
         <button class="modal-btn modal-btn-primary" id="drive-submit-btn" onclick="startDriveImport()">Import</button>
       </div>
@@ -1600,6 +1628,56 @@ async function doFollowup(question) {
 let uploadQueue = [];
 
 let _driveImportES = null;
+let _driveSources  = [];  // in-memory cache of saved Drive sources
+
+// ── Drive Sources ─────────────────────────────────────────────────────────────
+
+async function loadDriveSources() {
+  try {
+    const res = await fetch('/api/drive-sources');
+    const data = await res.json();
+    _driveSources = data.sources || [];
+    renderDriveSources();
+  } catch { /* ignore */ }
+}
+
+function renderDriveSources() {
+  const section = document.getElementById('drive-saved-section');
+  const list    = document.getElementById('drive-saved-list');
+  if (!_driveSources.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  list.innerHTML = '';
+  _driveSources.forEach((url, i) => {
+    const row = document.createElement('div');
+    row.className = 'drive-source-row';
+    // Show a short label: folder id or truncated URL
+    const label = url.replace('https://drive.google.com/', '').substring(0, 48) + '…';
+    row.innerHTML = `
+      <span class="drive-source-url" title="${url}">${label}</span>
+      <button class="drive-source-del" onclick="deleteDriveSource(${i})" title="Remove">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+async function deleteDriveSource(index) {
+  _driveSources.splice(index, 1);
+  await fetch('/api/drive-sources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sources: _driveSources })
+  });
+  renderDriveSources();
+}
+
+function scanSavedSources() {
+  if (!_driveSources.length) return;
+  // Fill the textarea with all saved sources and kick off import
+  document.getElementById('drive-urls-input').value = _driveSources.join('\n');
+  _runDriveImport(_driveSources.join('\n'), false);
+}
+
+// ── Tab switcher ──────────────────────────────────────────────────────────────
 
 function switchUploadTab(tab) {
   const isUpload = tab === 'upload';
@@ -1608,6 +1686,7 @@ function switchUploadTab(tab) {
   document.getElementById('upload-form-view').style.display = isUpload ? '' : 'none';
   document.getElementById('drive-form-view').style.display = isUpload ? 'none' : '';
   document.getElementById('upload-success-view').style.display = 'none';
+  if (!isUpload) loadDriveSources();
 }
 
 function openUploadModal() {
@@ -1646,16 +1725,37 @@ function _driveLog(msg, type) {
   log.scrollTop = log.scrollHeight;
 }
 
-function startDriveImport() {
+async function startDriveImport() {
   const urls = document.getElementById('drive-urls-input').value.trim();
   if (!urls) return;
+
+  // Save link if checkbox is checked
+  if (document.getElementById('drive-save-checkbox').checked) {
+    const newUrls = urls.split('\n').map(u => u.trim()).filter(u => u);
+    const merged  = [...new Set([..._driveSources, ...newUrls])];
+    _driveSources = merged;
+    await fetch('/api/drive-sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources: merged })
+    });
+    renderDriveSources();
+  }
+
+  _runDriveImport(urls, true);
+}
+
+function _runDriveImport(urls, canReset) {
   const log = document.getElementById('drive-log');
   log.innerHTML = '';
   log.style.display = 'none';
-  const btn = document.getElementById('drive-submit-btn');
+  const btn      = document.getElementById('drive-submit-btn');
+  const cancelBtn = document.getElementById('drive-cancel-btn');
+  const scanBtn  = document.getElementById('drive-scan-btn');
   btn.disabled = true;
   btn.textContent = 'Importing…';
-  document.getElementById('drive-cancel-btn').disabled = true;
+  cancelBtn.disabled = true;
+  if (scanBtn) scanBtn.disabled = true;
 
   const params = new URLSearchParams({ urls });
   const es = new EventSource('/api/drive-import?' + params.toString());
@@ -1667,9 +1767,11 @@ function startDriveImport() {
     if (data.type === 'done') {
       es.close(); _driveImportES = null;
       _driveLog('✓ All done — reloading episodes…', 'done_file');
-      btn.textContent = 'Done';
-      document.getElementById('drive-cancel-btn').disabled = false;
-      document.getElementById('drive-cancel-btn').textContent = 'Close';
+      btn.textContent = canReset ? 'Import' : 'Scan';
+      btn.disabled = false;
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Close';
+      if (scanBtn) scanBtn.disabled = false;
       loadEpisodeList();
     } else if (data.type === 'error') {
       _driveLog('⚠ ' + data.msg, 'error');
@@ -1685,8 +1787,10 @@ function startDriveImport() {
   es.onerror = () => {
     _driveLog('Connection lost — import may still be running on server.', 'error');
     es.close(); _driveImportES = null;
-    btn.disabled = false; btn.textContent = 'Import';
-    document.getElementById('drive-cancel-btn').disabled = false;
+    btn.disabled = false;
+    btn.textContent = canReset ? 'Import' : 'Scan';
+    cancelBtn.disabled = false;
+    if (scanBtn) scanBtn.disabled = false;
   };
 }
 

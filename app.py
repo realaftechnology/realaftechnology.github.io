@@ -115,17 +115,17 @@ def get_db():
         return None
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    # Ensure video_path and uploaded_at columns exist (migration for older dbs)
-    try:
-        conn.execute("ALTER TABLE episodes ADD COLUMN video_path TEXT")
-        conn.commit()
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE episodes ADD COLUMN uploaded_at TEXT")
-        conn.commit()
-    except Exception:
-        pass
+    # Migrations for older dbs
+    for stmt in [
+        "ALTER TABLE episodes ADD COLUMN video_path TEXT",
+        "ALTER TABLE episodes ADD COLUMN uploaded_at TEXT",
+        "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
+    ]:
+        try:
+            conn.execute(stmt)
+            conn.commit()
+        except Exception:
+            pass
     return conn
 
 
@@ -926,6 +926,35 @@ def upload_video():
     finally:
         if audio_path and os.path.exists(audio_path):
             os.remove(audio_path)
+
+
+@app.route("/api/drive-sources", methods=["GET"])
+@requires_auth
+def get_drive_sources():
+    conn = get_db()
+    if not conn:
+        return jsonify({"sources": []})
+    row = conn.execute("SELECT value FROM settings WHERE key='drive_sources'").fetchone()
+    conn.close()
+    sources = json.loads(row[0]) if row else []
+    return jsonify({"sources": sources})
+
+
+@app.route("/api/drive-sources", methods=["POST"])
+@requires_auth
+def save_drive_sources():
+    data = request.get_json()
+    sources = [s.strip() for s in data.get("sources", []) if s.strip()]
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "DB not available"}), 500
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('drive_sources', ?)",
+        (json.dumps(sources),)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "count": len(sources)})
 
 
 @app.route("/api/drive-import")
