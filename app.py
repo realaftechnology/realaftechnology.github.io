@@ -9,6 +9,7 @@ import re
 import subprocess
 import urllib.request
 import urllib.error
+from datetime import datetime
 from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -110,9 +111,14 @@ def get_db():
         return None
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    # Ensure video_path column exists (migration for older dbs)
+    # Ensure video_path and uploaded_at columns exist (migration for older dbs)
     try:
         conn.execute("ALTER TABLE episodes ADD COLUMN video_path TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE episodes ADD COLUMN uploaded_at TEXT")
         conn.commit()
     except Exception:
         pass
@@ -391,7 +397,7 @@ def episodes_list():
     conn = get_db()
     if not conn: return jsonify({"episodes": []})
     rows = conn.execute("""
-        SELECT e.id, e.title, e.video_path, COUNT(s.id) as segment_count
+        SELECT e.id, e.title, e.video_path, e.uploaded_at, COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
         GROUP BY e.id ORDER BY e.id DESC
     """).fetchall()
@@ -399,7 +405,8 @@ def episodes_list():
     return jsonify({"episodes": [
         {"id": r["id"], "title": r["title"], "segments": r["segment_count"],
          "has_video": bool(r["video_path"]),
-         "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None}
+         "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
+         "uploaded_at": r["uploaded_at"]}
         for r in rows
     ]})
 
@@ -705,8 +712,8 @@ def ingest_video_episode(conn, episode_id, title, video_path, whisper_result):
     cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
     cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
     cur.execute(
-        "INSERT INTO episodes (id, title, filename, video_path) VALUES (?, ?, ?, ?)",
-        (episode_id, title, os.path.basename(video_path), video_path)
+        "INSERT INTO episodes (id, title, filename, video_path, uploaded_at) VALUES (?, ?, ?, ?, ?)",
+        (episode_id, title, os.path.basename(video_path), video_path, datetime.now().strftime('%Y-%m-%d'))
     )
 
     raw = [
@@ -822,6 +829,24 @@ def delete_episode_endpoint(episode_id):
         except Exception:
             pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/episode-segments/<episode_id>")
+@requires_auth
+def episode_segments_by_id(episode_id):
+    """Return all segments for a specific episode by its TEXT id (used for video episodes)."""
+    conn = get_db()
+    if not conn:
+        return jsonify({"results": []})
+    rows = conn.execute("""
+        SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
+               e.title AS episode_title, e.filename, e.video_path, 0 AS rank
+        FROM segments s JOIN episodes e ON e.id = s.episode_id
+        WHERE e.id = ?
+        ORDER BY s.start_secs ASC
+    """, (episode_id,)).fetchall()
+    conn.close()
+    return jsonify({"results": [format_result(r, 0) for r in rows]})
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────────────────────

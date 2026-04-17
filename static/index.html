@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AFBrain">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="icon" href="/static/apple-touch-icon.png">
 <title>AFBrain</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -655,6 +656,37 @@ body {
   flex-shrink: 0;
 }
 .delete-ep-btn:hover { color: var(--red); }
+
+/* ── UPLOAD PROGRESS ── */
+.upload-progress {
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  display: none;
+}
+.upload-progress.visible { display: block; }
+.upload-progress-fill {
+  height: 100%;
+  background: var(--red);
+  width: 0%;
+  transition: width 0.2s ease;
+  border-radius: 2px;
+}
+.upload-success-view { text-align: center; padding: 10px 0 4px; }
+.upload-success-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; color: var(--label); }
+
+/* ── VIDEO SIDEBAR ITEM ── */
+.ep-item-video-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 </style>
 </head>
 <body>
@@ -672,17 +704,30 @@ body {
 <!-- UPLOAD MODAL -->
 <div class="modal-overlay" id="upload-modal">
   <div class="modal-box">
-    <div class="modal-title">Upload Video</div>
-    <input class="modal-field" type="text" id="upload-title" placeholder="Episode title (optional)">
-    <div class="file-drop" id="file-drop" onclick="document.getElementById('video-file-input').click()">
-      <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4</strong> or drag and drop</div>
-      <input type="file" id="video-file-input" accept=".mp4" style="display:none" onchange="onFileSelected(this)">
+    <!-- Form view -->
+    <div id="upload-form-view">
+      <div class="modal-title">Upload Video</div>
+      <input class="modal-field" type="text" id="upload-title" placeholder="Episode title (optional)">
+      <div class="file-drop" id="file-drop" onclick="document.getElementById('video-file-input').click()">
+        <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4</strong> or drag and drop</div>
+        <input type="file" id="video-file-input" accept=".mp4" style="display:none" onchange="onFileSelected(this)">
+      </div>
+      <div class="upload-progress" id="upload-progress">
+        <div class="upload-progress-fill" id="upload-progress-fill"></div>
+      </div>
+      <div class="modal-row">
+        <button class="modal-btn modal-btn-cancel" id="upload-cancel-btn" onclick="closeUploadModal()">Cancel</button>
+        <button class="modal-btn modal-btn-primary" id="upload-submit-btn" onclick="submitUpload()" disabled>Upload</button>
+      </div>
+      <div class="modal-status" id="upload-status"></div>
     </div>
-    <div class="modal-row">
-      <button class="modal-btn modal-btn-cancel" onclick="closeUploadModal()">Cancel</button>
-      <button class="modal-btn modal-btn-primary" id="upload-submit-btn" onclick="submitUpload()" disabled>Upload</button>
+    <!-- Success view -->
+    <div id="upload-success-view" style="display:none">
+      <div class="upload-success-view">
+        <div class="upload-success-title">Upload complete</div>
+        <button class="modal-btn modal-btn-primary" style="max-width:200px;margin:0 auto;display:block" onclick="closeUploadModal()">Close</button>
+      </div>
     </div>
-    <div class="modal-status" id="upload-status"></div>
   </div>
 </div>
 
@@ -841,6 +886,13 @@ function formatEpSubtitle(title) {
   return dateStr ? (show ? `${show} · ${dateStr}` : dateStr) : show || title;
 }
 
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 function renderEpisodeList(episodes) {
   const list = document.getElementById('episode-list');
   if (!episodes.length) {
@@ -853,20 +905,29 @@ function renderEpisodeList(episodes) {
     return nb - na;
   });
   list.innerHTML = sorted.map(ep => {
+    if (ep.has_video) {
+      const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
+      const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
+      const deleteBtn = `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}')" title="Delete episode">✕</button>`;
+      const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
+      const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
+      return `<div class="ep-item" style="display:flex;align-items:center;gap:4px" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+        <div style="flex:1;min-width:0">
+          <div class="ep-item-video-title">▶ ${ep.title.replace(/</g,'&lt;')}</div>
+          <div class="ep-item-title">${dateLabel}</div>
+        </div>
+        ${deleteBtn}
+      </div>`;
+    }
     const num = ep.title.match(/(\d+)/)?.[1] || '';
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
     const isActive = lockedEpisode === num;
-    const videoIcon = ep.has_video ? '<span style="color:var(--red);font-size:10px;margin-left:4px">▶</span>' : '';
-    const deleteBtn = ep.has_video
-      ? `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}')" title="Delete episode">✕</button>`
-      : '';
     return `<div class="ep-item${isActive ? ' active' : ''}" style="display:flex;align-items:center;gap:4px" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
       <div style="flex:1;min-width:0">
-        <div class="ep-item-num">Ep ${num}${videoIcon}</div>
+        <div class="ep-item-num">Ep ${num}</div>
         <div class="ep-item-title">${subtitle}</div>
       </div>
-      ${deleteBtn}
     </div>`;
   }).join('');
 }
@@ -1162,7 +1223,13 @@ function openUploadModal() {
   document.getElementById('file-drop-label').innerHTML = '<strong>Choose MP4</strong> or drag and drop';
   document.getElementById('file-drop').classList.remove('has-file');
   document.getElementById('upload-submit-btn').disabled = true;
+  document.getElementById('upload-cancel-btn').disabled = false;
   document.getElementById('upload-status').textContent = '';
+  document.getElementById('upload-status').style.color = '';
+  document.getElementById('upload-progress').classList.remove('visible');
+  document.getElementById('upload-progress-fill').style.width = '0%';
+  document.getElementById('upload-form-view').style.display = '';
+  document.getElementById('upload-success-view').style.display = 'none';
   document.getElementById('upload-modal').classList.add('open');
 }
 
@@ -1196,31 +1263,68 @@ fileDrop.addEventListener('drop', e => {
   }
 });
 
-async function submitUpload() {
+function submitUpload() {
   if (!selectedVideoFile) return;
   const btn = document.getElementById('upload-submit-btn');
+  const cancelBtn = document.getElementById('upload-cancel-btn');
   const status = document.getElementById('upload-status');
+  const progressBar = document.getElementById('upload-progress');
+  const progressFill = document.getElementById('upload-progress-fill');
+
   btn.disabled = true;
+  cancelBtn.disabled = true;
+  progressBar.classList.add('visible');
   status.textContent = 'Uploading...';
+
   const title = document.getElementById('upload-title').value.trim();
   const form = new FormData();
   form.append('file', selectedVideoFile);
   if (title) form.append('title', title);
-  try {
-    status.innerHTML = '<span class="spinner" style="display:inline-block"></span> Uploading and transcribing...';
-    const res = await fetch('/api/upload-video', { method: 'POST', body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Upload failed');
-    status.textContent = `Done — ${data.chunks} segment${data.chunks !== 1 ? 's' : ''} indexed.`;
-    setTimeout(() => {
-      closeUploadModal();
-      loadStats();
-    }, 1500);
-  } catch(e) {
-    status.style.color = 'var(--red)';
-    status.textContent = e.message;
-    btn.disabled = false;
-  }
+
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.addEventListener('progress', e => {
+    if (e.lengthComputable) {
+      const pct = Math.round(e.loaded / e.total * 100);
+      progressFill.style.width = pct + '%';
+      status.textContent = pct < 100 ? `Uploading... ${pct}%` : 'Transcribing...';
+    }
+  });
+
+  xhr.addEventListener('load', () => {
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (xhr.status >= 200 && xhr.status < 300 && !data.error) {
+        document.getElementById('upload-form-view').style.display = 'none';
+        document.getElementById('upload-success-view').style.display = '';
+        loadStats();
+      } else {
+        showUploadError(data.error || 'Upload failed');
+        cancelBtn.disabled = false;
+      }
+    } catch {
+      showUploadError('Upload failed');
+      cancelBtn.disabled = false;
+    }
+  });
+
+  xhr.addEventListener('error', () => {
+    showUploadError('Network error');
+    cancelBtn.disabled = false;
+  });
+
+  xhr.open('POST', '/api/upload-video');
+  xhr.send(form);
+}
+
+function showUploadError(msg) {
+  const btn = document.getElementById('upload-submit-btn');
+  const status = document.getElementById('upload-status');
+  const progressBar = document.getElementById('upload-progress');
+  btn.disabled = false;
+  progressBar.classList.remove('visible');
+  status.style.color = 'var(--red)';
+  status.textContent = msg;
 }
 
 // ── VIDEO PLAYER ──────────────────────────────────────────────────────────────
@@ -1262,6 +1366,97 @@ async function deleteEpisode(episodeId) {
     resetApp(false, false);
   } catch(e) {
     alert('Delete failed: ' + e.message);
+  }
+}
+
+// ── VIDEO EPISODE VIEW ────────────────────────────────────────────────────────
+
+async function openVideoEpisode(videoFilename, title, episodeId) {
+  toggleSidebar();
+  playVideo(videoFilename, title, 0);
+
+  currentQuery = title;
+  chatHistory = [];
+  hasResults = true;
+
+  const area = document.getElementById('results-area');
+  const safeTitle = title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  area.innerHTML = `
+    <div class="section-header">AI Summary</div>
+    <div id="ai-section">
+      <div class="ai-card">
+        <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
+        <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Generating summary...</div></div>
+      </div>
+      <button class="view-transcripts-btn" id="transcripts-toggle" style="display:none" onclick="toggleTranscripts()">
+        View Transcript &#8964;
+      </button>
+      <div class="transcripts-panel" id="transcripts-panel"></div>
+      <div id="chat-thread"></div>
+    </div>`;
+  scrollToTop();
+
+  try {
+    const res = await fetch(`/api/episode-segments/${encodeURIComponent(episodeId)}`);
+    const data = await res.json();
+    const results = data.results || [];
+    currentResults = results;
+
+    if (results.length > 0) {
+      const toggle = document.getElementById('transcripts-toggle');
+      if (toggle) {
+        toggle.style.display = 'inline-flex';
+        toggle.innerHTML = `View Transcript (${results.length}) &#8964;`;
+      }
+      const safeFilename = videoFilename.replace(/'/g, "\\'");
+      const safeT = title.replace(/'/g, "\\'");
+      const transcriptHtml = results.map(r => {
+        const playBtn = `<button class="play-btn" onclick="playVideo('${safeFilename}','${safeT}',${r.start_secs})">▶ ${r.timestamp}</button>`;
+        const snippet = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<div class="result-card">
+          <div class="result-meta-row">
+            <span class="result-ep">${safeTitle}</span>
+            ${playBtn}
+          </div>
+          <div class="result-text">${snippet}</div>
+        </div>`;
+      }).join('');
+      const panel = document.getElementById('transcripts-panel');
+      if (panel) panel.innerHTML = transcriptHtml;
+
+      runAnalysisForVideo(title, results);
+    } else {
+      const el = document.getElementById('ai-content');
+      if (el) el.textContent = 'No transcript available for this video.';
+    }
+  } catch(e) {
+    const el = document.getElementById('ai-content');
+    if (el) el.textContent = 'Failed to load transcript.';
+  }
+}
+
+async function runAnalysisForVideo(title, results) {
+  const el = document.getElementById('ai-content');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ query: `Summarize this episode: "${title}"`, results: results.slice(0, 20) })
+    });
+    await consumeStream(res,
+      (text) => { el.innerHTML = marked.parse(text); },
+      (text) => {
+        el.innerHTML = text
+          ? marked.parse(text)
+          : '<span style="color:var(--label-tertiary)">Could not generate summary.</span>';
+        if (text) chatHistory.push({ q: `Summarize: ${title}`, a: text });
+      },
+      (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
+    );
+  } catch(e) {
+    const el2 = document.getElementById('ai-content');
+    if (el2) el2.innerHTML = '<span style="color:var(--label-tertiary)">Summary unavailable.</span>';
   }
 }
 
