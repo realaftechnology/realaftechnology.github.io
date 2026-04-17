@@ -641,13 +641,17 @@ def secs_to_timestamp(secs):
 
 
 def extract_audio(video_path, audio_path):
-    """Extract audio from video to mp3 using ffmpeg."""
-    result = subprocess.run(
-        ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-ab", "64k", "-y", audio_path],
-        capture_output=True, timeout=120
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg error: {result.stderr.decode()[:200]}")
+    """Extract audio from video to mp3 using ffmpeg. Returns False if ffmpeg unavailable."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-ab", "64k", "-y", audio_path],
+            capture_output=True, timeout=120
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg error: {result.stderr.decode()[:200]}")
+        return True
+    except FileNotFoundError:
+        return False  # ffmpeg not installed — caller will send video directly
 
 
 def whisper_transcribe(audio_path):
@@ -757,8 +761,15 @@ def upload_video():
 
     audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
     try:
-        extract_audio(video_path, audio_path)
-        result = whisper_transcribe(audio_path)
+        ffmpeg_ok = extract_audio(video_path, audio_path)
+        transcribe_path = audio_path if ffmpeg_ok else video_path
+        # Check file size — Whisper limit is 25MB
+        if os.path.getsize(transcribe_path) > 24 * 1024 * 1024:
+            raise RuntimeError(
+                "File too large for direct transcription (>24MB) and ffmpeg is not available to extract audio. "
+                "Please install ffmpeg on the server."
+            )
+        result = whisper_transcribe(transcribe_path)
         episode_id = filename.rsplit(".", 1)[0]
         title = request.form.get("title", "").strip() or episode_id
         conn = get_db()
@@ -776,7 +787,7 @@ def upload_video():
             os.remove(video_path)
         return jsonify({"error": str(e)}), 500
     finally:
-        if os.path.exists(audio_path):
+        if audio_path and os.path.exists(audio_path):
             os.remove(audio_path)
 
 
