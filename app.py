@@ -8,6 +8,7 @@ import sqlite3
 import re
 import subprocess
 import shutil
+import tempfile
 import time
 import threading
 import queue as queue_module
@@ -920,10 +921,7 @@ def finalize_upload():
         title = title or episode_id.replace("_", " ").replace("-", " ")
         conn = get_db()
         count = ingest_video_episode(conn, episode_id, title, video_path, result)
-        cur = conn.cursor()
-        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
-        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
-            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        _rebuild_fts(conn)
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "episode_id": episode_id, "chunks": count, "title": title})
@@ -968,11 +966,7 @@ def upload_video():
         title = request.form.get("title", "").strip() or episode_id
         conn = get_db()
         count = ingest_video_episode(conn, episode_id, title, video_path, result)
-        # Rebuild FTS
-        cur = conn.cursor()
-        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
-        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
-            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        _rebuild_fts(conn)
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "episode_id": episode_id, "chunks": count, "title": title})
@@ -1055,10 +1049,59 @@ def _list_gdrive_folder(url):
     if not m:
         raise RuntimeError(f"Cannot extract folder ID from URL: {url}")
     folder_id = m.group(1)
+    errors = []
 
-    # ── Attempt 1: gdown internal API ────────────────────────────────────────
-    # gdown 5.x exposes _get_directory_structure; try several call signatures
-    # because the API changed between minor versions.
+    # ── Attempt 1: intercept gdown's own download_folder ─────────────────────
+    # gdown.download_folder already knows how to list Drive folders — we
+    # monkey-patch its per-file download function to collect file IDs/names
+    # without actually downloading anything.
+    try:
+        import gdown as _gdown
+        import gdown.download_folder as _gdf
+
+        # Find the download function gdown uses internally for each file
+        _orig_dl = None
+        for attr in ("download", "_download"):
+            if hasattr(_gdf, attr):
+                _orig_dl = getattr(_gdf, attr)
+                break
+
+        if _orig_dl is not None:
+            _found = []
+
+            def _mock_dl(url_or_id, output=None, **kwargs):
+                # Capture file id and name, create a zero-byte placeholder
+                fid = re.search(r'[?&]id=([a-zA-Z0-9_-]{25,})', url_or_id or '')
+                fid = fid.group(1) if fid else None
+                fname = os.path.basename(output) if output else None
+                if fid and fname:
+                    _found.append({"id": fid, "name": fname})
+                # Return a placeholder path so gdown thinks it succeeded
+                if output:
+                    try:
+                        os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
+                        open(output, "wb").close()
+                    except Exception:
+                        pass
+                return output
+
+            setattr(_gdf, _orig_dl.__name__, _mock_dl)
+            _tmp = os.path.join(tempfile.gettempdir(), f"gd_list_{folder_id}")
+            try:
+                _gdown.download_folder(url, output=_tmp, quiet=True, remaining_ok=True)
+            except Exception:
+                pass
+            finally:
+                setattr(_gdf, _orig_dl.__name__, _orig_dl)
+                shutil.rmtree(_tmp, ignore_errors=True)
+
+            result = [f for f in _found if f["name"].lower().endswith(_VIDEO_EXTS)]
+            if result:
+                return result
+    except Exception as e:
+        errors.append(f"gdown intercept: {e}")
+
+    # ── Attempt 2: gdown internal _get_directory_structure ───────────────────
     try:
         import gdown.download_folder as _gdf
         if hasattr(_gdf, "_get_directory_structure"):
@@ -1073,71 +1116,35 @@ def _list_gdrive_folder(url):
                     files = _flatten_gdrive_tree(raw)
                     if files:
                         return files
-                    break          # got a result (empty folder) — stop trying
+                    break
                 except TypeError:
-                    continue       # wrong signature, try next
-    except Exception:
-        pass
+                    continue
+    except Exception as e:
+        errors.append(f"_get_directory_structure: {e}")
 
-    # ── Attempt 2: requests session with cookies (gdown already depends on it) ─
-    # Fetching the folder page via a session with a prior cookie handshake gives
-    # Google enough signal to return full file metadata in the HTML.
+    # ── Attempt 3: use gdown's requests session to fetch the folder page ─────
     try:
-        import requests as _req
-        sess = _req.Session()
-        sess.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-        })
-        # Warm up cookies
-        try:
-            sess.get("https://drive.google.com", timeout=10)
-        except Exception:
-            pass
-
-        for folder_url in [
-            f"https://drive.google.com/drive/folders/{folder_id}",
-            f"https://drive.google.com/drive/folders/{folder_id}?hl=en",
-        ]:
-            try:
-                resp = sess.get(folder_url, timeout=25)
-                html = resp.text
-                files = _parse_drive_html(html)
-                if files:
-                    return files
-            except Exception:
-                continue
-    except ImportError:
-        pass
-
-    # ── Attempt 3: urllib fallback (no session) ───────────────────────────────
-    try:
-        import urllib.request as _ur
-        req = _ur.Request(
-            f"https://drive.google.com/drive/folders/{folder_id}",
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                )
-            },
-        )
-        with _ur.urlopen(req, timeout=25) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-        files = _parse_drive_html(html)
-        if files:
-            return files
-    except Exception:
-        pass
+        import gdown.download_folder as _gdf
+        _get_sess = getattr(_gdf, "_get_session", None)
+        if _get_sess is None:
+            import gdown.download as _gd2
+            _get_sess = getattr(_gd2, "_get_session", None)
+        if _get_sess:
+            sess = _get_sess(use_cookies=False)
+            resp = sess.get(
+                f"https://drive.google.com/drive/folders/{folder_id}?hl=en",
+                timeout=25,
+            )
+            files = _parse_drive_html(resp.text)
+            if files:
+                return files
+    except Exception as e:
+        errors.append(f"gdown session fetch: {e}")
 
     raise RuntimeError(
-        "Could not list folder contents. "
-        "Make sure the folder is shared as 'Anyone with the link'."
+        "Could not list folder contents — all methods failed.\n"
+        + "\n".join(errors)
+        + "\nMake sure the folder is shared as 'Anyone with the link'."
     )
 
 
@@ -1247,10 +1254,7 @@ def _ingest_one(job, video_path, filename, msg_q=None):
         result    = whisper_transcribe_chunked(audio_path) if ffmpeg_ok else whisper_transcribe(video_path)
         conn  = get_db()
         count = ingest_video_episode(conn, episode_id, title, video_path, result)
-        cur   = conn.cursor()
-        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
-        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
-            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        _rebuild_fts(conn)
         conn.commit()
         conn.close()
         with _jobs_lock:
@@ -1448,6 +1452,24 @@ def serve_video(filename):
     return send_file(file_path, mimetype="video/mp4", conditional=True)
 
 
+def _transcripts_dir():
+    env = os.environ.get("TRANSCRIPTS_DIR", "")
+    if env:
+        return env
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcripts")
+
+
+def _rebuild_fts(conn):
+    """Rebuild FTS5 index from segments, preserving rowid alignment."""
+    cur = conn.cursor()
+    cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+    for row in conn.execute("SELECT rowid, episode_id, text FROM segments").fetchall():
+        cur.execute(
+            "INSERT INTO fts_segments(rowid, episode_id, text) VALUES (?, ?, ?)",
+            (row[0], row[1], row[2]),
+        )
+
+
 @app.route("/api/delete-episode/<episode_id>", methods=["DELETE"])
 @requires_auth
 def delete_episode_endpoint(episode_id):
@@ -1455,19 +1477,31 @@ def delete_episode_endpoint(episode_id):
     if not conn:
         return jsonify({"error": "No database"}), 500
     cur = conn.cursor()
-    ep = conn.execute("SELECT video_path FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+    ep = conn.execute("SELECT video_path, filename FROM episodes WHERE id = ?", (episode_id,)).fetchone()
     cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
     cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
-    cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
-    for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
-        cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+    _rebuild_fts(conn)
     conn.commit()
     conn.close()
+
+    # Delete video file
     if ep and ep["video_path"] and os.path.exists(ep["video_path"]):
         try:
             os.remove(ep["video_path"])
         except Exception:
             pass
+
+    # Delete transcript .docx so ingest.py doesn't re-create the episode on restart.
+    # episode_id IS the docx filename without extension (set by ingest.py).
+    tdir = _transcripts_dir()
+    for ext in (".docx", ".DOCX"):
+        tp = os.path.join(tdir, episode_id + ext)
+        if os.path.exists(tp):
+            try:
+                os.remove(tp)
+            except Exception:
+                pass
+
     return jsonify({"ok": True})
 
 
