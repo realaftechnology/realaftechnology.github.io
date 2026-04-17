@@ -696,6 +696,29 @@ body {
 .upload-success-view { text-align: center; padding: 10px 0 4px; }
 .upload-success-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; color: var(--label); }
 
+/* ── GET AI SUMMARY BUTTON ── */
+.get-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-lg);
+  color: var(--label-secondary);
+  font-family: var(--sf);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 14px 18px;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 8px;
+  -webkit-appearance: none;
+  transition: background 0.15s;
+  justify-content: center;
+}
+.get-summary-btn:hover { background: var(--bg-tertiary); }
+.get-summary-btn:active { opacity: 0.75; }
+
 /* ── VIEW CLIP BUTTON ── */
 .view-clip-btn {
   display: inline-flex;
@@ -1266,9 +1289,9 @@ function renderResults(query, results, autoExpand = false) {
     return;
   }
   hasResults = true;
-  // Set video context if all results come from the same video file
-  const vFiles = [...new Set(results.filter(r => r.has_video).map(r => r.video_filename))];
-  currentVideoContext = (vFiles.length === 1) ? { filename: vFiles[0] } : null;
+  // Set video context to the first video result found (so View Clip button can appear)
+  const firstVideo = results.find(r => r.has_video && r.video_filename);
+  currentVideoContext = firstVideo ? { filename: firstVideo.video_filename } : null;
 
   let transcriptHtml = '';
   results.forEach(r => {
@@ -1434,7 +1457,7 @@ async function doFollowup(question) {
       (text) => { body.innerHTML = marked.parse(text); scrollToBottom(); },
       (text) => {
         body.innerHTML = marked.parse(text || 'No answer — try rephrasing or adding more context.');
-        if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); }
+        if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); maybeAddViewClipButton(item, text); }
         scrollToBottom();
       },
       (err) => { body.textContent = 'Request failed.'; }
@@ -1690,14 +1713,14 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
       </video>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px">
-      <div class="section-header" style="padding:0">AI Summary</div>
+      <div class="section-header" style="padding:0">Video</div>
       <button onclick="deleteEpisode('${episodeId}')" style="background:none;border:none;color:var(--label-quaternary);font-size:12px;cursor:pointer;padding:4px 0;font-family:var(--sf)" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--label-quaternary)'">Delete video</button>
     </div>
     <div id="ai-section">
-      <div class="ai-card">
-        <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
-        <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Generating summary...</div></div>
-      </div>
+      <button class="get-summary-btn" id="get-summary-btn" onclick="loadVideoSummary()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v4M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Get AI Summary
+      </button>
       <button class="view-transcripts-btn" id="transcripts-toggle" style="display:none" onclick="toggleTranscripts()">
         View Transcript &#8964;
       </button>
@@ -1722,9 +1745,10 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
         toggle.style.display = 'inline-flex';
         toggle.innerHTML = `View Transcript (${results.length}) &#8964;`;
       }
+      const safeFn = videoFilename.replace(/'/g, "\\'");
       const transcriptHtml = results.map(r => {
         const playBtn = `<button class="play-btn" onclick="seekInlineVideo(${r.start_secs})">▶ ${r.timestamp}</button>`;
-        const dlBtn = `<button class="download-btn" onclick="downloadClip('${videoFilename.replace(/'/g,"\\'")}',${r.start_secs})">↓ Clip</button>`;
+        const dlBtn   = `<button class="download-btn" onclick="downloadClip('${safeFn}',${r.start_secs})">↓ Clip</button>`;
         const snippet = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         return `<div class="result-card">
           <div class="result-meta-row">
@@ -1736,16 +1760,22 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
       }).join('');
       const panel = document.getElementById('transcripts-panel');
       if (panel) panel.innerHTML = transcriptHtml;
-
-      runAnalysisForVideo(title, results);
-    } else {
-      const el = document.getElementById('ai-content');
-      if (el) el.textContent = 'No transcript available for this video.';
     }
-  } catch(e) {
-    const el = document.getElementById('ai-content');
-    if (el) el.textContent = 'Failed to load transcript.';
-  }
+  } catch(e) { /* transcript load failed silently */ }
+}
+
+function loadVideoSummary() {
+  const btn = document.getElementById('get-summary-btn');
+  if (!btn || !currentResults.length) return;
+  const safeTitle = currentQuery.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const card = document.createElement('div');
+  card.className = 'ai-card';
+  card.style.marginBottom = '8px';
+  card.innerHTML = `
+    <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
+    <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Generating summary...</div></div>`;
+  btn.replaceWith(card);
+  runAnalysisForVideo(currentQuery, currentResults);
 }
 
 function seekInlineVideo(secs) {
@@ -1756,6 +1786,26 @@ function seekInlineVideo(secs) {
   scrollToTop();
 }
 
+async function saveVideoBlob(blob, filename) {
+  const file = new File([blob], filename, { type: 'video/mp4' });
+  // On iOS/Android: use Web Share API → triggers "Save to Camera Roll" option
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user dismissed share sheet — not an error
+      // Fall through to regular download on other errors
+    }
+  }
+  // Desktop fallback: trigger download
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function downloadClip(filename, startSecs, duration = 90) {
   const btn = event.currentTarget;
   const orig = btn.innerHTML;
@@ -1764,15 +1814,7 @@ async function downloadClip(filename, startSecs, duration = 90) {
   try {
     const res = await fetch(`/api/clip/${encodeURIComponent(filename)}?start=${startSecs}&duration=${duration}`);
     if (!res.ok) throw new Error('Failed');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `clip_${Math.floor(startSecs)}s.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    await saveVideoBlob(await res.blob(), `clip_${Math.floor(startSecs)}s.mp4`);
   } catch(e) {
     alert('Clip download failed. Make sure ffmpeg is available on the server.');
   } finally {
@@ -1927,12 +1969,7 @@ async function downloadTrimmedClip() {
   try {
     const res = await fetch(`/api/clip/${encodeURIComponent(trimState.filename)}?start=${start}&duration=${duration}`);
     if (!res.ok) throw new Error('Failed');
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `clip_${Math.floor(start)}s.mp4`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    await saveVideoBlob(await res.blob(), `clip_${Math.floor(start)}s.mp4`);
     closeClipViewer();
   } catch { alert('Download failed.'); }
   finally { btn.textContent = orig; btn.disabled = false; }
