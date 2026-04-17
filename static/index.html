@@ -587,6 +587,17 @@ body {
 .modal-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .modal-btn-cancel { background: var(--bg-tertiary); color: var(--label-secondary); }
 .modal-status { font-size: 13px; color: var(--label-secondary); margin-top: 10px; min-height: 18px; text-align: center; }
+.upload-tabs { display: flex; gap: 0; margin-bottom: 18px; border-radius: var(--radius); overflow: hidden; background: var(--bg-tertiary); padding: 3px; }
+.upload-tab {
+  flex: 1; height: 34px; border: none; background: transparent; color: var(--label-secondary);
+  font-family: var(--sf); font-size: 14px; font-weight: 500; cursor: pointer; border-radius: 8px;
+  transition: background 0.15s, color 0.15s; -webkit-appearance: none;
+}
+.upload-tab.active { background: var(--bg-secondary); color: var(--label-primary); font-weight: 600; }
+#drive-urls-input::placeholder { color: var(--label-tertiary); }
+#drive-log .log-line-done { color: #30d158; }
+#drive-log .log-line-error { color: #ff453a; }
+#drive-log .log-line-info { color: var(--label-secondary); }
 
 /* ── VIDEO PLAYER PANEL ── */
 .video-panel {
@@ -966,9 +977,14 @@ body {
 <!-- UPLOAD MODAL -->
 <div class="modal-overlay" id="upload-modal">
   <div class="modal-box">
+    <!-- Tab switcher -->
+    <div class="upload-tabs" id="upload-tabs">
+      <button class="upload-tab active" id="tab-upload" onclick="switchUploadTab('upload')">Upload File</button>
+      <button class="upload-tab" id="tab-drive" onclick="switchUploadTab('drive')">Drive Import</button>
+    </div>
+
     <!-- Form view -->
     <div id="upload-form-view">
-      <div class="modal-title">Upload Video</div>
       <input class="modal-field" type="text" id="upload-title" placeholder="Title (auto-detected from filename)">
       <div class="file-drop" id="file-drop" onclick="document.getElementById('video-file-input').click()">
         <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4(s)</strong> or drag and drop</div>
@@ -984,6 +1000,20 @@ body {
       </div>
       <div class="modal-status" id="upload-status"></div>
     </div>
+
+    <!-- Drive import view -->
+    <div id="drive-form-view" style="display:none">
+      <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;line-height:1.5">
+        Paste one Google Drive link per line. Files must be shared as <strong style="color:var(--label-primary)">"Anyone with the link"</strong>. You can paste individual file links or a folder link.
+      </div>
+      <textarea id="drive-urls-input" placeholder="https://drive.google.com/file/d/…&#10;https://drive.google.com/drive/folders/…" style="width:100%;box-sizing:border-box;height:110px;background:var(--bg-tertiary);border:1.5px solid var(--separator);border-radius:10px;color:var(--label-primary);font-family:var(--sf-mono);font-size:13px;padding:10px 12px;resize:none;outline:none;-webkit-appearance:none"></textarea>
+      <div id="drive-log" style="display:none;margin-top:10px;background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;max-height:160px;overflow-y:auto;font-family:var(--sf-mono);font-size:12px;line-height:1.6;color:var(--label-secondary)"></div>
+      <div class="modal-row" style="margin-top:14px">
+        <button class="modal-btn modal-btn-cancel" id="drive-cancel-btn" onclick="closeUploadModal()">Cancel</button>
+        <button class="modal-btn modal-btn-primary" id="drive-submit-btn" onclick="startDriveImport()">Import</button>
+      </div>
+    </div>
+
     <!-- Success view -->
     <div id="upload-success-view" style="display:none">
       <div class="upload-success-view">
@@ -1543,6 +1573,17 @@ async function doFollowup(question) {
 
 let uploadQueue = [];
 
+let _driveImportES = null;
+
+function switchUploadTab(tab) {
+  const isUpload = tab === 'upload';
+  document.getElementById('tab-upload').classList.toggle('active', isUpload);
+  document.getElementById('tab-drive').classList.toggle('active', !isUpload);
+  document.getElementById('upload-form-view').style.display = isUpload ? '' : 'none';
+  document.getElementById('drive-form-view').style.display = isUpload ? 'none' : '';
+  document.getElementById('upload-success-view').style.display = 'none';
+}
+
 function openUploadModal() {
   uploadQueue = [];
   document.getElementById('upload-title').value = '';
@@ -1557,12 +1598,68 @@ function openUploadModal() {
   document.getElementById('upload-queue-list').style.display = 'none';
   document.getElementById('upload-queue-list').innerHTML = '';
   document.getElementById('upload-form-view').style.display = '';
+  document.getElementById('drive-form-view').style.display = 'none';
   document.getElementById('upload-success-view').style.display = 'none';
+  document.getElementById('tab-upload').classList.add('active');
+  document.getElementById('tab-drive').classList.remove('active');
   document.getElementById('upload-modal').classList.add('open');
 }
 
 function closeUploadModal() {
+  if (_driveImportES) { _driveImportES.close(); _driveImportES = null; }
   document.getElementById('upload-modal').classList.remove('open');
+}
+
+function _driveLog(msg, type) {
+  const log = document.getElementById('drive-log');
+  log.style.display = '';
+  const line = document.createElement('div');
+  line.className = type === 'done_file' ? 'log-line-done' : type === 'error' ? 'log-line-error' : 'log-line-info';
+  line.textContent = msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function startDriveImport() {
+  const urls = document.getElementById('drive-urls-input').value.trim();
+  if (!urls) return;
+  const log = document.getElementById('drive-log');
+  log.innerHTML = '';
+  log.style.display = 'none';
+  const btn = document.getElementById('drive-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+  document.getElementById('drive-cancel-btn').disabled = true;
+
+  const params = new URLSearchParams({ urls });
+  const es = new EventSource('/api/drive-import?' + params.toString());
+  _driveImportES = es;
+
+  es.onmessage = e => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+    if (data.type === 'done') {
+      es.close(); _driveImportES = null;
+      _driveLog('✓ All done — reloading episodes…', 'done_file');
+      btn.textContent = 'Done';
+      document.getElementById('drive-cancel-btn').disabled = false;
+      document.getElementById('drive-cancel-btn').textContent = 'Close';
+      loadEpisodeList();
+    } else if (data.type === 'error') {
+      _driveLog('⚠ ' + data.msg, 'error');
+    } else if (data.type === 'done_file') {
+      _driveLog('✓ ' + data.msg, 'done_file');
+    } else {
+      _driveLog(data.msg, 'info');
+    }
+  };
+
+  es.onerror = () => {
+    _driveLog('Connection lost — import may still be running on server.', 'error');
+    es.close(); _driveImportES = null;
+    btn.disabled = false; btn.textContent = 'Import';
+    document.getElementById('drive-cancel-btn').disabled = false;
+  };
 }
 
 function onFileSelected(input) {
