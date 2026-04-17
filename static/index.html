@@ -104,7 +104,13 @@ body {
   display: none;
   flex-direction: column;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 100dvh = dynamic viewport height: shrinks automatically when the iOS
+     keyboard opens (Safari 15.4+). Falls back to bottom:0 on older browsers. */
+  height: 100dvh;
   align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -2566,32 +2572,30 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// iOS keyboard: shrink #main-screen to the visual viewport height when keyboard
-// opens so the input bar rides just above the keyboard. We ONLY adjust height
-// (never top/offsetTop — that causes the visible jump). We also clear the
-// inline style when the keyboard closes so CSS inset:0 restores full-screen.
-// No initial height set — visualViewport can be smaller than the screen on
-// Chrome due to browser UI (translate bar etc.), which would break the layout.
+// iOS keyboard handling.
+// Modern iOS (Safari 15.4+): `height: 100dvh` in CSS handles this natively —
+// the dynamic viewport unit shrinks automatically when the keyboard opens, no JS needed.
+// Older iOS fallback: use visualViewport resize to set an explicit height.
 const mainScreen = document.getElementById('main-screen');
-if (window.visualViewport) {
+const _dvhSupported = CSS.supports('height', '100dvh');
+if (!_dvhSupported && window.visualViewport) {
   let _vpRaf = null;
   const onViewport = () => {
     if (_vpRaf) return;
     _vpRaf = requestAnimationFrame(() => {
       _vpRaf = null;
       const vvh = window.visualViewport.height;
-      // Keyboard is open when visual viewport is meaningfully shorter than
-      // the layout viewport (innerHeight). Use 120px threshold to avoid
-      // triggering on browser chrome changes.
-      if (window.innerHeight - vvh > 120) {
-        mainScreen.style.height = vvh + 'px';
-      } else {
-        mainScreen.style.height = ''; // keyboard closed — let CSS fill screen
-      }
+      mainScreen.style.height = vvh > 100 ? vvh + 'px' : '';
     });
   };
   window.visualViewport.addEventListener('resize', onViewport);
 }
+// Prevent iOS from jumping the visual viewport when focusing the textarea.
+// iOS Safari briefly scrolls the visual viewport to bring the input into view;
+// window.scrollTo(0,0) resets that offset instantly.
+document.getElementById('search-input').addEventListener('focus', () => {
+  requestAnimationFrame(() => window.scrollTo(0, 0));
+});
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
   if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
