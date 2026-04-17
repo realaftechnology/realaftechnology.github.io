@@ -1,19 +1,25 @@
 #!/bin/bash
 
-# Use Railway persistent volume for the database
-export DB_PATH=/data/db.sqlite
+# Use Railway persistent volume if it's mounted and writable, otherwise use local db
+if [ -d "/data" ] && touch /data/.write_test 2>/dev/null; then
+  rm -f /data/.write_test
+  export DB_PATH=/data/db.sqlite
+  echo "==> Volume at /data is available — using /data/db.sqlite"
 
-echo "==> Checking database on volume..."
-if [ ! -f "$DB_PATH" ]; then
-  # Volume is empty — seed from bundled db if available, otherwise build fresh
-  BUNDLED="$(dirname "$0")/db.sqlite"
-  if [ -f "$BUNDLED" ]; then
-    echo "==> Seeding volume from bundled db.sqlite..."
-    cp "$BUNDLED" "$DB_PATH"
-    echo "==> Seed complete."
-  else
-    echo "==> No bundled db found — will build fresh from transcripts."
+  if [ ! -f "$DB_PATH" ]; then
+    BUNDLED="$(dirname "$0")/db.sqlite"
+    if [ -f "$BUNDLED" ]; then
+      echo "==> Seeding volume from bundled db.sqlite..."
+      cp "$BUNDLED" "$DB_PATH"
+      echo "==> Seed complete."
+    else
+      echo "==> No bundled db — will build fresh from transcripts."
+    fi
   fi
+else
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  export DB_PATH="$SCRIPT_DIR/db.sqlite"
+  echo "==> Volume not available — using local db at $DB_PATH"
 fi
 
 echo "==> Running ingest (new episodes only)..."
