@@ -690,7 +690,7 @@ body {
   align-items: center;
 }
 .upload-btn:hover { color: var(--label); }
-.delete-ep-btn {
+.delete-ep-btn-unused {
   background: none;
   border: none;
   color: var(--label-quaternary);
@@ -1308,27 +1308,24 @@ function renderEpisodeList(episodes) {
     if (ep.has_video) {
       const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
       const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
-      const deleteBtn = `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}',true)" title="Delete episode">✕</button>`;
       const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
       const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
-      return `<div class="ep-item" style="display:flex;align-items:center;gap:4px" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+      return `<div class="ep-item" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
         <div style="flex:1;min-width:0">
           <div class="ep-item-video-title">▶ ${ep.title.replace(/</g,'&lt;')}</div>
           <div class="ep-item-title">${dateLabel}</div>
         </div>
-        ${deleteBtn}
       </div>`;
     }
     const num = ep.title.match(/(\d+)/)?.[1] || '';
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
     const isActive = lockedEpisode === num;
-    return `<div class="ep-item${isActive ? ' active' : ''}" style="display:flex;align-items:center;gap:4px" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
+    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
       <div style="flex:1;min-width:0">
         <div class="ep-item-num">Ep ${num}</div>
         <div class="ep-item-title">${subtitle}</div>
       </div>
-      <button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}',false)" title="Delete episode">✕</button>
     </div>`;
   }).join('');
 }
@@ -1973,25 +1970,6 @@ function closeVideoPanel() {
   const player = document.getElementById('video-player');
   panel.classList.remove('open');
   player.pause();
-}
-
-// ── DELETE EPISODE ────────────────────────────────────────────────────────────
-
-async function deleteEpisode(episodeId, hasVideo = true) {
-  const msg = hasVideo
-    ? 'Delete this episode and its video? This cannot be undone.'
-    : 'Delete this episode and its transcript? This cannot be undone.';
-  if (!confirm(msg)) return;
-  try {
-    const res = await fetch(`/api/delete-episode/${encodeURIComponent(episodeId)}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
-    loadStats();
-    loadEpisodeList();
-    resetApp(false, false);
-  } catch(e) {
-    alert('Delete failed: ' + e.message);
-  }
 }
 
 // ── VIDEO EPISODE VIEW ────────────────────────────────────────────────────────

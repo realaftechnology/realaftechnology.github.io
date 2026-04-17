@@ -1463,8 +1463,8 @@ def index():
 
 
 @app.route("/dev")
-@requires_auth
 def dev_dashboard():
+    # No @requires_auth — the page renders its own login form when unauthenticated
     return send_from_directory("static", "dev.html")
 
 

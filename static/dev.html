@@ -17,6 +17,33 @@
   }
   body { background: var(--bg); color: var(--text); font-family: var(--sf); font-size: 14px; min-height: 100vh; }
 
+  /* Login screen */
+  #login-screen {
+    display: none; position: fixed; inset: 0; background: var(--bg);
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  #login-screen.visible { display: flex; }
+  .login-box {
+    background: var(--bg2); border-radius: 16px; padding: 36px 32px;
+    width: 100%; max-width: 340px; text-align: center;
+  }
+  .login-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .login-title span { color: var(--red); }
+  .login-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+  .login-input {
+    width: 100%; background: var(--bg3); border: 1.5px solid var(--sep);
+    border-radius: 10px; color: var(--text); font-family: var(--sf); font-size: 15px;
+    padding: 12px 14px; outline: none; -webkit-appearance: none; margin-bottom: 12px;
+    box-sizing: border-box;
+  }
+  .login-input:focus { border-color: var(--red); }
+  .login-btn {
+    width: 100%; height: 46px; background: var(--red); color: #fff; border: none;
+    border-radius: 10px; font-family: var(--sf); font-size: 15px; font-weight: 600;
+    cursor: pointer; -webkit-appearance: none;
+  }
+  .login-error { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; }
+
   .header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 24px; border-bottom: 1px solid var(--sep);
@@ -125,12 +152,30 @@
   .type-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
   .type-video { background: rgba(255,69,58,0.15); color: var(--red); }
   .type-transcript { background: rgba(255,255,255,0.08); color: var(--text3); }
+  .del-btn {
+    background: none; border: none; color: var(--text3); font-size: 13px;
+    cursor: pointer; padding: 4px 6px; border-radius: 5px; line-height: 1;
+    transition: color 0.12s, background 0.12s;
+  }
+  .del-btn:hover { color: var(--red); background: rgba(255,69,58,0.12); }
 
   .empty { text-align: center; padding: 36px; color: var(--text3); font-size: 13px; }
   .card-wrap { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
 </style>
 </head>
 <body>
+
+<!-- Login screen (shown when unauthenticated) -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title"><span>AF</span>BRAIN</div>
+    <div class="login-sub">Dev Dashboard</div>
+    <input class="login-input" type="password" id="login-pw" placeholder="Password"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
 
 <div class="header">
   <div>
@@ -198,8 +243,8 @@
     <div class="section-title">All Episodes <span class="badge" id="ep-badge"></span></div>
     <div class="card-wrap">
       <table class="ep-table">
-        <thead><tr><th>Title</th><th>Type</th><th>Segments</th><th>Imported</th></tr></thead>
-        <tbody id="ep-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        <thead><tr><th>Title</th><th>Type</th><th>Segments</th><th>Imported</th><th></th></tr></thead>
+        <tbody id="ep-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -362,30 +407,77 @@ function renderSearchHistory(searches) {
     </tr>`).join('');
 }
 
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const pw  = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  if (!pw) return;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: pw})
+    });
+    if (res.ok) {
+      document.getElementById('login-screen').classList.remove('visible');
+      refresh();
+    } else {
+      err.textContent = 'Wrong password.';
+      document.getElementById('login-pw').value = '';
+      document.getElementById('login-pw').focus();
+    }
+  } catch {
+    err.textContent = 'Connection error.';
+  }
+}
+
 // ── Episodes ──────────────────────────────────────────────────────────────────
 let _epsLoaded = false;
 function renderEpisodes() {
-  if (_epsLoaded) return;
   fetch('/api/episodes').then(r => r.json()).then(d => {
     const eps = d.episodes || [];
     _epsLoaded = true;
     document.getElementById('ep-badge').textContent = eps.length;
     const tbody = document.getElementById('ep-tbody');
-    if (!eps.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No episodes</td></tr>'; return; }
+    if (!eps.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No episodes</td></tr>'; return; }
     tbody.innerHTML = eps.map(ep => `
-      <tr>
+      <tr id="ep-row-${esc(ep.id)}">
         <td>${esc(ep.title || ep.id)}</td>
         <td><span class="type-badge ${ep.has_video ? 'type-video' : 'type-transcript'}">${ep.has_video ? 'Video' : 'Transcript'}</span></td>
         <td style="color:var(--text2)">${ep.segments}</td>
         <td style="color:var(--text3)">${ep.uploaded_at || '—'}</td>
+        <td><button class="del-btn" onclick="deleteEpisode('${esc(ep.id)}','${esc(ep.title||ep.id)}',${ep.has_video})" title="Delete">✕</button></td>
       </tr>`).join('');
   }).catch(() => {});
+}
+
+async function deleteEpisode(id, title, hasVideo) {
+  const what = hasVideo ? 'episode and its video file' : 'episode and its transcript';
+  if (!confirm(`Delete "${title}"?\n\nThis will remove the ${what} permanently.`)) return;
+  try {
+    const res = await fetch(`/api/delete-episode/${encodeURIComponent(id)}`, {method: 'DELETE'});
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+    // Remove row immediately
+    document.getElementById(`ep-row-${id}`)?.remove();
+    // Refresh stats
+    _epsLoaded = false;
+    refresh();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
 }
 
 // ── Main refresh ──────────────────────────────────────────────────────────────
 async function refresh() {
   try {
-    const data = await fetch('/api/dev/status').then(r => r.json());
+    const resp = await fetch('/api/dev/status');
+    if (resp.status === 401) {
+      document.getElementById('login-screen').classList.add('visible');
+      setTimeout(() => document.getElementById('login-pw').focus(), 50);
+      return;
+    }
+    const data = await resp.json();
 
     document.getElementById('s-ep').textContent  = data.episodes.toLocaleString();
     document.getElementById('s-vid').textContent = data.video_episodes.toLocaleString();
@@ -425,7 +517,19 @@ async function refresh() {
   }
 }
 
-refresh();
+// Check auth immediately on load — show login screen without a flash of the dashboard
+fetch('/api/dev/status').then(r => {
+  if (r.status === 401) {
+    document.getElementById('login-screen').classList.add('visible');
+    setTimeout(() => document.getElementById('login-pw').focus(), 50);
+  } else {
+    r.json().then(data => {
+      // Let full refresh handle rendering, just kick it off
+      refresh();
+    });
+  }
+}).catch(() => refresh());
+
 setInterval(refresh, 4000);
 </script>
 </body>
