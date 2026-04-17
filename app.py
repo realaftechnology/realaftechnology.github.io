@@ -10,7 +10,7 @@ import subprocess
 import urllib.request
 import urllib.error
 from datetime import datetime
-from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context
+from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request
 from functools import wraps
 from werkzeug.utils import secure_filename
 
@@ -829,6 +829,50 @@ def delete_episode_endpoint(episode_id):
         except Exception:
             pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/clip/<path:filename>")
+@requires_auth
+def download_clip(filename):
+    """Extract and download a clip from a video using ffmpeg."""
+    start = float(request.args.get("start", 0))
+    duration = float(request.args.get("duration", 90))
+    duration = min(duration, 600)  # cap at 10 minutes
+
+    vdir = videos_dir()
+    video_path = os.path.join(vdir, filename)
+    if not os.path.exists(video_path):
+        return jsonify({"error": "Video not found"}), 404
+
+    import tempfile
+    clip_name = f"clip_{int(start)}s.mp4"
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(tmp_fd)
+
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", video_path, "-ss", str(start), "-t", str(duration),
+             "-c", "copy", "-y", tmp_path],
+            capture_output=True, timeout=120
+        )
+        if result.returncode != 0:
+            return jsonify({"error": "Clip extraction failed"}), 500
+
+        @after_this_request
+        def cleanup(response):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            return response
+
+        return send_file(tmp_path, as_attachment=True, download_name=clip_name, mimetype="video/mp4")
+    except Exception as e:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/episode-segments/<episode_id>")

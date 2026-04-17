@@ -632,6 +632,25 @@ body {
   -webkit-appearance: none;
 }
 .play-btn:hover { background: rgba(255,69,58,0.22); }
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(120,120,128,0.18);
+  border: none;
+  border-radius: 6px;
+  color: var(--label-secondary);
+  font-family: var(--sf);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin-left: 4px;
+  flex-shrink: 0;
+  -webkit-appearance: none;
+  text-decoration: none;
+}
+.download-btn:hover { background: rgba(120,120,128,0.3); }
 .upload-btn {
   background: none;
   border: none;
@@ -725,7 +744,9 @@ body {
     <div id="upload-success-view" style="display:none">
       <div class="upload-success-view">
         <div class="upload-success-title">Upload complete</div>
-        <button class="modal-btn modal-btn-primary" style="max-width:200px;margin:0 auto;display:block" onclick="closeUploadModal()">Close</button>
+        <div style="display:flex;justify-content:center">
+          <button onclick="closeUploadModal()" style="background:var(--red);color:#fff;border:none;border-radius:var(--radius);font-family:var(--sf);font-size:15px;font-weight:600;cursor:pointer;padding:0 40px;height:44px;-webkit-appearance:none">Close</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1051,10 +1072,15 @@ function renderResults(query, results, autoExpand = false) {
     const playBtn = r.has_video
       ? `<button class="play-btn" onclick="playVideo('${r.video_filename}','${r.episode_title.replace(/'/g,"\\'")}',${r.start_secs})">▶ ${r.timestamp}</button>`
       : '';
+    const dlBtn = r.has_video
+      ? `<button class="download-btn" onclick="downloadClip('${r.video_filename}',${r.start_secs})">↓ Clip</button>`
+      : '';
     transcriptHtml += `<div class="result-card">
       <div class="result-meta-row">
         <span class="result-ep">${epShort}</span>
-        ${r.has_video ? playBtn : `<span class="result-ts">${r.timestamp}</span>`}
+        <span style="display:inline-flex;align-items:center;flex-shrink:0">
+          ${r.has_video ? playBtn + dlBtn : `<span class="result-ts">${r.timestamp}</span>`}
+        </span>
       </div>
       ${speaker}
       <div class="result-text">${snippet}</div>
@@ -1424,11 +1450,12 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
       }
       const transcriptHtml = results.map(r => {
         const playBtn = `<button class="play-btn" onclick="seekInlineVideo(${r.start_secs})">▶ ${r.timestamp}</button>`;
+        const dlBtn = `<button class="download-btn" onclick="downloadClip('${videoFilename.replace(/'/g,"\\'")}',${r.start_secs})">↓ Clip</button>`;
         const snippet = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         return `<div class="result-card">
           <div class="result-meta-row">
             <span class="result-ep">${safeTitle}</span>
-            ${playBtn}
+            <span style="display:inline-flex;align-items:center;flex-shrink:0">${playBtn}${dlBtn}</span>
           </div>
           <div class="result-text">${snippet}</div>
         </div>`;
@@ -1453,6 +1480,31 @@ function seekInlineVideo(secs) {
   v.currentTime = secs;
   v.play();
   scrollToTop();
+}
+
+async function downloadClip(filename, startSecs, duration = 90) {
+  const btn = event.currentTarget;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '…';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/clip/${encodeURIComponent(filename)}?start=${startSecs}&duration=${duration}`);
+    if (!res.ok) throw new Error('Failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clip_${Math.floor(startSecs)}s.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Clip download failed. Make sure ffmpeg is available on the server.');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
 }
 
 async function runAnalysisForVideo(title, results) {
