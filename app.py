@@ -992,6 +992,10 @@ def save_drive_sources():
     return jsonify({"ok": True, "count": len(sources)})
 
 
+_VIDEO_EXTS = ('.mp4', '.mov', '.avi', '.mkv', '.mp3', '.m4a', '.webm')
+_MIN_FREE_BYTES = 6 * 1024 ** 3  # 6 GB safety buffer
+
+
 def _already_ingested(episode_id):
     """Return True if this episode_id already exists in the DB."""
     try:
@@ -1001,6 +1005,98 @@ def _already_ingested(episode_id):
         return row is not None
     except Exception:
         return False
+
+
+def _disk_free_bytes():
+    """Return free bytes on the data volume (or app dir as fallback)."""
+    for path in ("/data", os.path.dirname(DB_PATH), "/"):
+        try:
+            return shutil.disk_usage(path).free
+        except Exception:
+            continue
+    return float("inf")
+
+
+def _fmt_bytes(n):
+    if n >= 1e9: return f"{n/1e9:.1f} GB"
+    if n >= 1e6: return f"{n/1e6:.1f} MB"
+    return f"{n/1e3:.0f} KB"
+
+
+def _list_gdrive_folder(url):
+    """
+    List video files in a public Google Drive folder WITHOUT downloading them.
+    Returns list of {'id': str, 'name': str} dicts.
+    Raises RuntimeError on failure.
+    """
+    m = re.search(r'/folders/([a-zA-Z0-9_-]+)', url)
+    if not m:
+        raise RuntimeError(f"Cannot extract folder ID from URL: {url}")
+    folder_id = m.group(1)
+
+    # ── Try gdown's internal directory structure API ─────────────────────────
+    # gdown 5.x exposes _get_directory_structure in download_folder module
+    try:
+        import gdown.download_folder as _gdf  # noqa
+        if hasattr(_gdf, "_get_directory_structure"):
+            raw = _gdf._get_directory_structure(
+                folder_id, use_cookies=False, remaining_ok=True
+            )
+            return _flatten_gdrive_tree(raw)
+    except Exception:
+        pass
+
+    # ── Fallback: parse the public folder HTML page ───────────────────────────
+    # Google Drive embeds file metadata as escaped JSON in the page source.
+    try:
+        import urllib.request as _ur
+        req = _ur.Request(
+            f"https://drive.google.com/drive/folders/{folder_id}",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with _ur.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+
+        # Extract file IDs and names from the embedded data blob.
+        # Pattern: ["FILE_ID","FILE_NAME","mime/type" ...]
+        entries = re.findall(
+            r'\["([a-zA-Z0-9_-]{25,})",\s*"([^"]+\.[a-zA-Z0-9]{2,4})"',
+            html
+        )
+        result = [
+            {"id": fid, "name": fname}
+            for fid, fname in entries
+            if fname.lower().endswith(_VIDEO_EXTS)
+        ]
+        if result:
+            return result
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Could not list folder contents. "
+        "Make sure the folder is shared as 'Anyone with the link'."
+    )
+
+
+def _flatten_gdrive_tree(node):
+    """Recursively flatten a gdown directory tree into a list of video file dicts."""
+    result = []
+
+    def _walk(n):
+        if isinstance(n, dict):
+            is_folder = n.get("is_folder", False) or n.get("type") == "folder"
+            if not is_folder and n.get("id") and n.get("name"):
+                if n["name"].lower().endswith(_VIDEO_EXTS):
+                    result.append({"id": n["id"], "name": n["name"]})
+            for child in n.get("children", []):
+                _walk(child)
+        elif isinstance(n, list):
+            for item in n:
+                _walk(item)
+
+    _walk(node)
+    return result
 
 
 def _ingest_one(job, video_path, filename, msg_q=None):
@@ -1038,8 +1134,45 @@ def _ingest_one(job, video_path, filename, msg_q=None):
             except: pass
 
 
+def _drive_download_one(job, gdown, file_id_or_url, tmp_dir, msg_q):
+    """
+    Download a single Drive file into tmp_dir.
+    Returns the local path on success, None on failure.
+    """
+    # Disk-space guard BEFORE downloading
+    free = _disk_free_bytes()
+    if free < _MIN_FREE_BYTES:
+        _job_log(job, "error",
+                 f"STOPPING — only {_fmt_bytes(free)} free. "
+                 f"Need at least {_fmt_bytes(_MIN_FREE_BYTES)} before downloading next file.",
+                 msg_q)
+        return None, True   # (path, stop_all)
+
+    url = (
+        f"https://drive.google.com/uc?id={file_id_or_url}"
+        if not file_id_or_url.startswith("http")
+        else file_id_or_url
+    )
+    try:
+        out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
+    except Exception as e:
+        _job_log(job, "error",
+                 f"Download failed: {e} — make sure link is 'Anyone with the link'", msg_q)
+        return None, False
+
+    if not out or not os.path.isfile(out):
+        _job_log(job, "error", "Download returned no file — check share link is public", msg_q)
+        return None, False
+
+    return out, False
+
+
 def _drive_worker(job, urls, msg_q=None):
-    """Background worker: download from Drive + ingest. Shared by SSE route and any future callers."""
+    """
+    Background worker: download from Google Drive + ingest, one file at a time.
+    For folder URLs: lists contents first (no bulk download), then processes each
+    file individually so disk never accumulates more than one video at once.
+    """
     try:
         import gdown
     except ImportError:
@@ -1057,59 +1190,82 @@ def _drive_worker(job, urls, msg_q=None):
         is_folder = "/folders/" in url
         try:
             if is_folder:
-                tmp_dir = os.path.join(tmp_base, f"gd_folder_{int(time.time())}")
-                os.makedirs(tmp_dir, exist_ok=True)
-                _job_log(job, "log", "Downloading Drive folder…", msg_q)
+                # ── FOLDER: list first, then download one at a time ──────────
+                _job_log(job, "log", "Reading Drive folder contents (no download yet)…", msg_q)
                 try:
-                    gdown.download_folder(url, output=tmp_dir, quiet=True, use_cookies=False)
-                except Exception as e:
-                    _job_log(job, "error", f"Folder download failed: {e}", msg_q)
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    folder_files = _list_gdrive_folder(url)
+                except RuntimeError as e:
+                    _job_log(job, "error", str(e), msg_q)
                     continue
-                video_exts = ('.mp4', '.mov', '.avi', '.mkv', '.mp3', '.m4a')
-                found      = [f for f in os.listdir(tmp_dir) if f.lower().endswith(video_exts)]
-                new_files  = []
-                for fn in found:
-                    safe = secure_filename(fn)
+
+                # Partition into new vs already ingested
+                new_files = []
+                for f in folder_files:
+                    safe = secure_filename(f["name"])
                     eid  = os.path.splitext(safe)[0]
                     if _already_ingested(eid):
-                        _job_log(job, "skipped", f"Skipped (already in DB): {fn}", msg_q)
+                        _job_log(job, "skipped", f"Skipped (already in DB): {f['name']}", msg_q)
                     else:
-                        new_files.append(fn)
-                _job_log(job, "log", f"Found {len(found)} file(s) — {len(new_files)} new, {len(found)-len(new_files)} already imported", msg_q)
-                for fn in new_files:
-                    src  = os.path.join(tmp_dir, fn)
-                    safe = secure_filename(fn)
-                    dst  = os.path.join(vdir, safe)
-                    shutil.move(src, dst)
+                        new_files.append(f)
+
+                skip_count = len(folder_files) - len(new_files)
+                _job_log(job, "log",
+                         f"Folder has {len(folder_files)} video(s) — "
+                         f"{len(new_files)} to import, {skip_count} already done",
+                         msg_q)
+
+                for idx, f in enumerate(new_files):
+                    safe    = secure_filename(f["name"])
+                    tmp_dir = os.path.join(tmp_base, f"gd_f_{int(time.time())}_{idx}")
+                    os.makedirs(tmp_dir, exist_ok=True)
+
+                    _job_log(job, "log",
+                             f"[{idx+1}/{len(new_files)}] Downloading {f['name']} "
+                             f"({_fmt_bytes(_disk_free_bytes())} free)…", msg_q)
+
+                    out, stop = _drive_download_one(job, gdown, f["id"], tmp_dir, msg_q)
+                    if stop:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        break   # disk full — stop this folder
+                    if not out:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        continue
+
+                    dst = os.path.join(vdir, safe)
+                    shutil.move(out, dst)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    # Transcribe + ingest; temp audio is cleaned up inside _ingest_one
                     _ingest_one(job, dst, safe, msg_q)
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+
             else:
+                # ── SINGLE FILE ───────────────────────────────────────────────
+                safe    = None  # unknown until after download
                 tmp_dir = os.path.join(tmp_base, f"gd_file_{int(time.time())}_{i}")
                 os.makedirs(tmp_dir, exist_ok=True)
-                _job_log(job, "log", f"Downloading file {i + 1} of {len(urls)}…", msg_q)
-                try:
-                    out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
-                except Exception as e:
-                    _job_log(job, "error", f"Download failed: {e} — make sure the link is set to 'Anyone with the link'", msg_q)
+
+                _job_log(job, "log",
+                         f"Downloading file {i+1}/{len(urls)} "
+                         f"({_fmt_bytes(_disk_free_bytes())} free)…", msg_q)
+
+                out, stop = _drive_download_one(job, gdown, url, tmp_dir, msg_q)
+                if stop or not out:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
+                    if stop: break
                     continue
-                if not out:
-                    _job_log(job, "error", "Download returned no file — check the share link is public", msg_q)
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-                    continue
+
                 fn   = os.path.basename(out)
                 safe = secure_filename(fn)
                 dst  = os.path.join(vdir, safe)
                 shutil.move(out, dst)
                 shutil.rmtree(tmp_dir, ignore_errors=True)
                 _ingest_one(job, dst, safe, msg_q)
+
         except Exception as e:
             _job_log(job, "error", str(e), msg_q)
 
     _finish_job(job, "done" if job["stats"]["errors"] == 0 else "error")
     if msg_q:
-        msg_q.put(None)  # sentinel: all done
+        msg_q.put(None)
 
 
 @app.route("/api/drive-import")
@@ -1304,7 +1460,7 @@ def dev_status():
 
     disk_total = disk_free = 0
     try:
-        du = shutil.disk_usage(os.path.dirname(DB_PATH))
+        du = shutil.disk_usage("/data" if os.path.isdir("/data") else os.path.dirname(DB_PATH))
         disk_total = du.total
         disk_free  = du.free
     except Exception:
