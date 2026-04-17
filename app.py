@@ -11,10 +11,12 @@ import shutil
 import time
 import threading
 import queue as queue_module
+import uuid
 import urllib.request
 import urllib.error
+from collections import deque
 from datetime import datetime
-from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request
+from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request, render_template_string
 from functools import wraps
 from werkzeug.utils import secure_filename
 
@@ -25,6 +27,39 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB max upload
 DB_PATH       = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "db.sqlite"))
 OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "") # used for all AI text generation
+
+# ── Import job registry (in-memory, last 100 jobs) ────────────────────────────
+_jobs      = deque(maxlen=100)
+_jobs_lock = threading.Lock()
+
+def _new_job(urls):
+    job = {
+        "id":          uuid.uuid4().hex[:8],
+        "started_at":  datetime.now().isoformat(),
+        "finished_at": None,
+        "urls":        urls,
+        "status":      "running",
+        "logs":        [],
+        "stats":       {"done": 0, "skipped": 0, "errors": 0},
+    }
+    with _jobs_lock:
+        _jobs.appendleft(job)
+    return job
+
+def _job_log(job, msg_type, msg, msg_q=None):
+    entry = {"ts": datetime.now().strftime("%H:%M:%S"), "type": msg_type, "msg": msg}
+    with _jobs_lock:
+        job["logs"].append(entry)
+        if msg_type == "done_file": job["stats"]["done"]    += 1
+        elif msg_type == "skipped": job["stats"]["skipped"] += 1
+        elif msg_type == "error":   job["stats"]["errors"]  += 1
+    if msg_q is not None:
+        msg_q.put({"type": msg_type, "msg": msg})
+
+def _finish_job(job, status="done"):
+    with _jobs_lock:
+        job["status"]      = status
+        job["finished_at"] = datetime.now().isoformat()
 
 YOUTUBE_TITLE_KNOWLEDGE = """
 YOUTUBE TITLE GENERATION EXPERTISE:
@@ -957,6 +992,126 @@ def save_drive_sources():
     return jsonify({"ok": True, "count": len(sources)})
 
 
+def _already_ingested(episode_id):
+    """Return True if this episode_id already exists in the DB."""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT id FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+        conn.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+def _ingest_one(job, video_path, filename, msg_q=None):
+    """Ingest one downloaded file; logs to job record and optionally to msg_q."""
+    episode_id = os.path.splitext(os.path.basename(filename))[0]
+    if _already_ingested(episode_id):
+        _job_log(job, "skipped", f"Skipped (already in DB): {filename}", msg_q)
+        if os.path.exists(video_path):
+            try: os.remove(video_path)
+            except: pass
+        return
+    title      = episode_id.replace("_", " ").replace("-", " ").strip()
+    audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
+    _job_log(job, "log", f"Transcribing {filename}…", msg_q)
+    try:
+        ffmpeg_ok = extract_audio(video_path, audio_path)
+        result    = whisper_transcribe_chunked(audio_path) if ffmpeg_ok else whisper_transcribe(video_path)
+        conn  = get_db()
+        count = ingest_video_episode(conn, episode_id, title, video_path, result)
+        cur   = conn.cursor()
+        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
+            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        conn.commit()
+        conn.close()
+        _job_log(job, "done_file", f"Done: {filename} ({count} segments)", msg_q)
+    except Exception as e:
+        if os.path.exists(video_path):
+            try: os.remove(video_path)
+            except: pass
+        _job_log(job, "error", f"{filename}: {e}", msg_q)
+    finally:
+        if os.path.exists(audio_path):
+            try: os.remove(audio_path)
+            except: pass
+
+
+def _drive_worker(job, urls, msg_q=None):
+    """Background worker: download from Drive + ingest. Shared by SSE route and any future callers."""
+    try:
+        import gdown
+    except ImportError:
+        _job_log(job, "error", "gdown not installed on server (add to requirements.txt)", msg_q)
+        _finish_job(job, "error")
+        if msg_q: msg_q.put(None)
+        return
+
+    vdir     = videos_dir()
+    tmp_base = temp_uploads_dir()
+    os.makedirs(vdir,     exist_ok=True)
+    os.makedirs(tmp_base, exist_ok=True)
+
+    for i, url in enumerate(urls):
+        is_folder = "/folders/" in url
+        try:
+            if is_folder:
+                tmp_dir = os.path.join(tmp_base, f"gd_folder_{int(time.time())}")
+                os.makedirs(tmp_dir, exist_ok=True)
+                _job_log(job, "log", "Downloading Drive folder…", msg_q)
+                try:
+                    gdown.download_folder(url, output=tmp_dir, quiet=True, use_cookies=False)
+                except Exception as e:
+                    _job_log(job, "error", f"Folder download failed: {e}", msg_q)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    continue
+                video_exts = ('.mp4', '.mov', '.avi', '.mkv', '.mp3', '.m4a')
+                found      = [f for f in os.listdir(tmp_dir) if f.lower().endswith(video_exts)]
+                new_files  = []
+                for fn in found:
+                    safe = secure_filename(fn)
+                    eid  = os.path.splitext(safe)[0]
+                    if _already_ingested(eid):
+                        _job_log(job, "skipped", f"Skipped (already in DB): {fn}", msg_q)
+                    else:
+                        new_files.append(fn)
+                _job_log(job, "log", f"Found {len(found)} file(s) — {len(new_files)} new, {len(found)-len(new_files)} already imported", msg_q)
+                for fn in new_files:
+                    src  = os.path.join(tmp_dir, fn)
+                    safe = secure_filename(fn)
+                    dst  = os.path.join(vdir, safe)
+                    shutil.move(src, dst)
+                    _ingest_one(job, dst, safe, msg_q)
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            else:
+                tmp_dir = os.path.join(tmp_base, f"gd_file_{int(time.time())}_{i}")
+                os.makedirs(tmp_dir, exist_ok=True)
+                _job_log(job, "log", f"Downloading file {i + 1} of {len(urls)}…", msg_q)
+                try:
+                    out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
+                except Exception as e:
+                    _job_log(job, "error", f"Download failed: {e} — make sure the link is set to 'Anyone with the link'", msg_q)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    continue
+                if not out:
+                    _job_log(job, "error", "Download returned no file — check the share link is public", msg_q)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    continue
+                fn   = os.path.basename(out)
+                safe = secure_filename(fn)
+                dst  = os.path.join(vdir, safe)
+                shutil.move(out, dst)
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                _ingest_one(job, dst, safe, msg_q)
+        except Exception as e:
+            _job_log(job, "error", str(e), msg_q)
+
+    _finish_job(job, "done" if job["stats"]["errors"] == 0 else "error")
+    if msg_q:
+        msg_q.put(None)  # sentinel: all done
+
+
 @app.route("/api/drive-import")
 @requires_auth
 def drive_import():
@@ -967,128 +1122,10 @@ def drive_import():
         return jsonify({"error": "No URLs provided"}), 400
 
     msg_q = queue_module.Queue()
-
-    def _already_ingested(episode_id):
-        """Return True if this episode_id already exists in the DB."""
-        try:
-            conn = get_db()
-            row = conn.execute("SELECT id FROM episodes WHERE id = ?", (episode_id,)).fetchone()
-            conn.close()
-            return row is not None
-        except Exception:
-            return False
-
-    def _ingest_one(video_path, filename):
-        """Download + ingest one file; posts log messages to msg_q."""
-        episode_id = os.path.splitext(os.path.basename(filename))[0]
-        # ── Deduplication check ──────────────────────────────────────────
-        if _already_ingested(episode_id):
-            msg_q.put({"type": "skipped", "msg": f"Skipped (already in DB): {filename}"})
-            if os.path.exists(video_path):
-                try: os.remove(video_path)
-                except: pass
-            return
-        # ────────────────────────────────────────────────────────────────
-        title = episode_id.replace("_", " ").replace("-", " ").strip()
-        audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
-        msg_q.put({"type": "log", "msg": f"Transcribing {filename}…"})
-        try:
-            ffmpeg_ok = extract_audio(video_path, audio_path)
-            result = whisper_transcribe_chunked(audio_path) if ffmpeg_ok else whisper_transcribe(video_path)
-            conn = get_db()
-            count = ingest_video_episode(conn, episode_id, title, video_path, result)
-            cur = conn.cursor()
-            cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
-            for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
-                cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
-            conn.commit()
-            conn.close()
-            msg_q.put({"type": "done_file", "msg": f"Done: {filename} ({count} segments)"})
-        except Exception as e:
-            if os.path.exists(video_path):
-                try: os.remove(video_path)
-                except: pass
-            msg_q.put({"type": "error", "msg": f"{filename}: {e}"})
-        finally:
-            if os.path.exists(audio_path):
-                try: os.remove(audio_path)
-                except: pass
-
-    def worker():
-        try:
-            import gdown
-        except ImportError:
-            msg_q.put({"type": "error", "msg": "gdown not installed on server (add to requirements.txt)"})
-            msg_q.put(None)
-            return
-
-        vdir = videos_dir()
-        os.makedirs(vdir, exist_ok=True)
-        tmp_base = temp_uploads_dir()
-        os.makedirs(tmp_base, exist_ok=True)
-
-        for i, url in enumerate(urls):
-            is_folder = "/folders/" in url
-            try:
-                if is_folder:
-                    tmp_dir = os.path.join(tmp_base, f"gd_folder_{int(time.time())}")
-                    os.makedirs(tmp_dir, exist_ok=True)
-                    msg_q.put({"type": "log", "msg": "Downloading Drive folder…"})
-                    try:
-                        gdown.download_folder(url, output=tmp_dir, quiet=True, use_cookies=False)
-                    except Exception as e:
-                        msg_q.put({"type": "error", "msg": f"Folder download failed: {e}"})
-                        shutil.rmtree(tmp_dir, ignore_errors=True)
-                        continue
-                    video_exts = ('.mp4', '.mov', '.avi', '.mkv', '.mp3', '.m4a')
-                    found = [f for f in os.listdir(tmp_dir) if f.lower().endswith(video_exts)]
-                    # Pre-filter: separate new vs already-ingested before doing any work
-                    new_files = []
-                    for fn in found:
-                        safe = secure_filename(fn)
-                        eid  = os.path.splitext(safe)[0]
-                        if _already_ingested(eid):
-                            msg_q.put({"type": "skipped", "msg": f"Skipped (already in DB): {fn}"})
-                        else:
-                            new_files.append(fn)
-                    msg_q.put({"type": "log", "msg": f"Found {len(found)} file(s) — {len(new_files)} new, {len(found)-len(new_files)} already imported"})
-                    for fn in new_files:
-                        src = os.path.join(tmp_dir, fn)
-                        safe = secure_filename(fn)
-                        dst = os.path.join(vdir, safe)
-                        shutil.move(src, dst)
-                        _ingest_one(dst, safe)
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-                else:
-                    tmp_dir = os.path.join(tmp_base, f"gd_file_{int(time.time())}_{i}")
-                    os.makedirs(tmp_dir, exist_ok=True)
-                    msg_q.put({"type": "log", "msg": f"Downloading file {i + 1} of {len(urls)}…"})
-                    try:
-                        # fuzzy=True handles share links, viewer links, etc.
-                        out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
-                    except Exception as e:
-                        msg_q.put({"type": "error", "msg": f"Download failed: {e} — make sure the link is set to 'Anyone with the link'"})
-                        shutil.rmtree(tmp_dir, ignore_errors=True)
-                        continue
-                    if not out:
-                        msg_q.put({"type": "error", "msg": "Download returned no file — check the share link is public"})
-                        shutil.rmtree(tmp_dir, ignore_errors=True)
-                        continue
-                    fn   = os.path.basename(out)
-                    safe = secure_filename(fn)
-                    dst  = os.path.join(vdir, safe)
-                    shutil.move(out, dst)
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-                    _ingest_one(dst, safe)
-            except Exception as e:
-                msg_q.put({"type": "error", "msg": str(e)})
-
-        msg_q.put(None)  # sentinel: all done
-
-    threading.Thread(target=worker, daemon=True).start()
+    job   = _new_job(urls)
+    threading.Thread(target=_drive_worker, args=(job, urls, msg_q), daemon=True).start()
 
     def generate():
-        # Yield immediately so the proxy/browser doesn't time out before first byte
         yield f"data: {json.dumps({'type': 'log', 'msg': 'Connecting to Google Drive…'})}\n\n"
         while True:
             try:
@@ -1098,7 +1135,7 @@ def drive_import():
                     break
                 yield f"data: {json.dumps(item)}\n\n"
             except queue_module.Empty:
-                yield ": heartbeat\n\n"  # keep connection alive during long ops (gdown / whisper)
+                yield ": heartbeat\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -1230,6 +1267,75 @@ def episode_segments_by_id(episode_id):
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
+
+
+@app.route("/dev")
+@requires_auth
+def dev_dashboard():
+    return send_from_directory("static", "dev.html")
+
+
+@app.route("/api/dev/status")
+@requires_auth
+def dev_status():
+    """Return system stats + all tracked import jobs."""
+    # DB stats
+    conn = get_db()
+    ep_count  = 0
+    seg_count = 0
+    vid_count = 0
+    if conn:
+        ep_count  = conn.execute("SELECT COUNT(*) FROM episodes").fetchone()[0]
+        seg_count = conn.execute("SELECT COUNT(*) FROM segments").fetchone()[0]
+        vid_count = conn.execute("SELECT COUNT(*) FROM episodes WHERE video_path IS NOT NULL AND video_path != ''").fetchone()[0]
+        conn.close()
+
+    # Disk stats
+    db_bytes    = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+    vdir        = videos_dir()
+    videos_bytes = 0
+    video_count_files = 0
+    if os.path.isdir(vdir):
+        for f in os.listdir(vdir):
+            fp = os.path.join(vdir, f)
+            if os.path.isfile(fp):
+                videos_bytes += os.path.getsize(fp)
+                video_count_files += 1
+
+    disk_total = disk_free = 0
+    try:
+        du = shutil.disk_usage(os.path.dirname(DB_PATH))
+        disk_total = du.total
+        disk_free  = du.free
+    except Exception:
+        pass
+
+    with _jobs_lock:
+        jobs_snapshot = [
+            {
+                "id":          j["id"],
+                "started_at":  j["started_at"],
+                "finished_at": j["finished_at"],
+                "status":      j["status"],
+                "urls":        j["urls"],
+                "stats":       dict(j["stats"]),
+                "logs":        list(j["logs"]),
+            }
+            for j in _jobs
+        ]
+
+    return jsonify({
+        "episodes":      ep_count,
+        "segments":      seg_count,
+        "video_episodes": vid_count,
+        "transcript_episodes": ep_count - vid_count,
+        "db_bytes":      db_bytes,
+        "videos_bytes":  videos_bytes,
+        "video_files":   video_count_files,
+        "disk_total":    disk_total,
+        "disk_free":     disk_free,
+        "jobs":          jobs_snapshot,
+    })
 
 
 if __name__ == "__main__":
