@@ -598,6 +598,7 @@ body {
 #drive-log .log-line-done { color: #30d158; }
 #drive-log .log-line-error { color: #ff453a; }
 #drive-log .log-line-info { color: var(--label-secondary); }
+#drive-log .log-line-skipped { color: var(--label-tertiary); }
 
 /* ── VIDEO PLAYER PANEL ── */
 .video-panel {
@@ -1639,7 +1640,7 @@ function _driveLog(msg, type) {
   const log = document.getElementById('drive-log');
   log.style.display = '';
   const line = document.createElement('div');
-  line.className = type === 'done_file' ? 'log-line-done' : type === 'error' ? 'log-line-error' : 'log-line-info';
+  line.className = type === 'done_file' ? 'log-line-done' : type === 'error' ? 'log-line-error' : type === 'skipped' ? 'log-line-skipped' : 'log-line-info';
   line.textContent = msg;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
@@ -1674,6 +1675,8 @@ function startDriveImport() {
       _driveLog('⚠ ' + data.msg, 'error');
     } else if (data.type === 'done_file') {
       _driveLog('✓ ' + data.msg, 'done_file');
+    } else if (data.type === 'skipped') {
+      _driveLog('— ' + data.msg, 'skipped');
     } else {
       _driveLog(data.msg, 'info');
     }

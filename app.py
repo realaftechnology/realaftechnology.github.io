@@ -8,6 +8,9 @@ import sqlite3
 import re
 import subprocess
 import shutil
+import time
+import threading
+import queue as queue_module
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -923,6 +926,156 @@ def upload_video():
     finally:
         if audio_path and os.path.exists(audio_path):
             os.remove(audio_path)
+
+
+@app.route("/api/drive-import")
+@requires_auth
+def drive_import():
+    """SSE endpoint: downloads Google Drive share links and ingests each as a video episode."""
+    urls_raw = request.args.get("urls", "")
+    urls = [u.strip() for u in urls_raw.strip().splitlines() if u.strip()]
+    if not urls:
+        return jsonify({"error": "No URLs provided"}), 400
+
+    msg_q = queue_module.Queue()
+
+    def _already_ingested(episode_id):
+        """Return True if this episode_id already exists in the DB."""
+        try:
+            conn = get_db()
+            row = conn.execute("SELECT id FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+            conn.close()
+            return row is not None
+        except Exception:
+            return False
+
+    def _ingest_one(video_path, filename):
+        """Download + ingest one file; posts log messages to msg_q."""
+        episode_id = os.path.splitext(os.path.basename(filename))[0]
+        # ── Deduplication check ──────────────────────────────────────────
+        if _already_ingested(episode_id):
+            msg_q.put({"type": "skipped", "msg": f"Skipped (already in DB): {filename}"})
+            if os.path.exists(video_path):
+                try: os.remove(video_path)
+                except: pass
+            return
+        # ────────────────────────────────────────────────────────────────
+        title = episode_id.replace("_", " ").replace("-", " ").strip()
+        audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
+        msg_q.put({"type": "log", "msg": f"Transcribing {filename}…"})
+        try:
+            ffmpeg_ok = extract_audio(video_path, audio_path)
+            result = whisper_transcribe_chunked(audio_path) if ffmpeg_ok else whisper_transcribe(video_path)
+            conn = get_db()
+            count = ingest_video_episode(conn, episode_id, title, video_path, result)
+            cur = conn.cursor()
+            cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+            for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
+                cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+            conn.commit()
+            conn.close()
+            msg_q.put({"type": "done_file", "msg": f"Done: {filename} ({count} segments)"})
+        except Exception as e:
+            if os.path.exists(video_path):
+                try: os.remove(video_path)
+                except: pass
+            msg_q.put({"type": "error", "msg": f"{filename}: {e}"})
+        finally:
+            if os.path.exists(audio_path):
+                try: os.remove(audio_path)
+                except: pass
+
+    def worker():
+        try:
+            import gdown
+        except ImportError:
+            msg_q.put({"type": "error", "msg": "gdown not installed on server (add to requirements.txt)"})
+            msg_q.put(None)
+            return
+
+        vdir = videos_dir()
+        os.makedirs(vdir, exist_ok=True)
+        tmp_base = temp_uploads_dir()
+        os.makedirs(tmp_base, exist_ok=True)
+
+        for i, url in enumerate(urls):
+            is_folder = "/folders/" in url
+            try:
+                if is_folder:
+                    tmp_dir = os.path.join(tmp_base, f"gd_folder_{int(time.time())}")
+                    os.makedirs(tmp_dir, exist_ok=True)
+                    msg_q.put({"type": "log", "msg": "Downloading Drive folder…"})
+                    try:
+                        gdown.download_folder(url, output=tmp_dir, quiet=True, use_cookies=False)
+                    except Exception as e:
+                        msg_q.put({"type": "error", "msg": f"Folder download failed: {e}"})
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        continue
+                    video_exts = ('.mp4', '.mov', '.avi', '.mkv', '.mp3', '.m4a')
+                    found = [f for f in os.listdir(tmp_dir) if f.lower().endswith(video_exts)]
+                    # Pre-filter: separate new vs already-ingested before doing any work
+                    new_files = []
+                    for fn in found:
+                        safe = secure_filename(fn)
+                        eid  = os.path.splitext(safe)[0]
+                        if _already_ingested(eid):
+                            msg_q.put({"type": "skipped", "msg": f"Skipped (already in DB): {fn}"})
+                        else:
+                            new_files.append(fn)
+                    msg_q.put({"type": "log", "msg": f"Found {len(found)} file(s) — {len(new_files)} new, {len(found)-len(new_files)} already imported"})
+                    for fn in new_files:
+                        src = os.path.join(tmp_dir, fn)
+                        safe = secure_filename(fn)
+                        dst = os.path.join(vdir, safe)
+                        shutil.move(src, dst)
+                        _ingest_one(dst, safe)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                else:
+                    tmp_dir = os.path.join(tmp_base, f"gd_file_{int(time.time())}_{i}")
+                    os.makedirs(tmp_dir, exist_ok=True)
+                    msg_q.put({"type": "log", "msg": f"Downloading file {i + 1} of {len(urls)}…"})
+                    try:
+                        # fuzzy=True handles share links, viewer links, etc.
+                        out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
+                    except Exception as e:
+                        msg_q.put({"type": "error", "msg": f"Download failed: {e} — make sure the link is set to 'Anyone with the link'"})
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        continue
+                    if not out:
+                        msg_q.put({"type": "error", "msg": "Download returned no file — check the share link is public"})
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        continue
+                    fn   = os.path.basename(out)
+                    safe = secure_filename(fn)
+                    dst  = os.path.join(vdir, safe)
+                    shutil.move(out, dst)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    _ingest_one(dst, safe)
+            except Exception as e:
+                msg_q.put({"type": "error", "msg": str(e)})
+
+        msg_q.put(None)  # sentinel: all done
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def generate():
+        # Yield immediately so the proxy/browser doesn't time out before first byte
+        yield f"data: {json.dumps({'type': 'log', 'msg': 'Connecting to Google Drive…'})}\n\n"
+        while True:
+            try:
+                item = msg_q.get(timeout=20)
+                if item is None:
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+            except queue_module.Empty:
+                yield ": heartbeat\n\n"  # keep connection alive during long ops (gdown / whisper)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+    )
 
 
 @app.route("/api/video/<path:filename>")
