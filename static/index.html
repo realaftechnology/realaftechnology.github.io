@@ -696,6 +696,173 @@ body {
 .upload-success-view { text-align: center; padding: 10px 0 4px; }
 .upload-success-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; color: var(--label); }
 
+/* ── VIEW CLIP BUTTON ── */
+.view-clip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--red);
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-family: var(--sf);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 18px;
+  cursor: pointer;
+  margin-top: 14px;
+  -webkit-appearance: none;
+  transition: opacity 0.15s;
+}
+.view-clip-btn:active { opacity: 0.75; }
+
+/* ── CLIP VIEWER OVERLAY ── */
+#clip-viewer {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 600;
+  flex-direction: column;
+}
+#clip-viewer.open { display: flex; }
+.clip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 14px) 20px 14px;
+  flex-shrink: 0;
+  background: #111;
+  border-bottom: 0.5px solid var(--separator);
+}
+.clip-header-btn {
+  background: none;
+  border: none;
+  color: var(--label-secondary);
+  font-family: var(--sf);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 0;
+  min-width: 64px;
+  -webkit-appearance: none;
+}
+.clip-header-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label);
+}
+.clip-video-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.clip-video-wrap video { max-width: 100%; max-height: 100%; display: block; }
+.clip-trim-area {
+  flex-shrink: 0;
+  padding: 18px 16px 10px;
+  background: #111;
+}
+.clip-filmstrip-wrap {
+  position: relative;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #2c2c2e;
+  touch-action: none;
+}
+#clip-filmstrip-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.clip-dim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+#clip-dim-left { left: 0; }
+#clip-dim-right { right: 0; }
+.clip-sel-bar {
+  position: absolute;
+  height: 3px;
+  background: #ffd60a;
+  pointer-events: none;
+  z-index: 2;
+}
+#clip-sel-top { top: 0; }
+#clip-sel-bottom { bottom: 0; }
+.clip-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: #ffd60a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: 5px 0 0 5px;
+}
+#clip-handle-right { border-radius: 0 5px 5px 0; }
+.clip-handle-bar {
+  width: 2px;
+  height: 22px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 1px;
+}
+.clip-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2.5px;
+  background: #fff;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: 0 0 4px rgba(0,0,0,0.6);
+}
+.clip-time-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 9px;
+  font-family: var(--sf-mono);
+  font-size: 12px;
+  color: var(--label-tertiary);
+}
+.clip-time-row span:nth-child(2) { color: var(--label-secondary); }
+.clip-actions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px calc(env(safe-area-inset-bottom) + 18px);
+  background: #111;
+  flex-shrink: 0;
+}
+.clip-action-btn {
+  flex: 1;
+  height: 50px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--sf);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-appearance: none;
+  transition: opacity 0.15s;
+}
+.clip-action-btn:active { opacity: 0.75; }
+.clip-play-btn { background: var(--bg-tertiary); color: var(--label); }
+.clip-dl-btn { background: var(--red); color: #fff; }
+
 /* ── VIDEO SIDEBAR ITEM ── */
 .ep-item-video-title {
   font-size: 13px;
@@ -750,6 +917,39 @@ body {
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- CLIP VIEWER / TRIMMER -->
+<div id="clip-viewer">
+  <div class="clip-header">
+    <button class="clip-header-btn" onclick="closeClipViewer()">Cancel</button>
+    <span class="clip-header-title">Trim Clip</span>
+    <button class="clip-header-btn" id="clip-save-btn" style="color:var(--red);font-weight:600;text-align:right" onclick="downloadTrimmedClip()">Save</button>
+  </div>
+  <div class="clip-video-wrap">
+    <video id="clip-video" playsinline webkit-playsinline></video>
+  </div>
+  <div class="clip-trim-area">
+    <div class="clip-filmstrip-wrap" id="clip-filmstrip-wrap">
+      <canvas id="clip-filmstrip-canvas"></canvas>
+      <div class="clip-dim" id="clip-dim-left"></div>
+      <div class="clip-dim" id="clip-dim-right"></div>
+      <div class="clip-sel-bar" id="clip-sel-top"></div>
+      <div class="clip-sel-bar" id="clip-sel-bottom"></div>
+      <div class="clip-handle" id="clip-handle-left"><div class="clip-handle-bar"></div></div>
+      <div class="clip-handle" id="clip-handle-right"><div class="clip-handle-bar"></div></div>
+      <div class="clip-playhead" id="clip-playhead"></div>
+    </div>
+    <div class="clip-time-row">
+      <span id="clip-start-label">0:00</span>
+      <span id="clip-dur-label">0:00</span>
+      <span id="clip-end-label">0:00</span>
+    </div>
+  </div>
+  <div class="clip-actions">
+    <button class="clip-action-btn clip-play-btn" id="clip-play-btn" onclick="toggleClipPlay()">▶ Play</button>
+    <button class="clip-action-btn clip-dl-btn" onclick="downloadTrimmedClip()">↓ Download</button>
   </div>
 </div>
 
@@ -825,8 +1025,9 @@ let chatHistory = [];
 let currentQuery = '';
 let analyzing = false;
 let hasResults = false;
-let lockedEpisode = null;   // episode number string when browsing a specific episode
-let allEpisodes = [];        // cached episode list for sidebar filtering
+let lockedEpisode = null;
+let allEpisodes = [];
+let currentVideoContext = null; // {filename} set when AI response can reference a known video
 
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
@@ -1008,6 +1209,7 @@ function clearLockedEpisode() {
 
 function resetApp(clearLock = true, focusInput = true) {
   currentResults = []; chatHistory = []; currentQuery = ''; analyzing = false; hasResults = false;
+  currentVideoContext = null;
   if (clearLock) {
     lockedEpisode = null;
     document.getElementById('locked-pill').style.display = 'none';
@@ -1064,6 +1266,9 @@ function renderResults(query, results, autoExpand = false) {
     return;
   }
   hasResults = true;
+  // Set video context if all results come from the same video file
+  const vFiles = [...new Set(results.filter(r => r.has_video).map(r => r.video_filename))];
+  currentVideoContext = (vFiles.length === 1) ? { filename: vFiles[0] } : null;
 
   let transcriptHtml = '';
   results.forEach(r => {
@@ -1199,7 +1404,7 @@ async function runAnalysis(query, results) {
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
         el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No answer — try rephrasing or adding more context.</span>';
-        if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); }
+        if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); maybeAddViewClipButton(el.parentElement, text); }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
     );
@@ -1471,6 +1676,7 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
   currentQuery = title;
   chatHistory = [];
   hasResults = true;
+  currentVideoContext = { filename: videoFilename };
 
   const src = `/api/video/${encodeURIComponent(videoFilename)}`;
   const safeTitle = title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1590,7 +1796,7 @@ async function runAnalysisForVideo(title, results) {
         el.innerHTML = text
           ? marked.parse(text)
           : '<span style="color:var(--label-tertiary)">Could not generate summary.</span>';
-        if (text) chatHistory.push({ q: `Summarize: ${title}`, a: text });
+        if (text) { chatHistory.push({ q: `Summarize: ${title}`, a: text }); maybeAddViewClipButton(el.parentElement, text); }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
     );
@@ -1599,6 +1805,180 @@ async function runAnalysisForVideo(title, results) {
     if (el2) el2.innerHTML = '<span style="color:var(--label-tertiary)">Summary unavailable.</span>';
   }
 }
+
+// ── CLIP VIEWER & TRIMMER ─────────────────────────────────────────────────────
+
+const trimState = { filename: null, duration: 0, startFrac: 0, endFrac: 1, dragging: null };
+
+function fmtSecs(s) {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`;
+}
+function parseTsSecs(str) {
+  const p = str.split(':').map(Number);
+  return p.length === 3 ? p[0]*3600+p[1]*60+p[2] : p[0]*60+(p[1]||0);
+}
+
+function maybeAddViewClipButton(containerEl, text) {
+  if (!currentVideoContext) return;
+  const m = text.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+  if (!m) return;
+  // Don't add if one already exists
+  if (containerEl.querySelector('.view-clip-btn')) return;
+  const secs = parseTsSecs(m[1]);
+  const btn = document.createElement('button');
+  btn.className = 'view-clip-btn';
+  btn.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none"><polygon points="0,0 11,6.5 0,13" fill="white"/></svg> View Clip at ${m[1]}`;
+  btn.onclick = () => openClipViewer(currentVideoContext.filename, secs);
+  containerEl.appendChild(btn);
+}
+
+async function openClipViewer(filename, startSecs) {
+  trimState.filename = filename;
+  trimState.startFrac = 0;
+  trimState.endFrac = 1;
+  const viewer = document.getElementById('clip-viewer');
+  const video  = document.getElementById('clip-video');
+  video.src = `/api/video/${encodeURIComponent(filename)}`;
+  video.load();
+  viewer.classList.add('open');
+  // Wait for duration
+  await new Promise(r => video.readyState >= 1 ? r() : video.addEventListener('loadedmetadata', r, { once: true }));
+  trimState.duration = video.duration || 0;
+  video.currentTime = startSecs;
+  // Default selection: ±90s around the timestamp
+  if (trimState.duration > 0) {
+    trimState.startFrac = Math.max(0, (startSecs - 90) / trimState.duration);
+    trimState.endFrac   = Math.min(1, (startSecs + 90) / trimState.duration);
+  }
+  updateTrimUI();
+  buildFilmstrip(video.src, trimState.duration);
+}
+
+function closeClipViewer() {
+  const video = document.getElementById('clip-video');
+  document.getElementById('clip-viewer').classList.remove('open');
+  video.pause();
+  video.src = '';
+}
+
+function toggleClipPlay() {
+  const video = document.getElementById('clip-video');
+  if (video.paused) {
+    const end = trimState.endFrac * trimState.duration;
+    if (video.currentTime >= end) video.currentTime = trimState.startFrac * trimState.duration;
+    video.play();
+  } else {
+    video.pause();
+  }
+}
+
+function updateTrimUI() {
+  const wrap = document.getElementById('clip-filmstrip-wrap');
+  if (!wrap) return;
+  const W = wrap.offsetWidth, HW = 18;
+  const lx = trimState.startFrac * W;
+  const rx = trimState.endFrac * W;
+  document.getElementById('clip-dim-left').style.width   = lx + 'px';
+  document.getElementById('clip-dim-right').style.width  = (W - rx) + 'px';
+  document.getElementById('clip-handle-left').style.left  = lx + 'px';
+  document.getElementById('clip-handle-right').style.left = (rx - HW) + 'px';
+  const selL = lx + HW, selW = Math.max(0, rx - lx - HW * 2);
+  ['clip-sel-top','clip-sel-bottom'].forEach(id => {
+    document.getElementById(id).style.left  = selL + 'px';
+    document.getElementById(id).style.width = selW + 'px';
+  });
+  const s = trimState.startFrac * trimState.duration;
+  const e = trimState.endFrac   * trimState.duration;
+  document.getElementById('clip-start-label').textContent = fmtSecs(s);
+  document.getElementById('clip-dur-label').textContent   = fmtSecs(e - s);
+  document.getElementById('clip-end-label').textContent   = fmtSecs(e);
+}
+
+async function buildFilmstrip(videoSrc, duration) {
+  const canvas = document.getElementById('clip-filmstrip-canvas');
+  const wrap   = document.getElementById('clip-filmstrip-wrap');
+  const ctx    = canvas.getContext('2d');
+  const FH = 60, FW = 54;
+  const n  = Math.max(1, Math.floor(wrap.offsetWidth / FW));
+  canvas.width  = wrap.offsetWidth;
+  canvas.height = FH;
+  const tmp = document.createElement('video');
+  tmp.muted = true;
+  tmp.src   = videoSrc;
+  tmp.preload = 'auto';
+  await new Promise(r => tmp.readyState >= 1 ? r() : tmp.addEventListener('loadedmetadata', r, { once: true }));
+  for (let i = 0; i < n; i++) {
+    tmp.currentTime = (i / n) * duration;
+    await new Promise(r => tmp.addEventListener('seeked', r, { once: true }));
+    ctx.drawImage(tmp, i * FW, 0, FW, FH);
+  }
+  tmp.src = '';
+}
+
+async function downloadTrimmedClip() {
+  const btn = document.querySelector('.clip-dl-btn');
+  const orig = btn.textContent;
+  btn.textContent = 'Preparing…';
+  btn.disabled = true;
+  const start    = trimState.startFrac * trimState.duration;
+  const duration = (trimState.endFrac - trimState.startFrac) * trimState.duration;
+  try {
+    const res = await fetch(`/api/clip/${encodeURIComponent(trimState.filename)}?start=${start}&duration=${duration}`);
+    if (!res.ok) throw new Error('Failed');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `clip_${Math.floor(start)}s.mp4`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    closeClipViewer();
+  } catch { alert('Download failed.'); }
+  finally { btn.textContent = orig; btn.disabled = false; }
+}
+
+function initTrimHandles() {
+  const wrap = document.getElementById('clip-filmstrip-wrap');
+  const lh   = document.getElementById('clip-handle-left');
+  const rh   = document.getElementById('clip-handle-right');
+  const video = document.getElementById('clip-video');
+  const getX = e => e.touches ? e.touches[0].clientX : e.clientX;
+
+  const onMove = e => {
+    if (!trimState.dragging) return;
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (getX(e) - rect.left) / rect.width));
+    if (trimState.dragging === 'left')  trimState.startFrac = Math.min(frac, trimState.endFrac - 0.01);
+    else                                 trimState.endFrac   = Math.max(frac, trimState.startFrac + 0.01);
+    updateTrimUI();
+    video.currentTime = (trimState.dragging === 'left' ? trimState.startFrac : trimState.endFrac) * trimState.duration;
+  };
+  const endDrag = () => { trimState.dragging = null; };
+
+  lh.addEventListener('mousedown',  () => trimState.dragging = 'left');
+  rh.addEventListener('mousedown',  () => trimState.dragging = 'right');
+  lh.addEventListener('touchstart', () => trimState.dragging = 'left',  { passive: true });
+  rh.addEventListener('touchstart', () => trimState.dragging = 'right', { passive: true });
+  document.addEventListener('mousemove',  onMove);
+  document.addEventListener('touchmove',  onMove, { passive: false });
+  document.addEventListener('mouseup',    endDrag);
+  document.addEventListener('touchend',   endDrag);
+
+  video.addEventListener('timeupdate', () => {
+    if (!trimState.duration) return;
+    const frac = video.currentTime / trimState.duration;
+    const W = wrap.offsetWidth;
+    document.getElementById('clip-playhead').style.left = (frac * W) + 'px';
+    if (video.currentTime >= trimState.endFrac * trimState.duration) {
+      video.pause();
+    }
+  });
+  video.addEventListener('play',  () => document.getElementById('clip-play-btn').textContent = '⏸ Pause');
+  video.addEventListener('pause', () => document.getElementById('clip-play-btn').textContent = '▶ Play');
+}
+initTrimHandles();
 
 function scrollToBottom() {
   const s = document.getElementById('scroll-area');
