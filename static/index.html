@@ -1188,19 +1188,22 @@ body {
     <div class="scroll-bottom-pad"></div>
   </div>
 
-  <div class="input-area">
-    <div id="locked-pill" style="display:none">
-      <div class="locked-ep-pill">
-        <span id="locked-label"></span>
-        <button onclick="clearLockedEpisode()">✕</button>
-      </div>
-    </div>
-    <div class="input-bar">
-      <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
-      <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+
+</div>
+
+<!-- Input bar lives OUTSIDE #main-screen so it is never part of its flex layout.
+     position:fixed makes it fully independent of everything else on the page. -->
+<div class="input-area" id="input-area">
+  <div id="locked-pill" style="display:none">
+    <div class="locked-ep-pill">
+      <span id="locked-label"></span>
+      <button onclick="clearLockedEpisode()">✕</button>
     </div>
   </div>
-
+  <div class="input-bar">
+    <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
+    <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+  </div>
 </div>
 
 <script>
@@ -2572,26 +2575,40 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keyboard handling: ONLY the input bar moves — nothing else on screen shifts.
-// .input-area is position:fixed on its own. When the keyboard opens we just
-// translateY it upward by the keyboard height. The rest of the app is untouched.
-const _inputArea = document.querySelector('.input-area');
+// Keyboard handling: ONLY the input bar moves — nothing else shifts.
+// .input-area is position:fixed and lives outside #main-screen entirely.
+// When the keyboard opens, translateY it up by the keyboard height.
+//
+// Key formula: kh = innerHeight - vv.height  (NOT minus offsetTop).
+// iOS scrolls the visual viewport up by ~keyboard height when an input
+// is focused, making offsetTop ≈ keyboard height. Subtracting it made
+// kh ≈ 0, so no transform was applied — the bar stayed under the keyboard.
+//
+// We also call window.scrollTo(0,0) on the scroll event to reset the
+// iOS visual viewport scroll that makes the rest of the screen appear
+// to jump upward.
+const _inputArea = document.getElementById('input-area');
 if (window.visualViewport) {
   let _kbRaf = null;
   const _syncKeyboard = () => {
     if (_kbRaf) return;
     _kbRaf = requestAnimationFrame(() => {
       _kbRaf = null;
-      // Keyboard height = layout viewport minus visual viewport (minus any
-      // visual viewport scroll offset iOS might have added).
-      const kh = window.innerHeight
-                 - window.visualViewport.height
-                 - window.visualViewport.offsetTop;
+      // True keyboard height — do NOT subtract offsetTop here
+      const kh = window.innerHeight - window.visualViewport.height;
       _inputArea.style.transform = kh > 50 ? `translateY(${-kh}px)` : '';
     });
   };
+  const _resetScroll = () => {
+    // iOS scrolls the visual viewport when an input is focused;
+    // this resets it so the rest of the layout doesn't appear to jump.
+    if (window.visualViewport.offsetTop !== 0) window.scrollTo(0, 0);
+  };
   window.visualViewport.addEventListener('resize', _syncKeyboard);
-  window.visualViewport.addEventListener('scroll', _syncKeyboard);
+  window.visualViewport.addEventListener('scroll', () => {
+    _resetScroll();
+    _syncKeyboard();
+  });
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
