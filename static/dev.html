@@ -520,16 +520,29 @@ async function refresh() {
       _lastActiveJson = activeJson;
       renderJobs(data.jobs||[], 'active-jobs', true);
     } else {
-      // Structure unchanged — patch logs and duration in-place, no DOM flash
+      // Only sub-content changed — patch in-place to prevent any DOM flash
       activeJobs.forEach(job => {
+        // Files table
+        const filesWrap = document.getElementById(`jt-files-${job.id}`);
+        if (filesWrap) filesWrap.innerHTML = renderFilesTable(job.files);
+        // Logs
         const logWrap = document.getElementById(`jt-log-${job.id}`);
         if (logWrap) {
           logWrap.innerHTML = renderLogLines(job.logs);
           const logEl = logWrap.querySelector('.job-log');
           if (logEl) logEl.scrollTop = 99999;
         }
-        const logTab = document.querySelector(`#job-${job.id} .job-tab:last-child`);
-        if (logTab) logTab.textContent = `Log (${(job.logs||[]).length})`;
+        // Tab counts
+        const tabs = document.querySelectorAll(`#job-${job.id} .job-tab`);
+        if (tabs[0]) tabs[0].textContent = `Files (${(job.files||[]).length})`;
+        if (tabs[1]) tabs[1].textContent = `Log (${(job.logs||[]).length})`;
+        // Stats badges
+        const countsEl = document.querySelector(`#job-${job.id} .job-counts`);
+        if (countsEl) countsEl.innerHTML =
+          (job.stats.done    > 0 ? `<span class="jc d">✓ ${job.stats.done}</span>` : '') +
+          (job.stats.skipped > 0 ? `<span class="jc s">— ${job.stats.skipped}</span>` : '') +
+          (job.stats.errors  > 0 ? `<span class="jc e">⚠ ${job.stats.errors}</span>` : '');
+        // Duration
         const durEl = document.querySelector(`#job-${job.id} .job-dur`);
         if (durEl) durEl.textContent = `running ${elapsed(job.started_at, null)}`;
       });

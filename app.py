@@ -283,16 +283,18 @@ def ep_filter_clauses(ep_number):
     Avoids 'Ep 1' matching 'Ep 10', 'Ep 100', 'Ep 1000' etc."""
     try:
         n = int(ep_number)
-        # Titles look like "Ep 01 - ..." or "Ep 979 - ..."
-        # Match number followed by space, dash, or dot — not another digit
-        patterns = [f"Ep {n} %", f"Ep {n}-%", f"Ep {n}.%"]
+        patterns = [f"Ep {n} %", f"Ep {n}-%", f"Ep {n}.%", f"Ep {n}"]
         if n < 100:
-            p = f"{n:02d}"  # zero-padded: 1 -> 01
+            p = f"{n:02d}"
             patterns += [f"Ep {p} %", f"Ep {p}-%", f"Ep {p}.%"]
         sql = "(" + " OR ".join(["e.title LIKE ?"] * len(patterns)) + ")"
         return sql, patterns
     except ValueError:
-        return "e.title LIKE ?", [f"%{ep_number}%"]
+        # Non-numeric filter: match against title OR episode id (which may have
+        # underscores where the title has spaces — Drive imports hit this case)
+        normalized = ep_number.replace("_", " ").replace("-", " ")
+        sql = "(e.title LIKE ? OR e.id LIKE ? OR e.title LIKE ?)"
+        return sql, [f"%{ep_number}%", f"%{ep_number}%", f"%{normalized}%"]
 
 
 def episode_search(ep_number):
@@ -1196,6 +1198,19 @@ def _flatten_gdrive_tree(node):
     return result
 
 
+def _clean_drive_title(filename):
+    """Produce a clean episode title from a raw Drive filename."""
+    name = os.path.splitext(os.path.basename(filename))[0]
+    name = re.sub(r'[_\-]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Normalize "ep998", "EP 998", "Ep998" → "Ep 998 ..."
+    m = re.match(r'^[Ee][Pp]\s*(\d+)(.*)', name)
+    if m:
+        rest = m.group(2).strip()
+        return f"Ep {int(m.group(1))}" + (f" {rest}" if rest else "")
+    return name
+
+
 def _ingest_one(job, video_path, filename, msg_q=None):
     """Ingest one downloaded file; logs to job record and optionally to msg_q."""
     episode_id = os.path.splitext(os.path.basename(filename))[0]
@@ -1213,7 +1228,7 @@ def _ingest_one(job, video_path, filename, msg_q=None):
         job["files"].append(file_rec)
     # ──────────────────────────────────────────────────────────────────────────
 
-    title      = episode_id.replace("_", " ").replace("-", " ").strip()
+    title      = _clean_drive_title(filename)
     audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
     _job_log(job, "log", f"Transcribing {filename}…", msg_q)
     try:
