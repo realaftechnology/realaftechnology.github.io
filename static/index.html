@@ -1309,24 +1309,31 @@ function renderEpisodeList(episodes) {
     list.innerHTML = '<div style="padding:20px;color:var(--label-tertiary);font-size:13px">No episodes.</div>';
     return;
   }
-  const sorted = [...episodes].sort((a, b) => {
-    const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
-    const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
-    return nb - na;
-  });
-  list.innerHTML = sorted.map(ep => {
-    if (ep.has_video) {
-      const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
-      const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
-      const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
-      const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
-      return `<div class="ep-item" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
-        <div style="flex:1;min-width:0">
-          <div class="ep-item-video-title">▶ ${ep.title.replace(/</g,'&lt;')}</div>
-          <div class="ep-item-title">${dateLabel}</div>
-        </div>
-      </div>`;
-    }
+  // Split into video (Drive imports) and regular (numbered) episodes
+  const videoEps   = episodes.filter(ep => ep.has_video)
+    .sort((a, b) => (b.uploaded_at || '').localeCompare(a.uploaded_at || ''));
+  const regularEps = episodes.filter(ep => !ep.has_video)
+    .sort((a, b) => {
+      const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
+      const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
+      return nb - na;
+    });
+
+  const renderVideo = ep => {
+    const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
+    const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
+    const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
+    const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
+    const isActive = lockedEpisode === epId;
+    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+      <div style="flex:1;min-width:0">
+        <div class="ep-item-video-title">▶ ${ep.title.replace(/</g,'&lt;')}</div>
+        <div class="ep-item-title">${dateLabel}</div>
+      </div>
+    </div>`;
+  };
+
+  const renderRegular = ep => {
     const num = ep.title.match(/(\d+)/)?.[1] || '';
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
@@ -1337,7 +1344,14 @@ function renderEpisodeList(episodes) {
         <div class="ep-item-title">${subtitle}</div>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  const sectionLabel = (text) =>
+    `<div style="padding:10px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--label-tertiary);text-transform:uppercase">${text}</div>`;
+
+  list.innerHTML =
+    (videoEps.length   ? sectionLabel('Video / Audio') + videoEps.map(renderVideo).join('')     : '') +
+    (regularEps.length ? sectionLabel('Episodes')      + regularEps.map(renderRegular).join('') : '');
 }
 
 function filterEpisodes(query) {
@@ -1991,6 +2005,13 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
   chatHistory = [];
   hasResults = true;
   currentVideoContext = { filename: videoFilename };
+
+  // Lock context to this episode so chat queries search within it
+  lockedEpisode = episodeId;
+  const shortTitle = title.length > 32 ? title.slice(0, 32) + '…' : title;
+  document.getElementById('locked-pill').style.display = 'block';
+  document.getElementById('locked-label').textContent = shortTitle;
+  document.getElementById('search-input').placeholder = `Ask about "${shortTitle}"…`;
 
   const src = `/api/video/${encodeURIComponent(videoFilename)}`;
   const safeTitle = title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

@@ -569,8 +569,11 @@ def extract_episode_filter(text):
     """Extract an episode number from text. Returns string or None."""
     m = re.search(r'\b(?:ep|episode)[\s_-]*(\d+)\b', text, re.IGNORECASE)
     if m: return m.group(1)
-    m = re.search(r'\b(\d{4})\b', text)
-    if m: return m.group(1)
+    # Match 4-digit numbers but exclude calendar years (2000-2030) which appear
+    # in date-based Drive titles like "04.12.2024 Audio Exclusive"
+    for m in re.finditer(r'\b(\d{4})\b', text):
+        if not (2000 <= int(m.group(1)) <= 2030):
+            return m.group(1)
     return None
 
 
