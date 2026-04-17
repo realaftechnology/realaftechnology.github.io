@@ -749,6 +749,31 @@ body {
   transition: opacity 0.15s;
 }
 .view-clip-btn:active { opacity: 0.75; }
+.clip-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.clip-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--red);
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-family: var(--sf);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 14px;
+  height: 34px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.clip-chip-btn:active { opacity: 0.75; }
 
 /* ── CLIP VIEWER OVERLAY ── */
 #clip-viewer {
@@ -1528,7 +1553,7 @@ async function runAnalysis(query, results) {
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
         el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No answer — try rephrasing or adding more context.</span>';
-        if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); maybeAddViewClipButton(el.parentElement, text); }
+        if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); addAllClipButtons(el.parentElement, text); }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
     );
@@ -1558,7 +1583,7 @@ async function doFollowup(question) {
       (text) => { body.innerHTML = marked.parse(text); scrollToBottom(); },
       (text) => {
         body.innerHTML = marked.parse(text || 'No answer — try rephrasing or adding more context.');
-        if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); maybeAddViewClipButton(item, text); }
+        if (text) { chatHistory.push({q: question, a: text}); addEpisodeButtons(item, text); addAllClipButtons(item, text); }
         scrollToBottom();
       },
       (err) => { body.textContent = 'Request failed.'; }
@@ -2008,7 +2033,7 @@ async function runAnalysisForVideo(title, results) {
         el.innerHTML = text
           ? marked.parse(text)
           : '<span style="color:var(--label-tertiary)">Could not generate summary.</span>';
-        if (text) { chatHistory.push({ q: `Summarize: ${title}`, a: text }); maybeAddViewClipButton(el.parentElement, text); }
+        if (text) { chatHistory.push({ q: `Summarize: ${title}`, a: text }); addAllClipButtons(el.parentElement, text); }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
     );
@@ -2040,18 +2065,69 @@ function parseTsSecs(str) {
   return p.length === 3 ? p[0]*3600+p[1]*60+p[2] : p[0]*60+(p[1]||0);
 }
 
-function maybeAddViewClipButton(containerEl, text) {
-  if (!currentVideoContext) return;
-  const m = text.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
-  if (!m) return;
-  // Don't add if one already exists
-  if (containerEl.querySelector('.view-clip-btn')) return;
-  const secs = parseTsSecs(m[1]);
-  const btn = document.createElement('button');
-  btn.className = 'view-clip-btn';
-  btn.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none"><polygon points="0,0 11,6.5 0,13" fill="white"/></svg> View Clip at ${m[1]}`;
-  btn.onclick = () => openClipViewer(currentVideoContext.filename, secs);
-  containerEl.appendChild(btn);
+function addAllClipButtons(containerEl, text) {
+  // Don't double-add
+  if (containerEl.querySelector('.view-clip-btn, .clip-chips-row')) return;
+
+  // Match "Ep 880 @ 07:37", "Ep 1014, 00:10:55", "Ep 880 @ 7:37" etc.
+  const re = /\bEp\s+(\d{3,5})[,\s@]+(\d{1,2}:\d{2}(?::\d{2})?)\b/g;
+  const seen = new Set();
+  const clips = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const epNum = m[1];
+    const tsStr = m[2];
+    const key = `${epNum}_${tsStr}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const secs = parseTsSecs(tsStr);
+    // Find best matching result: same episode number, has video, closest timestamp
+    const match =
+      currentResults.find(r => {
+        const n = (r.episode_title || '').match(/\b(\d{3,5})\b/);
+        return n && n[1] === epNum && r.has_video && Math.abs((r.start_secs || 0) - secs) < 15;
+      }) ||
+      currentResults.find(r => {
+        const n = (r.episode_title || '').match(/\b(\d{3,5})\b/);
+        return n && n[1] === epNum && r.has_video;
+      });
+    if (match) clips.push({ epNum, tsStr, filename: match.video_filename, secs });
+  }
+
+  // Fallback: if no structured citations found but there's a video context + any timestamp
+  if (!clips.length) {
+    if (!currentVideoContext) return;
+    const fm = text.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+    if (!fm) return;
+    const secs = parseTsSecs(fm[1]);
+    const btn = document.createElement('button');
+    btn.className = 'view-clip-btn';
+    btn.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none"><polygon points="0,0 11,6.5 0,13" fill="white"/></svg> View Clip at ${fm[1]}`;
+    btn.onclick = () => openClipViewer(currentVideoContext.filename, secs);
+    containerEl.appendChild(btn);
+    return;
+  }
+
+  if (clips.length === 1) {
+    const btn = document.createElement('button');
+    btn.className = 'view-clip-btn';
+    btn.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none"><polygon points="0,0 11,6.5 0,13" fill="white"/></svg> View Clip at ${clips[0].tsStr}`;
+    btn.onclick = () => openClipViewer(clips[0].filename, clips[0].secs);
+    containerEl.appendChild(btn);
+    return;
+  }
+
+  // Multiple clips — compact chip row
+  const wrap = document.createElement('div');
+  wrap.className = 'clip-chips-row';
+  clips.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'clip-chip-btn';
+    btn.innerHTML = `<svg width="9" height="11" viewBox="0 0 11 13" fill="none"><polygon points="0,0 11,6.5 0,13" fill="white"/></svg> Ep ${c.epNum} · ${c.tsStr}`;
+    btn.onclick = () => openClipViewer(c.filename, c.secs);
+    wrap.appendChild(btn);
+  });
+  containerEl.appendChild(wrap);
 }
 
 async function openClipViewer(filename, startSecs) {
