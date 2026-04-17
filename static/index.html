@@ -1224,7 +1224,7 @@ function renderEpisodeList(episodes) {
     if (ep.has_video) {
       const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
       const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
-      const deleteBtn = `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}')" title="Delete episode">✕</button>`;
+      const deleteBtn = `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}',true)" title="Delete episode">✕</button>`;
       const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
       const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
       return `<div class="ep-item" style="display:flex;align-items:center;gap:4px" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
@@ -1244,6 +1244,7 @@ function renderEpisodeList(episodes) {
         <div class="ep-item-num">Ep ${num}</div>
         <div class="ep-item-title">${subtitle}</div>
       </div>
+      <button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}',false)" title="Delete episode">✕</button>
     </div>`;
   }).join('');
 }
@@ -1747,8 +1748,11 @@ function closeVideoPanel() {
 
 // ── DELETE EPISODE ────────────────────────────────────────────────────────────
 
-async function deleteEpisode(episodeId) {
-  if (!confirm(`Delete this episode and its video? This cannot be undone.`)) return;
+async function deleteEpisode(episodeId, hasVideo = true) {
+  const msg = hasVideo
+    ? 'Delete this episode and its video? This cannot be undone.'
+    : 'Delete this episode and its transcript? This cannot be undone.';
+  if (!confirm(msg)) return;
   try {
     const res = await fetch(`/api/delete-episode/${encodeURIComponent(episodeId)}`, { method: 'DELETE' });
     const data = await res.json();
