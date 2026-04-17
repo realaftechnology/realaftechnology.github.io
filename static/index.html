@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AFBrain">
+<meta name="google" content="notranslate">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="icon" href="/static/apple-touch-icon.png">
 <title>AFBrain</title>
@@ -103,11 +104,7 @@ body {
   display: none;
   flex-direction: column;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  /* bottom is intentionally omitted — JS sets height via visualViewport */
-  height: 100%;
+  inset: 0;
   align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -1011,7 +1008,7 @@ body {
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-logo"><span>AF</span>BRAIN</div>
+    <div class="login-logo" translate="no"><span>AF</span>BRAIN</div>
     <input class="login-field" type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" onclick="doLogin()">Continue</button>
     <div class="login-error" id="login-error"></div>
@@ -1167,7 +1164,7 @@ body {
       <button class="sidebar-btn" onclick="toggleSidebar()">
         <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
       </button>
-      <div class="app-title" style="flex:1" onclick="resetApp()"><span>AF</span>BRAIN</div>
+      <div class="app-title" style="flex:1" onclick="resetApp()" translate="no"><span>AF</span>BRAIN</div>
       <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
       <button class="upload-btn" onclick="openUploadModal()" title="Upload video">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="10" width="16" height="7" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M9 1v8M6 4l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -2569,8 +2566,12 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keep input above iOS keyboard — track visual viewport height only.
-// Never move `top` — offsetTop shifts the whole screen and causes the jump.
+// iOS keyboard: shrink #main-screen to the visual viewport height when keyboard
+// opens so the input bar rides just above the keyboard. We ONLY adjust height
+// (never top/offsetTop — that causes the visible jump). We also clear the
+// inline style when the keyboard closes so CSS inset:0 restores full-screen.
+// No initial height set — visualViewport can be smaller than the screen on
+// Chrome due to browser UI (translate bar etc.), which would break the layout.
 const mainScreen = document.getElementById('main-screen');
 if (window.visualViewport) {
   let _vpRaf = null;
@@ -2578,13 +2579,18 @@ if (window.visualViewport) {
     if (_vpRaf) return;
     _vpRaf = requestAnimationFrame(() => {
       _vpRaf = null;
-      mainScreen.style.height = window.visualViewport.height + 'px';
+      const vvh = window.visualViewport.height;
+      // Keyboard is open when visual viewport is meaningfully shorter than
+      // the layout viewport (innerHeight). Use 120px threshold to avoid
+      // triggering on browser chrome changes.
+      if (window.innerHeight - vvh > 120) {
+        mainScreen.style.height = vvh + 'px';
+      } else {
+        mainScreen.style.height = ''; // keyboard closed — let CSS fill screen
+      }
     });
   };
   window.visualViewport.addEventListener('resize', onViewport);
-  window.visualViewport.addEventListener('scroll', onViewport);
-  // Set initial height so it's already correct before any keyboard interaction
-  mainScreen.style.height = window.visualViewport.height + 'px';
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
