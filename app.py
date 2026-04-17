@@ -1051,81 +1051,68 @@ def _list_gdrive_folder(url):
     folder_id = m.group(1)
     errors = []
 
-    # ── Attempt 1: intercept gdown's own download_folder ─────────────────────
-    # gdown.download_folder already knows how to list Drive folders — we
-    # monkey-patch its per-file download function to collect file IDs/names
-    # without actually downloading anything.
+    # ── Attempt 1: intercept gdown's download_folder ─────────────────────────
+    # gdown/download_folder.py does `from .download import download` at the
+    # module level, so `gdown.download_folder.download` is the function it
+    # calls for every file. We replace that reference temporarily to capture
+    # file IDs/names without downloading anything.
+    #
+    # Critical: gdown calls download(url="...", output="...") with url as a
+    # keyword argument — the mock MUST name the first param `url` to match.
     try:
         import gdown as _gdown
         import gdown.download_folder as _gdf
 
-        # Find the download function gdown uses internally for each file
-        _orig_dl = None
-        for attr in ("download", "_download"):
-            if hasattr(_gdf, attr):
-                _orig_dl = getattr(_gdf, attr)
-                break
-
-        if _orig_dl is not None:
+        if hasattr(_gdf, "download"):
+            _orig_dl = _gdf.download
             _found = []
 
-            def _mock_dl(url_or_id, output=None, **kwargs):
-                # Capture file id and name, create a zero-byte placeholder
-                fid = re.search(r'[?&]id=([a-zA-Z0-9_-]{25,})', url_or_id or '')
+            def _mock_dl(url=None, output=None, **kwargs):
+                _url = url or kwargs.get("url", "")
+                fid = re.search(r'[?&]id=([a-zA-Z0-9_-]{25,})', _url or "")
                 fid = fid.group(1) if fid else None
                 fname = os.path.basename(output) if output else None
                 if fid and fname:
                     _found.append({"id": fid, "name": fname})
-                # Return a placeholder path so gdown thinks it succeeded
+                # Create a zero-byte placeholder so gdown doesn't error out
                 if output:
                     try:
-                        os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
+                        os.makedirs(
+                            os.path.dirname(os.path.abspath(output)), exist_ok=True
+                        )
                         open(output, "wb").close()
                     except Exception:
                         pass
                 return output
 
-            setattr(_gdf, _orig_dl.__name__, _mock_dl)
+            _gdf.download = _mock_dl
             _tmp = os.path.join(tempfile.gettempdir(), f"gd_list_{folder_id}")
             try:
                 _gdown.download_folder(url, output=_tmp, quiet=True, remaining_ok=True)
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(f"gdown intercept download_folder: {e}")
             finally:
-                setattr(_gdf, _orig_dl.__name__, _orig_dl)
+                _gdf.download = _orig_dl
                 shutil.rmtree(_tmp, ignore_errors=True)
 
             result = [f for f in _found if f["name"].lower().endswith(_VIDEO_EXTS)]
             if result:
                 return result
+            if _found:
+                # Files were found but none are video — return all so the caller
+                # can surface a clearer error
+                errors.append(
+                    f"gdown found {len(_found)} file(s) but none matched video extensions"
+                )
+        else:
+            errors.append("gdown.download_folder has no 'download' attribute")
     except Exception as e:
         errors.append(f"gdown intercept: {e}")
 
-    # ── Attempt 2: gdown internal _get_directory_structure ───────────────────
+    # ── Attempt 2: use gdown's own session to fetch the folder page ───────────
     try:
-        import gdown.download_folder as _gdf
-        if hasattr(_gdf, "_get_directory_structure"):
-            fn = _gdf._get_directory_structure
-            for kwargs in [
-                dict(use_cookies=False, remaining_ok=True),
-                dict(use_cookies=False),
-                {},
-            ]:
-                try:
-                    raw = fn(folder_id, **kwargs)
-                    files = _flatten_gdrive_tree(raw)
-                    if files:
-                        return files
-                    break
-                except TypeError:
-                    continue
-    except Exception as e:
-        errors.append(f"_get_directory_structure: {e}")
-
-    # ── Attempt 3: use gdown's requests session to fetch the folder page ─────
-    try:
-        import gdown.download_folder as _gdf
-        _get_sess = getattr(_gdf, "_get_session", None)
+        import gdown.download_folder as _gdf2
+        _get_sess = getattr(_gdf2, "_get_session", None)
         if _get_sess is None:
             import gdown.download as _gd2
             _get_sess = getattr(_gd2, "_get_session", None)
@@ -1138,12 +1125,15 @@ def _list_gdrive_folder(url):
             files = _parse_drive_html(resp.text)
             if files:
                 return files
+            errors.append("gdown session fetch: folder page returned no video files")
+        else:
+            errors.append("gdown: no _get_session found")
     except Exception as e:
         errors.append(f"gdown session fetch: {e}")
 
     raise RuntimeError(
         "Could not list folder contents — all methods failed.\n"
-        + "\n".join(errors)
+        + "\n".join(f"  • {e}" for e in errors)
         + "\nMake sure the folder is shared as 'Anyone with the link'."
     )
 
