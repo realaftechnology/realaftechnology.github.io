@@ -507,17 +507,32 @@ async function refresh() {
     badge.style.display = activeCount ? '' : 'none';
     if (activeCount) badge.textContent = activeCount + ' running';
 
-    // Only re-render jobs/search sections when data actually changed —
-    // this prevents the "active imports" section from flashing every 4s.
+    // Only re-render jobs/search sections when data actually changed.
+    // Exclude logs from the active-jobs comparison — logs grow every poll and
+    // would otherwise trigger a full innerHTML replacement (causing the flash).
     const activeJobs  = (data.jobs||[]).filter(j => j.status === 'running');
     const pastJobs    = (data.jobs||[]).filter(j => j.status !== 'running');
-    const activeJson  = JSON.stringify(activeJobs);
+    const activeJson  = JSON.stringify(activeJobs.map(({logs: _, ...rest}) => rest));
     const pastJson    = JSON.stringify(pastJobs);
-    const searchJson  = JSON.stringify((data.searches||[]).slice(0, 20)); // compare top 20
+    const searchJson  = JSON.stringify((data.searches||[]).slice(0, 20));
 
     if (activeJson !== _lastActiveJson) {
       _lastActiveJson = activeJson;
       renderJobs(data.jobs||[], 'active-jobs', true);
+    } else {
+      // Structure unchanged — patch logs and duration in-place, no DOM flash
+      activeJobs.forEach(job => {
+        const logWrap = document.getElementById(`jt-log-${job.id}`);
+        if (logWrap) {
+          logWrap.innerHTML = renderLogLines(job.logs);
+          const logEl = logWrap.querySelector('.job-log');
+          if (logEl) logEl.scrollTop = 99999;
+        }
+        const logTab = document.querySelector(`#job-${job.id} .job-tab:last-child`);
+        if (logTab) logTab.textContent = `Log (${(job.logs||[]).length})`;
+        const durEl = document.querySelector(`#job-${job.id} .job-dur`);
+        if (durEl) durEl.textContent = `running ${elapsed(job.started_at, null)}`;
+      });
     }
     if (pastJson !== _lastPastJson) {
       _lastPastJson = pastJson;
