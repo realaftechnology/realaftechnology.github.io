@@ -7,131 +7,127 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --red: #ff453a;
-    --green: #30d158;
-    --yellow: #ffd60a;
-    --orange: #ff9f0a;
-    --bg: #0a0a0a;
-    --bg2: #141414;
-    --bg3: #1c1c1e;
-    --bg4: #2c2c2e;
+    --red: #ff453a; --green: #30d158; --yellow: #ffd60a; --orange: #ff9f0a;
+    --bg: #0a0a0a; --bg2: #141414; --bg3: #1c1c1e; --bg4: #2c2c2e;
     --sep: rgba(255,255,255,0.1);
-    --text: #ffffff;
-    --text2: rgba(255,255,255,0.6);
-    --text3: rgba(255,255,255,0.35);
+    --text: #fff; --text2: rgba(255,255,255,0.6); --text3: rgba(255,255,255,0.35);
     --sf: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     --mono: "SF Mono", "Fira Code", monospace;
     --radius: 10px;
   }
   body { background: var(--bg); color: var(--text); font-family: var(--sf); font-size: 14px; min-height: 100vh; }
 
-  /* Header */
   .header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 24px; border-bottom: 1px solid var(--sep);
     position: sticky; top: 0; background: var(--bg); z-index: 10;
   }
-  .header-title { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+  .header-title { font-size: 15px; font-weight: 700; }
   .header-title span { color: var(--red); }
-  .header-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .header-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
   .header-right { display: flex; align-items: center; gap: 10px; }
   .back-btn {
     background: var(--bg3); border: none; color: var(--text2); font-family: var(--sf);
     font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 6px;
-    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
   }
   .back-btn:hover { background: var(--bg4); }
-  .refresh-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .refresh-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); transition: background 0.3s; }
   .refresh-dot.stale { background: var(--text3); }
-  .last-updated { font-size: 11px; color: var(--text3); }
 
-  /* Page layout */
-  .page { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .page { padding: 24px; max-width: 1160px; margin: 0 auto; }
 
   /* Stat cards */
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
-  .stat-card { background: var(--bg2); border-radius: var(--radius); padding: 16px; }
-  .stat-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
-  .stat-val { font-size: 26px; font-weight: 700; line-height: 1; }
-  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
-  .stat-val.red { color: var(--red); }
-  .stat-val.green { color: var(--green); }
-  .stat-val.yellow { color: var(--yellow); }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .stat-card { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; }
+  .stat-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .stat-val { font-size: 24px; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .red { color: var(--red); } .green { color: var(--green); } .yellow { color: var(--yellow); }
 
   /* Storage bar */
-  .storage-card { background: var(--bg2); border-radius: var(--radius); padding: 16px; margin-bottom: 28px; }
-  .storage-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-  .storage-title { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; }
+  .storage-card { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 24px; }
+  .storage-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .storage-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; }
   .storage-nums { font-size: 12px; color: var(--text2); }
-  .storage-bar { height: 8px; background: var(--bg4); border-radius: 4px; overflow: hidden; }
-  .storage-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.4s; }
+  .storage-bar { height: 7px; background: var(--bg4); border-radius: 4px; overflow: hidden; }
+  .storage-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s; }
   .storage-fill.warn { background: var(--yellow); }
   .storage-fill.danger { background: var(--red); }
-  .storage-legend { display: flex; gap: 16px; margin-top: 8px; }
-  .storage-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); }
-  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
   /* Section */
   .section { margin-bottom: 28px; }
-  .section-title {
-    font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase;
-    letter-spacing: 0.6px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-  }
-  .badge {
-    background: var(--bg3); color: var(--text2); font-size: 11px; font-weight: 600;
-    padding: 2px 7px; border-radius: 20px; letter-spacing: 0;
-  }
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .badge { background: var(--bg3); color: var(--text2); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px; letter-spacing: 0; }
   .badge.running { background: rgba(255,159,10,0.2); color: var(--orange); }
-  .badge.done { background: rgba(48,209,88,0.15); color: var(--green); }
-  .badge.error { background: rgba(255,69,58,0.15); color: var(--red); }
 
   /* Job cards */
-  .job-card { background: var(--bg2); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
-  .job-header {
-    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-    cursor: pointer; user-select: none;
-  }
+  .job-card { background: var(--bg2); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+  .job-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; user-select: none; }
   .job-header:hover { background: var(--bg3); }
-  .job-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .job-status-dot.running { background: var(--orange); animation: pulse 1.2s infinite; }
-  .job-status-dot.done    { background: var(--green); }
-  .job-status-dot.error   { background: var(--red); }
+  .job-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .job-dot.running { background: var(--orange); animation: pulse 1.2s infinite; }
+  .job-dot.done    { background: var(--green); }
+  .job-dot.error   { background: var(--red); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .job-title { flex: 1; font-size: 13px; font-weight: 500; }
-  .job-meta  { font-size: 11px; color: var(--text3); }
-  .job-stats { display: flex; gap: 12px; }
-  .job-stat  { font-size: 11px; }
-  .job-stat.done    { color: var(--green); }
-  .job-stat.skipped { color: var(--text3); }
-  .job-stat.errors  { color: var(--red); }
-  .job-chevron { font-size: 10px; color: var(--text3); transition: transform 0.15s; }
+  .job-title { flex: 1; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job-counts { display: flex; gap: 10px; flex-shrink: 0; }
+  .jc { font-size: 11px; }
+  .jc.d { color: var(--green); } .jc.s { color: var(--text3); } .jc.e { color: var(--red); }
+  .job-dur { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+  .job-chevron { font-size: 10px; color: var(--text3); transition: transform 0.15s; flex-shrink: 0; }
   .job-card.open .job-chevron { transform: rotate(180deg); }
-  .job-log {
-    display: none; padding: 0 14px 12px;
-    font-family: var(--mono); font-size: 11px; line-height: 1.7;
-    max-height: 260px; overflow-y: auto;
-  }
-  .job-card.open .job-log { display: block; }
+
+  /* Job body (tabs) */
+  .job-body { display: none; border-top: 1px solid var(--sep); }
+  .job-card.open .job-body { display: block; }
+  .job-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--sep); }
+  .job-tab { background: none; border: none; color: var(--text3); font-family: var(--sf); font-size: 12px; font-weight: 500; padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .job-tab.active { color: var(--text); border-bottom-color: var(--red); }
+
+  /* Files table inside job */
+  .files-wrap { padding: 10px 14px 12px; }
+  .files-table { width: 100%; border-collapse: collapse; }
+  .files-table th { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 0 6px 6px; }
+  .files-table td { padding: 7px 6px; border-top: 1px solid var(--sep); font-size: 12px; }
+  .file-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .file-dot.transcribing { background: var(--orange); animation: pulse 1.2s infinite; }
+  .file-dot.done         { background: var(--green); }
+  .file-dot.error        { background: var(--red); }
+  .file-dot.skipped      { background: var(--text3); }
+  .file-name { font-family: var(--mono); font-size: 11px; }
+
+  /* Log inside job */
+  .job-log { padding: 10px 14px 12px; font-family: var(--mono); font-size: 11px; line-height: 1.7; max-height: 240px; overflow-y: auto; }
   .log-ts { color: var(--text3); margin-right: 6px; }
   .log-done    { color: var(--green); }
   .log-error   { color: var(--red); }
   .log-skipped { color: var(--text3); }
   .log-info    { color: var(--text2); }
-  .job-url { font-size: 11px; color: var(--text3); font-family: var(--mono); word-break: break-all; padding: 0 14px 8px; }
 
-  /* Empty state */
-  .empty { text-align: center; padding: 40px; color: var(--text3); font-size: 13px; }
+  /* Search history */
+  .search-table { width: 100%; border-collapse: collapse; }
+  .search-table th { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 0 10px 8px; border-bottom: 1px solid var(--sep); }
+  .search-table td { padding: 9px 10px; border-bottom: 1px solid var(--sep); font-size: 13px; }
+  .search-table tr:last-child td { border-bottom: none; }
+  .search-table tr:hover td { background: var(--bg3); }
+  .search-q { font-weight: 500; }
+  .search-ep { font-size: 11px; font-family: var(--mono); color: var(--orange); }
+  .search-count { font-size: 12px; color: var(--text2); }
+  .search-ts { font-size: 11px; color: var(--text3); white-space: nowrap; }
 
   /* Episodes table */
   .ep-table { width: 100%; border-collapse: collapse; }
   .ep-table th { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 0 8px 8px; border-bottom: 1px solid var(--sep); }
-  .ep-table td { padding: 9px 8px; border-bottom: 1px solid var(--sep); font-size: 13px; }
+  .ep-table td { padding: 8px; border-bottom: 1px solid var(--sep); font-size: 13px; }
   .ep-table tr:last-child td { border-bottom: none; }
   .ep-table tr:hover td { background: var(--bg3); }
   .type-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
   .type-video { background: rgba(255,69,58,0.15); color: var(--red); }
   .type-transcript { background: rgba(255,255,255,0.08); color: var(--text3); }
-  .ep-id { font-family: var(--mono); color: var(--text3); font-size: 11px; }
+
+  .empty { text-align: center; padding: 36px; color: var(--text3); font-size: 13px; }
+  .card-wrap { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
 </style>
 </head>
 <body>
@@ -149,27 +145,24 @@
 
 <div class="page">
 
-  <!-- Stat cards -->
-  <div class="stat-grid" id="stat-grid">
-    <div class="stat-card"><div class="stat-label">Episodes</div><div class="stat-val" id="s-episodes">—</div></div>
-    <div class="stat-card"><div class="stat-label">Video Episodes</div><div class="stat-val red" id="s-videos">—</div></div>
-    <div class="stat-card"><div class="stat-label">Transcripts</div><div class="stat-val" id="s-transcripts">—</div></div>
-    <div class="stat-card"><div class="stat-label">Segments</div><div class="stat-val" id="s-segments">—</div><div class="stat-sub">searchable chunks</div></div>
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Episodes</div><div class="stat-val" id="s-ep">—</div></div>
+    <div class="stat-card"><div class="stat-label">Video Episodes</div><div class="stat-val red" id="s-vid">—</div></div>
+    <div class="stat-card"><div class="stat-label">Transcripts</div><div class="stat-val" id="s-tx">—</div></div>
+    <div class="stat-card"><div class="stat-label">Segments</div><div class="stat-val" id="s-seg">—</div><div class="stat-sub">searchable chunks</div></div>
     <div class="stat-card"><div class="stat-label">DB Size</div><div class="stat-val yellow" id="s-db">—</div></div>
-    <div class="stat-card"><div class="stat-label">Video Storage</div><div class="stat-val" id="s-vidsize">—</div></div>
+    <div class="stat-card"><div class="stat-label">Video Storage</div><div class="stat-val" id="s-vs">—</div></div>
+    <div class="stat-card"><div class="stat-label">Searches (all time)</div><div class="stat-val" id="s-sq">—</div></div>
   </div>
 
-  <!-- Storage bar -->
+  <!-- Disk -->
   <div class="storage-card" id="storage-card" style="display:none">
     <div class="storage-header">
       <div class="storage-title">Disk Usage</div>
       <div class="storage-nums" id="storage-nums"></div>
     </div>
     <div class="storage-bar"><div class="storage-fill" id="storage-fill" style="width:0%"></div></div>
-    <div class="storage-legend">
-      <div class="storage-legend-item"><div class="legend-dot" style="background:var(--green)"></div>Used</div>
-      <div class="storage-legend-item"><div class="legend-dot" style="background:var(--bg4)"></div>Free</div>
-    </div>
   </div>
 
   <!-- Active imports -->
@@ -184,18 +177,29 @@
     <div id="past-jobs"><div class="empty">No imports yet this session</div></div>
   </div>
 
+  <!-- Search history -->
+  <div class="section">
+    <div class="section-title">Search History <span class="badge" id="search-badge"></span></div>
+    <div class="card-wrap">
+      <table class="search-table">
+        <thead><tr>
+          <th>Query</th>
+          <th>Episode filter</th>
+          <th>Results</th>
+          <th>When</th>
+        </tr></thead>
+        <tbody id="search-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Episodes -->
   <div class="section">
     <div class="section-title">All Episodes <span class="badge" id="ep-badge"></span></div>
-    <div style="background:var(--bg2);border-radius:var(--radius);overflow:hidden">
-      <table class="ep-table" id="ep-table">
-        <thead><tr>
-          <th>Title</th>
-          <th>Type</th>
-          <th>Segments</th>
-          <th>Imported</th>
-        </tr></thead>
-        <tbody id="ep-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">Loading…</td></tr></tbody>
+    <div class="card-wrap">
+      <table class="ep-table">
+        <thead><tr><th>Title</th><th>Type</th><th>Segments</th><th>Imported</th></tr></thead>
+        <tbody id="ep-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -203,108 +207,174 @@
 </div>
 
 <script>
-let _lastData = null;
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) {
   if (n >= 1e9) return (n/1e9).toFixed(1) + ' GB';
   if (n >= 1e6) return (n/1e6).toFixed(1) + ' MB';
   if (n >= 1e3) return (n/1e3).toFixed(0) + ' KB';
   return n + ' B';
 }
-
 function timeAgo(iso) {
   if (!iso) return '—';
-  const d = new Date(iso), now = new Date();
-  const sec = Math.floor((now - d) / 1000);
-  if (sec < 5)   return 'just now';
-  if (sec < 60)  return sec + 's ago';
+  const sec = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (sec < 5)    return 'just now';
+  if (sec < 60)   return sec + 's ago';
   if (sec < 3600) return Math.floor(sec/60) + 'm ago';
-  return Math.floor(sec/3600) + 'h ago';
+  if (sec < 86400) return Math.floor(sec/3600) + 'h ago';
+  return Math.floor(sec/86400) + 'd ago';
+}
+function elapsed(start, end) {
+  const sec = Math.floor((end ? new Date(end) : new Date() - new Date(start)) / 1000);
+  if (typeof start === 'string' && typeof end !== 'string' && end == null) {
+    const ms = Date.now() - new Date(start);
+    const s  = Math.floor(ms / 1000);
+    if (s < 60)   return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  }
+  const s = Math.floor((new Date(end||Date.now()) - new Date(start)) / 1000);
+  if (s < 60)   return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function elapsed(start, end) {
-  const s = new Date(start), e = end ? new Date(end) : new Date();
-  const sec = Math.floor((e - s) / 1000);
-  if (sec < 60) return sec + 's';
-  if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
-  return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+// ── Job rendering ─────────────────────────────────────────────────────────────
+const _openJobs = new Set();
+const _activeTab = {};   // job.id -> 'files' | 'log'
+
+function jobLabel(job) {
+  return job.urls.map(u => {
+    const m = u.match(/\/folders\/([^?/]+)/) || u.match(/\/d\/([^?/]+)/);
+    return m ? (u.includes('/folders/') ? 'Folder · ' : 'File · ') + m[1].substring(0,18) + '…'
+             : u.replace(/^https?:\/\//, '').substring(0, 40) + '…';
+  }).join('  ·  ');
+}
+
+function renderFilesTable(files) {
+  if (!files || !files.length) return '<div style="padding:12px 14px;font-size:12px;color:var(--text3)">No files tracked yet</div>';
+  return `<div class="files-wrap"><table class="files-table">
+    <thead><tr><th>File</th><th>Status</th><th>Duration</th><th>Segments</th></tr></thead>
+    <tbody>${files.map(f => {
+      const statusLabel = f.status === 'transcribing' ? 'Transcribing…'
+                        : f.status === 'done'         ? 'Done'
+                        : f.status === 'error'        ? 'Error'
+                        : f.status === 'skipped'      ? 'Skipped'
+                        : f.status;
+      const dur = f.started_at ? elapsed(f.started_at, f.finished_at) : '—';
+      const segs = f.segments > 0 ? f.segments : '—';
+      return `<tr>
+        <td><span class="file-dot ${f.status}"></span><span class="file-name">${esc(f.name)}</span></td>
+        <td style="color:${f.status==='done'?'var(--green)':f.status==='error'?'var(--red)':f.status==='skipped'?'var(--text3)':'var(--orange)'}">${statusLabel}</td>
+        <td style="color:var(--text3);font-size:11px">${dur}</td>
+        <td style="color:var(--text2)">${segs}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function renderLogLines(logs) {
+  if (!logs || !logs.length) return '<div style="padding:12px 14px;font-size:12px;color:var(--text3)">No log entries</div>';
+  return `<div class="job-log">${logs.map(l => {
+    const cls = l.type==='done_file' ? 'log-done' : l.type==='error' ? 'log-error' : l.type==='skipped' ? 'log-skipped' : 'log-info';
+    const pre = l.type==='done_file' ? '✓' : l.type==='error' ? '⚠' : l.type==='skipped' ? '—' : '·';
+    return `<div class="${cls}"><span class="log-ts">${l.ts}</span>${pre} ${esc(l.msg)}</div>`;
+  }).join('')}</div>`;
 }
 
 function renderJobs(jobs, containerId, activeOnly) {
-  const el = document.getElementById(containerId);
-  const filtered = activeOnly
-    ? jobs.filter(j => j.status === 'running')
-    : jobs.filter(j => j.status !== 'running');
+  const el       = document.getElementById(containerId);
+  const filtered = activeOnly ? jobs.filter(j => j.status==='running') : jobs.filter(j => j.status!=='running');
   if (!filtered.length) {
-    el.innerHTML = `<div class="empty">${activeOnly ? 'No active imports' : 'No imports yet this session'}</div>`;
+    el.innerHTML = `<div class="empty">${activeOnly ? 'No active imports' : 'No imports this session'}</div>`;
     return;
   }
   el.innerHTML = filtered.map(job => {
-    const shortUrl = job.urls.map(u => {
-      const m = u.match(/\/folders\/([^?/]+)/) || u.match(/\/d\/([^?/]+)/);
-      return m ? (u.includes('/folders/') ? 'Folder: ' : 'File: ') + m[1].substring(0,20)+'…' : u.substring(0,40)+'…';
-    }).join(', ');
-    const logLines = job.logs.map(l => {
-      const cls = l.type === 'done_file' ? 'log-done' : l.type === 'error' ? 'log-error' : l.type === 'skipped' ? 'log-skipped' : 'log-info';
-      const prefix = l.type === 'done_file' ? '✓' : l.type === 'error' ? '⚠' : l.type === 'skipped' ? '—' : '·';
-      return `<div class="${cls}"><span class="log-ts">${l.ts}</span>${prefix} ${l.msg}</div>`;
-    }).join('');
-    const dur = job.status === 'running'
-      ? `running ${elapsed(job.started_at)}`
-      : `${elapsed(job.started_at, job.finished_at)} · ${timeAgo(job.finished_at)}`;
-    return `
-      <div class="job-card" id="job-${job.id}">
-        <div class="job-header" onclick="toggleJob('${job.id}')">
-          <div class="job-status-dot ${job.status}"></div>
-          <div class="job-title">${shortUrl}</div>
-          <div class="job-stats">
-            ${job.stats.done    > 0 ? `<span class="job-stat done">✓ ${job.stats.done}</span>` : ''}
-            ${job.stats.skipped > 0 ? `<span class="job-stat skipped">— ${job.stats.skipped}</span>` : ''}
-            ${job.stats.errors  > 0 ? `<span class="job-stat errors">⚠ ${job.stats.errors}</span>` : ''}
-          </div>
-          <div class="job-meta">${dur}</div>
-          <div class="job-chevron">▼</div>
+    const tab  = _activeTab[job.id] || (job.files && job.files.length ? 'files' : 'log');
+    const dur  = job.status === 'running'
+               ? `running ${elapsed(job.started_at, null)}`
+               : `${elapsed(job.started_at, job.finished_at)} · ${timeAgo(job.finished_at)}`;
+    return `<div class="job-card ${_openJobs.has(job.id) || job.status==='running' ? 'open' : ''}" id="job-${job.id}">
+      <div class="job-header" onclick="toggleJob('${job.id}')">
+        <div class="job-dot ${job.status}"></div>
+        <div class="job-title">${esc(jobLabel(job))}</div>
+        <div class="job-counts">
+          ${job.stats.done    > 0 ? `<span class="jc d">✓ ${job.stats.done}</span>` : ''}
+          ${job.stats.skipped > 0 ? `<span class="jc s">— ${job.stats.skipped}</span>` : ''}
+          ${job.stats.errors  > 0 ? `<span class="jc e">⚠ ${job.stats.errors}</span>` : ''}
         </div>
-        ${job.logs.length ? `<div class="job-log">${logLines}</div>` : ''}
-      </div>`;
+        <div class="job-dur">${dur}</div>
+        <div class="job-chevron">▼</div>
+      </div>
+      <div class="job-body">
+        <div class="job-tabs">
+          <button class="job-tab ${tab==='files' ? 'active' : ''}" onclick="switchJobTab(event,'${job.id}','files')">Files (${(job.files||[]).length})</button>
+          <button class="job-tab ${tab==='log'   ? 'active' : ''}" onclick="switchJobTab(event,'${job.id}','log')">Log (${(job.logs||[]).length})</button>
+        </div>
+        <div id="jt-files-${job.id}" style="display:${tab==='files'?'':'none'}">${renderFilesTable(job.files)}</div>
+        <div id="jt-log-${job.id}"   style="display:${tab==='log'?'':'none'}">${renderLogLines(job.logs)}</div>
+      </div>
+    </div>`;
   }).join('');
-  // Keep open state
-  filtered.forEach(job => {
-    const card = document.getElementById('job-' + job.id);
-    if (card && _openJobs.has(job.id)) card.classList.add('open');
-    // Auto-open running jobs
-    if (job.status === 'running' && card) {
-      card.classList.add('open');
-      _openJobs.add(job.id);
-      // Scroll log to bottom
-      const log = card.querySelector('.job-log');
-      if (log) log.scrollTop = log.scrollHeight;
-    }
+
+  // Scroll active logs to bottom
+  filtered.filter(j => j.status === 'running').forEach(job => {
+    _openJobs.add(job.id);
+    const logEl = document.getElementById(`jt-log-${job.id}`);
+    if (logEl) logEl.querySelector('.job-log') && (logEl.querySelector('.job-log').scrollTop = 99999);
   });
 }
 
-const _openJobs = new Set();
 function toggleJob(id) {
   const card = document.getElementById('job-' + id);
   if (!card) return;
   card.classList.toggle('open');
-  if (card.classList.contains('open')) _openJobs.add(id);
-  else _openJobs.delete(id);
+  if (card.classList.contains('open')) _openJobs.add(id); else _openJobs.delete(id);
 }
 
-function renderEpisodes(data) {
-  // We need to fetch episodes separately
+function switchJobTab(e, jobId, tab) {
+  e.stopPropagation();
+  _activeTab[jobId] = tab;
+  const body = document.getElementById('job-' + jobId)?.querySelector('.job-body');
+  if (!body) return;
+  body.querySelectorAll('.job-tab').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(`jt-files-${jobId}`).style.display = tab === 'files' ? '' : 'none';
+  document.getElementById(`jt-log-${jobId}`).style.display   = tab === 'log'   ? '' : 'none';
+}
+
+// ── Search history ────────────────────────────────────────────────────────────
+function renderSearchHistory(searches) {
+  const tbody = document.getElementById('search-tbody');
+  document.getElementById('search-badge').textContent = searches.length;
+  if (!searches.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No searches recorded yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = searches.map(s => `
+    <tr>
+      <td class="search-q">${esc(s.query)}</td>
+      <td>${s.ep_filter ? `<span class="search-ep">Ep ${esc(s.ep_filter)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td class="search-count">${s.results}</td>
+      <td class="search-ts">${timeAgo(s.searched_at)}</td>
+    </tr>`).join('');
+}
+
+// ── Episodes ──────────────────────────────────────────────────────────────────
+let _epsLoaded = false;
+function renderEpisodes() {
+  if (_epsLoaded) return;
   fetch('/api/episodes').then(r => r.json()).then(d => {
     const eps = d.episodes || [];
+    _epsLoaded = true;
     document.getElementById('ep-badge').textContent = eps.length;
     const tbody = document.getElementById('ep-tbody');
-    if (!eps.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">No episodes</td></tr>';
-      return;
-    }
+    if (!eps.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No episodes</td></tr>'; return; }
     tbody.innerHTML = eps.map(ep => `
       <tr>
-        <td>${ep.title || ep.id}</td>
+        <td>${esc(ep.title || ep.id)}</td>
         <td><span class="type-badge ${ep.has_video ? 'type-video' : 'type-transcript'}">${ep.has_video ? 'Video' : 'Transcript'}</span></td>
         <td style="color:var(--text2)">${ep.segments}</td>
         <td style="color:var(--text3)">${ep.uploaded_at || '—'}</td>
@@ -312,52 +382,46 @@ function renderEpisodes(data) {
   }).catch(() => {});
 }
 
+// ── Main refresh ──────────────────────────────────────────────────────────────
 async function refresh() {
   try {
-    const res  = await fetch('/api/dev/status');
-    const data = await res.json();
-    _lastData  = data;
+    const data = await fetch('/api/dev/status').then(r => r.json());
 
-    // Stat cards
-    document.getElementById('s-episodes').textContent    = data.episodes.toLocaleString();
-    document.getElementById('s-videos').textContent      = data.video_episodes.toLocaleString();
-    document.getElementById('s-transcripts').textContent = data.transcript_episodes.toLocaleString();
-    document.getElementById('s-segments').textContent    = data.segments.toLocaleString();
-    document.getElementById('s-db').textContent          = fmt(data.db_bytes);
-    document.getElementById('s-vidsize').textContent     = fmt(data.videos_bytes);
+    document.getElementById('s-ep').textContent  = data.episodes.toLocaleString();
+    document.getElementById('s-vid').textContent = data.video_episodes.toLocaleString();
+    document.getElementById('s-tx').textContent  = data.transcript_episodes.toLocaleString();
+    document.getElementById('s-seg').textContent = data.segments.toLocaleString();
+    document.getElementById('s-db').textContent  = fmt(data.db_bytes);
+    document.getElementById('s-vs').textContent  = fmt(data.videos_bytes);
+    document.getElementById('s-sq').textContent  = (data.searches || []).length.toLocaleString();
 
-    // Storage bar
     if (data.disk_total > 0) {
-      const used = data.disk_total - data.disk_free;
-      const pct  = Math.round(used / data.disk_total * 100);
+      const used = data.disk_total - data.disk_free, pct = Math.round(used / data.disk_total * 100);
       document.getElementById('storage-card').style.display = '';
       document.getElementById('storage-fill').style.width   = pct + '%';
-      document.getElementById('storage-nums').textContent   = fmt(used) + ' used of ' + fmt(data.disk_total) + ' (' + pct + '%)';
+      document.getElementById('storage-nums').textContent   = `${fmt(used)} used of ${fmt(data.disk_total)} (${pct}%) — ${fmt(data.disk_free)} free`;
       const fill = document.getElementById('storage-fill');
       fill.className = 'storage-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
     }
 
-    // Jobs
-    const activeCount = (data.jobs || []).filter(j => j.status === 'running').length;
-    const activeBadge = document.getElementById('active-badge');
-    if (activeCount > 0) {
-      activeBadge.style.display = '';
-      activeBadge.textContent   = activeCount + ' running';
-    } else {
-      activeBadge.style.display = 'none';
-    }
-    renderJobs(data.jobs || [], 'active-jobs', true);
-    renderJobs(data.jobs || [], 'past-jobs',   false);
+    const activeCount = (data.jobs||[]).filter(j => j.status==='running').length;
+    const badge = document.getElementById('active-badge');
+    badge.style.display = activeCount ? '' : 'none';
+    if (activeCount) badge.textContent = activeCount + ' running';
 
-    // Header
+    renderJobs(data.jobs||[], 'active-jobs', true);
+    renderJobs(data.jobs||[], 'past-jobs',   false);
+    renderSearchHistory(data.searches||[]);
+
+    // Episodes: only load once; reload if active import just finished
+    if (!_epsLoaded || activeCount === 0) renderEpisodes();
+
     const dot = document.getElementById('refresh-dot');
     dot.classList.remove('stale');
-    document.getElementById('last-updated').textContent = 'Last updated ' + new Date().toLocaleTimeString();
-    setTimeout(() => dot.classList.add('stale'), 4000);
-
-    renderEpisodes(data);
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    setTimeout(() => dot.classList.add('stale'), 3500);
   } catch(e) {
-    document.getElementById('last-updated').textContent = 'Error fetching status';
+    document.getElementById('last-updated').textContent = 'Error fetching data';
   }
 }
 

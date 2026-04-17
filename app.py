@@ -40,6 +40,7 @@ def _new_job(urls):
         "urls":        urls,
         "status":      "running",
         "logs":        [],
+        "files":       [],   # per-file progress: [{name, status, started_at, finished_at, segments}]
         "stats":       {"done": 0, "skipped": 0, "errors": 0},
     }
     with _jobs_lock:
@@ -155,6 +156,13 @@ def get_db():
         "ALTER TABLE episodes ADD COLUMN video_path TEXT",
         "ALTER TABLE episodes ADD COLUMN uploaded_at TEXT",
         "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
+        """CREATE TABLE IF NOT EXISTS search_history (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            query     TEXT NOT NULL,
+            ep_filter TEXT,
+            results   INTEGER DEFAULT 0,
+            searched_at TEXT DEFAULT (datetime('now'))
+        )""",
     ]:
         try:
             conn.execute(stmt)
@@ -486,6 +494,20 @@ def search_endpoint():
         results = keyword_search(query, limit=100)
 
     results = sort_by_episode(results)
+
+    # Log to search history (best-effort, never block the response)
+    try:
+        conn = get_db()
+        if conn:
+            conn.execute(
+                "INSERT INTO search_history (query, ep_filter, results) VALUES (?, ?, ?)",
+                (query, ep_filter or None, len(results))
+            )
+            conn.commit()
+            conn.close()
+    except Exception:
+        pass
+
     return jsonify({"results": results, "count": len(results)})
 
 
@@ -1108,6 +1130,14 @@ def _ingest_one(job, video_path, filename, msg_q=None):
             try: os.remove(video_path)
             except: pass
         return
+
+    # ── Per-file record ───────────────────────────────────────────────────────
+    file_rec = {"name": filename, "status": "transcribing",
+                "started_at": datetime.now().isoformat(), "finished_at": None, "segments": 0}
+    with _jobs_lock:
+        job["files"].append(file_rec)
+    # ──────────────────────────────────────────────────────────────────────────
+
     title      = episode_id.replace("_", " ").replace("-", " ").strip()
     audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
     _job_log(job, "log", f"Transcribing {filename}…", msg_q)
@@ -1122,8 +1152,15 @@ def _ingest_one(job, video_path, filename, msg_q=None):
             cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
         conn.commit()
         conn.close()
+        with _jobs_lock:
+            file_rec["status"]      = "done"
+            file_rec["finished_at"] = datetime.now().isoformat()
+            file_rec["segments"]    = count
         _job_log(job, "done_file", f"Done: {filename} ({count} segments)", msg_q)
     except Exception as e:
+        with _jobs_lock:
+            file_rec["status"]      = "error"
+            file_rec["finished_at"] = datetime.now().isoformat()
         if os.path.exists(video_path):
             try: os.remove(video_path)
             except: pass
@@ -1476,21 +1513,37 @@ def dev_status():
                 "urls":        j["urls"],
                 "stats":       dict(j["stats"]),
                 "logs":        list(j["logs"]),
+                "files":       list(j.get("files", [])),
             }
             for j in _jobs
         ]
 
+    # Search history — last 200 queries, newest first
+    searches = []
+    try:
+        conn = get_db()
+        if conn:
+            rows = conn.execute(
+                "SELECT query, ep_filter, results, searched_at FROM search_history "
+                "ORDER BY id DESC LIMIT 200"
+            ).fetchall()
+            conn.close()
+            searches = [dict(r) for r in rows]
+    except Exception:
+        pass
+
     return jsonify({
-        "episodes":      ep_count,
-        "segments":      seg_count,
-        "video_episodes": vid_count,
+        "episodes":            ep_count,
+        "segments":            seg_count,
+        "video_episodes":      vid_count,
         "transcript_episodes": ep_count - vid_count,
-        "db_bytes":      db_bytes,
-        "videos_bytes":  videos_bytes,
-        "video_files":   video_count_files,
-        "disk_total":    disk_total,
-        "disk_free":     disk_free,
-        "jobs":          jobs_snapshot,
+        "db_bytes":            db_bytes,
+        "videos_bytes":        videos_bytes,
+        "video_files":         video_count_files,
+        "disk_total":          disk_total,
+        "disk_free":           disk_free,
+        "jobs":                jobs_snapshot,
+        "searches":            searches,
     })
 
 
