@@ -1406,6 +1406,10 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
     </div>`;
   scrollToTop();
 
+  // Autoplay immediately while still in the user-gesture call stack
+  const inlineVid = document.getElementById('inline-video-player');
+  if (inlineVid) inlineVid.play().catch(() => {});
+
   try {
     const res = await fetch(`/api/episode-segments/${encodeURIComponent(episodeId)}`);
     const data = await res.json();
