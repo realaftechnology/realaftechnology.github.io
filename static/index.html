@@ -950,13 +950,33 @@ body {
   position: absolute;
   top: -3px;
   bottom: -3px;
-  width: 2.5px;
+  width: 3px;
   background: #fff;
   border-radius: 2px;
   pointer-events: none;
   z-index: 4;
   box-shadow: 0 0 4px rgba(0,0,0,0.6);
 }
+.clip-filmstrip-wrap { cursor: crosshair; }
+.clip-handle { cursor: ew-resize; }
+.clip-speed-badge {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--sf);
+  letter-spacing: -0.5px;
+  padding: 10px 22px;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.clip-speed-badge.visible { opacity: 1; }
 .clip-time-row {
   display: flex;
   align-items: center;
@@ -1113,6 +1133,7 @@ body {
       </div>
     </div>
     <video id="clip-video" playsinline webkit-playsinline></video>
+    <div id="clip-speed-badge" class="clip-speed-badge"></div>
   </div>
   <div class="clip-trim-area">
     <div class="clip-filmstrip-wrap" id="clip-filmstrip-wrap">
@@ -2488,43 +2509,75 @@ async function downloadTrimmedClip() {
 }
 
 function initTrimHandles() {
-  const wrap  = document.getElementById('clip-filmstrip-wrap');
-  const lh    = document.getElementById('clip-handle-left');
-  const rh    = document.getElementById('clip-handle-right');
-  const video = document.getElementById('clip-video');
-  const getX  = e => e.touches ? e.touches[0].clientX : e.clientX;
+  const wrap       = document.getElementById('clip-filmstrip-wrap');
+  const lh         = document.getElementById('clip-handle-left');
+  const rh         = document.getElementById('clip-handle-right');
+  const video      = document.getElementById('clip-video');
+  const videoWrap  = document.querySelector('.clip-video-wrap');
+  const speedBadge = document.getElementById('clip-speed-badge');
+  const getX = e => e.touches ? e.touches[0].clientX : e.clientX;
+
+  // ── Timeline scrub (tap / drag anywhere on filmstrip outside handles) ────────
+  let scrubbing = false;
+
+  const scrubToX = (clientX) => {
+    if (!trimState.duration) return;
+    const rect = wrap.getBoundingClientRect();
+    const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+    const frac = Math.max(0, Math.min(1, vs + (clientX - rect.left) / rect.width * span));
+    video.currentTime = frac * trimState.duration;
+  };
+
+  wrap.addEventListener('mousedown', e => {
+    if (trimState.dragging) return; // handle grabbed its own event first
+    scrubbing = true;
+    video.pause();
+    scrubToX(e.clientX);
+  });
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || trimState.dragging) return;
+    scrubbing = true;
+    video.pause();
+    scrubToX(e.touches[0].clientX);
+  }, { passive: true });
 
   // ── Handle drag ──────────────────────────────────────────────────────────────
   const onMove = e => {
-    if (!trimState.dragging) return;
+    if (!trimState.dragging && !scrubbing) return;
     e.preventDefault();
     const rect = wrap.getBoundingClientRect();
     const vs = trimState.viewStart, span = trimState.viewEnd - vs;
-    // Map pixel position to timeline fraction accounting for current zoom
     const frac = Math.max(0, Math.min(1, vs + (getX(e) - rect.left) / rect.width * span));
-    if (trimState.dragging === 'left')  trimState.startFrac = Math.min(frac, trimState.endFrac - 0.01);
-    else                                trimState.endFrac   = Math.max(frac, trimState.startFrac + 0.01);
-    updateTrimUI();
-    video.currentTime = (trimState.dragging === 'left' ? trimState.startFrac : trimState.endFrac) * trimState.duration;
+    if (trimState.dragging === 'left') {
+      trimState.startFrac = Math.min(frac, trimState.endFrac - 0.01);
+      updateTrimUI();
+      video.currentTime = trimState.startFrac * trimState.duration;
+    } else if (trimState.dragging === 'right') {
+      trimState.endFrac = Math.max(frac, trimState.startFrac + 0.01);
+      updateTrimUI();
+      video.currentTime = trimState.endFrac * trimState.duration;
+    } else if (scrubbing) {
+      scrubToX(getX(e));
+    }
   };
+
   const endDrag = () => {
     if (trimState.dragging && trimState.duration) {
-      // Camera Roll behaviour: after adjusting either handle, preview the
-      // selection from the beginning
       video.currentTime = trimState.startFrac * trimState.duration;
       video.play().catch(() => {});
     }
     trimState.dragging = null;
+    scrubbing = false;
   };
 
   lh.addEventListener('mousedown',  () => trimState.dragging = 'left');
   rh.addEventListener('mousedown',  () => trimState.dragging = 'right');
   lh.addEventListener('touchstart', () => trimState.dragging = 'left',  { passive: true });
   rh.addEventListener('touchstart', () => trimState.dragging = 'right', { passive: true });
-  document.addEventListener('mousemove',  onMove);
-  document.addEventListener('touchmove',  onMove, { passive: false });
-  document.addEventListener('mouseup',    endDrag);
-  document.addEventListener('touchend',   endDrag);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup',   endDrag);
+  document.addEventListener('touchend',  endDrag);
 
   // ── Pinch-to-zoom on filmstrip ────────────────────────────────────────────
   let pinchStartDist = 0, pinchStartVS = 0, pinchStartVE = 1, pinchMidFrac = 0.5;
@@ -2535,8 +2588,8 @@ function initTrimHandles() {
     pinchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
     pinchStartVS = trimState.viewStart;
     pinchStartVE = trimState.viewEnd;
-    const rect  = wrap.getBoundingClientRect();
-    const midX  = (t0.clientX + t1.clientX) / 2;
+    const rect = wrap.getBoundingClientRect();
+    const midX = (t0.clientX + t1.clientX) / 2;
     const vs = trimState.viewStart, span = trimState.viewEnd - vs;
     pinchMidFrac = vs + ((midX - rect.left) / rect.width) * span;
   }, { passive: true });
@@ -2546,10 +2599,9 @@ function initTrimHandles() {
     e.preventDefault();
     const t0 = e.touches[0], t1 = e.touches[1];
     const dist  = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-    const scale = pinchStartDist / dist; // spread fingers → dist↑ → scale<1 → span shrinks → zoom in
+    const scale = pinchStartDist / dist;
     const startSpan = pinchStartVE - pinchStartVS;
     const newSpan   = Math.max(0.05, Math.min(1, startSpan * scale));
-    // Keep pinchMidFrac at the same screen position
     const ratio  = newSpan / startSpan;
     let newVS = pinchMidFrac - (pinchMidFrac - pinchStartVS) * ratio;
     let newVE = newVS + newSpan;
@@ -2558,18 +2610,64 @@ function initTrimHandles() {
     trimState.viewStart = Math.max(0, newVS);
     trimState.viewEnd   = Math.min(1, newVE);
     updateTrimUI();
-    updateFilmstripZoom(); // CSS preview during gesture
+    updateFilmstripZoom();
   }, { passive: false });
 
-  // When fingers lift, redraw filmstrip at correct resolution for the new range
   wrap.addEventListener('touchend', e => {
     if (e.touches.length < 2 && pinchStartDist > 0) {
       pinchStartDist = 0;
-      if (trimState.blobUrl && trimState.duration) {
-        buildFilmstrip(trimState.blobUrl, trimState.duration);
-      }
+      if (trimState.blobUrl && trimState.duration) buildFilmstrip(trimState.blobUrl, trimState.duration);
     }
   }, { passive: true });
+
+  // ── Hold-left = rewind · Hold-right = 2× speed ──────────────────────────────
+  let holdTimer = null, rewindInt = null, holdIsLeft = false, holdWasPaused = false;
+
+  const activateHold = (isLeft) => {
+    if (isLeft) {
+      video.pause();
+      if (speedBadge) { speedBadge.textContent = '«'; speedBadge.classList.add('visible'); }
+      rewindInt = setInterval(() => {
+        video.currentTime = Math.max(
+          trimState.startFrac * (trimState.duration || 0),
+          video.currentTime - 0.25
+        );
+      }, 50);
+    } else {
+      if (speedBadge) { speedBadge.textContent = '2×'; speedBadge.classList.add('visible'); }
+      video.playbackRate = 2;
+      if (video.paused) video.play().catch(() => {});
+    }
+  };
+
+  const cancelHold = () => {
+    clearTimeout(holdTimer); holdTimer = null;
+    if (rewindInt) { clearInterval(rewindInt); rewindInt = null; }
+    if (video.playbackRate !== 1) video.playbackRate = 1;
+    if (speedBadge) speedBadge.classList.remove('visible');
+  };
+
+  const releaseHold = () => {
+    const wasRewinding = !!rewindInt;
+    const was2x = video.playbackRate === 2;
+    cancelHold();
+    if (wasRewinding && !holdWasPaused) video.play().catch(() => {});
+    if (was2x && holdWasPaused) video.pause();
+  };
+
+  const startHold = (clientX) => {
+    const rect = videoWrap.getBoundingClientRect();
+    holdIsLeft    = (clientX - rect.left) < rect.width / 2;
+    holdWasPaused = video.paused;
+    holdTimer = setTimeout(() => activateHold(holdIsLeft), 150);
+  };
+
+  videoWrap.addEventListener('mousedown',   e => startHold(e.clientX));
+  videoWrap.addEventListener('mouseup',     releaseHold);
+  videoWrap.addEventListener('mouseleave',  releaseHold);
+  videoWrap.addEventListener('touchstart',  e => { if (e.touches.length === 1) startHold(e.touches[0].clientX); }, { passive: true });
+  videoWrap.addEventListener('touchend',    releaseHold, { passive: true });
+  videoWrap.addEventListener('touchcancel', releaseHold, { passive: true });
 
   // ── Playhead tracking ────────────────────────────────────────────────────────
   video.addEventListener('timeupdate', () => {
@@ -2578,9 +2676,7 @@ function initTrimHandles() {
     const W    = wrap.offsetWidth;
     const vs = trimState.viewStart, span = trimState.viewEnd - vs;
     document.getElementById('clip-playhead').style.left = ((frac - vs) / span * W) + 'px';
-    if (video.currentTime >= trimState.endFrac * trimState.duration) {
-      video.pause();
-    }
+    if (video.currentTime >= trimState.endFrac * trimState.duration) video.pause();
   });
   video.addEventListener('play',  () => document.getElementById('clip-play-btn').textContent = 'Pause');
   video.addEventListener('pause', () => document.getElementById('clip-play-btn').textContent = 'Play');
