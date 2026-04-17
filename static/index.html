@@ -749,7 +749,15 @@ body {
   overflow: hidden;
   flex-direction: column;
 }
-#clip-viewer.open { display: flex; }
+#clip-viewer.open {
+  display: flex;
+  opacity: 1;
+  transition: opacity 0.28s ease;
+}
+#clip-viewer.open.closing {
+  opacity: 0;
+  pointer-events: none;
+}
 .clip-header {
   display: flex;
   align-items: center;
@@ -2041,13 +2049,17 @@ async function openClipViewer(filename, startSecs) {
 }
 
 function closeClipViewer() {
-  const video = document.getElementById('clip-video');
-  document.getElementById('clip-viewer').classList.remove('open');
+  const viewer = document.getElementById('clip-viewer');
+  const video  = document.getElementById('clip-video');
+  viewer.classList.add('closing');
   video.pause();
-  video.src = '';
-  if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
-  const overlay = document.getElementById('clip-saved-overlay');
-  if (overlay) overlay.style.display = 'none';
+  setTimeout(() => {
+    viewer.classList.remove('open', 'closing');
+    video.src = '';
+    if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
+    const overlay = document.getElementById('clip-saved-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }, 300);
 }
 
 function toggleClipPlay() {
@@ -2123,14 +2135,22 @@ async function buildFilmstrip(blobUrl, duration) {
   ctx.fillStyle = '#1c1c1e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Separate video element backed by the same blob → instant seeking, no network
+  // Separate video element backed by the same blob → instant seeking, no network.
+  // Must be in the DOM for iOS Safari to allow seeking and frame decoding.
   const tmp = document.createElement('video');
-  tmp.muted   = true;
-  tmp.preload = 'auto';
-  tmp.src     = blobUrl;
+  tmp.muted        = true;
+  tmp.playsInline  = true;
+  tmp.preload      = 'auto';
+  tmp.style.cssText = 'position:fixed;top:-200%;left:-200%;width:1px;height:1px;opacity:0;pointer-events:none';
+  document.body.appendChild(tmp);
+  tmp.src = blobUrl;
 
-  if (tmp.readyState < 1) {
-    await new Promise(r => tmp.addEventListener('loadedmetadata', r, { once: true }));
+  // Wait for enough data to seek (canplay > loadedmetadata on iOS)
+  if (tmp.readyState < 3) {
+    await new Promise(r => {
+      tmp.addEventListener('canplay', r, { once: true });
+      tmp.load();
+    });
   }
 
   // Seek helper with 1.5 s fallback so a stalled seek never blocks the loop
@@ -2149,6 +2169,7 @@ async function buildFilmstrip(blobUrl, duration) {
     ctx.fillRect(i * FW, 0, 1, FH);
   }
   tmp.src = '';
+  document.body.removeChild(tmp);
 
   trimState.filmstripVS = vs;
   trimState.filmstripVE = ve;
@@ -2193,7 +2214,15 @@ function initTrimHandles() {
     updateTrimUI();
     video.currentTime = (trimState.dragging === 'left' ? trimState.startFrac : trimState.endFrac) * trimState.duration;
   };
-  const endDrag = () => { trimState.dragging = null; };
+  const endDrag = () => {
+    if (trimState.dragging && trimState.duration) {
+      // Camera Roll behaviour: after adjusting either handle, preview the
+      // selection from the beginning
+      video.currentTime = trimState.startFrac * trimState.duration;
+      video.play().catch(() => {});
+    }
+    trimState.dragging = null;
+  };
 
   lh.addEventListener('mousedown',  () => trimState.dragging = 'left');
   rh.addEventListener('mousedown',  () => trimState.dragging = 'right');
