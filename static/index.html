@@ -103,7 +103,11 @@ body {
   display: none;
   flex-direction: column;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* bottom is intentionally omitted — JS sets height via visualViewport */
+  height: 100%;
   align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -2565,16 +2569,22 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keep input above iOS keyboard — resize main-screen to match visual viewport
+// Keep input above iOS keyboard — track visual viewport height only.
+// Never move `top` — offsetTop shifts the whole screen and causes the jump.
 const mainScreen = document.getElementById('main-screen');
 if (window.visualViewport) {
+  let _vpRaf = null;
   const onViewport = () => {
-    const vv = window.visualViewport;
-    mainScreen.style.height = vv.height + 'px';
-    mainScreen.style.top = vv.offsetTop + 'px';
+    if (_vpRaf) return;
+    _vpRaf = requestAnimationFrame(() => {
+      _vpRaf = null;
+      mainScreen.style.height = window.visualViewport.height + 'px';
+    });
   };
   window.visualViewport.addEventListener('resize', onViewport);
   window.visualViewport.addEventListener('scroll', onViewport);
+  // Set initial height so it's already correct before any keyboard interaction
+  mainScreen.style.height = window.visualViewport.height + 'px';
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
