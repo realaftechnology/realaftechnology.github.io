@@ -804,13 +804,18 @@ body {
   background: rgba(255,255,255,0.12);
   border-radius: 2px;
   overflow: hidden;
+  position: relative;
 }
 .clip-progress-bar {
-  height: 100%;
-  width: 0%;
-  background: #fff;
+  position: absolute;
+  top: 0; height: 100%; width: 38%;
+  background: rgba(255,255,255,0.85);
   border-radius: 2px;
-  transition: width 0.15s linear;
+  animation: clip-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes clip-shimmer {
+  0%   { left: -38%; }
+  100% { left: 100%; }
 }
 .clip-video-wrap video { max-width: 100%; max-height: 100%; display: block; }
 .clip-trim-area {
@@ -1891,7 +1896,7 @@ const trimState = {
   clipOffset: 0,      // absolute start time in original video where loaded clip begins
   viewStart: 0,       // visible fraction of clip timeline (for zoom)
   viewEnd: 1,
-  blobUrl: null,      // revocable blob URL for pre-generated clip
+  clipUrl: null,      // direct server URL for the pre-generated clip window
   filmstripVS: 0,     // viewStart at time of last filmstrip draw
   filmstripVE: 1      // viewEnd at time of last filmstrip draw
 };
@@ -1928,59 +1933,51 @@ async function openClipViewer(filename, startSecs) {
   trimState.viewStart  = 0;
   trimState.viewEnd    = 1;
   trimState.clipOffset = 0;
-  if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
+  trimState.clipUrl    = null;
 
   const viewer  = document.getElementById('clip-viewer');
   const video   = document.getElementById('clip-video');
   const loading = document.getElementById('clip-loading');
 
-  // Stop any other playing videos before opening
+  // Stop any other playing videos
   ['video-player', 'inline-video-player'].forEach(id => {
     const v = document.getElementById(id);
-    if (v) { v.pause(); }
+    if (v) v.pause();
   });
 
-  // Show viewer immediately with loading state
+  // Show viewer with loading shimmer immediately
   viewer.classList.add('open');
-  const progressBar = document.getElementById('clip-progress-bar');
   const loadingLabel = document.getElementById('clip-loading-label');
-  if (progressBar) progressBar.style.width = '0%';
   if (loadingLabel) loadingLabel.textContent = 'Preparing clip…';
   loading.style.display = 'flex';
   video.style.opacity = '0';
 
-  // Pre-generate a 4-minute window around the timestamp
+  // Build the clip URL — server runs ffmpeg fast-seek, serves inline
   const preStart    = Math.max(0, startSecs - 120);
   const preDuration = 240;
   trimState.clipOffset = preStart;
+  const clipUrl = `/api/clip/${encodeURIComponent(filename)}?start=${preStart}&duration=${preDuration}`;
+  trimState.clipUrl = clipUrl;
 
   try {
-    const res = await fetch(`/api/clip/${encodeURIComponent(filename)}?start=${preStart}&duration=${preDuration}`);
-    if (!res.ok) throw new Error('clip fetch failed');
-
-    // Stream with download progress
-    const contentLength = res.headers.get('Content-Length');
-    const total = contentLength ? parseInt(contentLength) : 0;
-    const progressBar = document.getElementById('clip-progress-bar');
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (total && progressBar) {
-        progressBar.style.width = Math.min(94, Math.round(received / total * 100)) + '%';
-      }
-    }
-    if (progressBar) progressBar.style.width = '100%';
-    const blob = new Blob(chunks, { type: 'video/mp4' });
-    trimState.blobUrl = URL.createObjectURL(blob);
-
-    video.src = trimState.blobUrl;
+    // Point video src directly at the clip URL — no blob, no memory pressure.
+    // The browser streams it natively with range-request support.
+    video.src = clipUrl;
     video.load();
-    await new Promise(r => video.readyState >= 1 ? r() : video.addEventListener('loadedmetadata', r, { once: true }));
+
+    // Wait until there's enough data to determine duration and start playing
+    await new Promise((resolve, reject) => {
+      const onReady = () => { cleanup(); resolve(); };
+      const onErr   = () => { cleanup(); reject(new Error('video load error')); };
+      const cleanup = () => {
+        video.removeEventListener('loadedmetadata', onReady);
+        video.removeEventListener('error', onErr);
+      };
+      if (video.readyState >= 1) { resolve(); return; }
+      video.addEventListener('loadedmetadata', onReady, { once: true });
+      video.addEventListener('error', onErr,   { once: true });
+    });
+
     trimState.duration = video.duration || 0;
 
     // Selection: ±90s around the target, expressed as fractions of the loaded clip
@@ -1990,7 +1987,6 @@ async function openClipViewer(filename, startSecs) {
       trimState.endFrac   = Math.min(1, (posInClip + 90) / trimState.duration);
     }
 
-    // Seek to start of selection
     video.currentTime = trimState.startFrac * trimState.duration;
 
     loading.style.display = 'none';
@@ -1998,10 +1994,9 @@ async function openClipViewer(filename, startSecs) {
 
     updateTrimUI();
     updateFilmstripZoom();
-    buildFilmstrip(trimState.blobUrl, trimState.duration);
+    buildFilmstrip(clipUrl, trimState.duration);
   } catch(e) {
-    loading.querySelector('.clip-loading-label').textContent = 'Failed to load clip.';
-    loading.querySelector('.clip-spinner').style.display = 'none';
+    if (loadingLabel) loadingLabel.textContent = 'Failed to load clip.';
   }
 }
 
@@ -2010,7 +2005,7 @@ function closeClipViewer() {
   document.getElementById('clip-viewer').classList.remove('open');
   video.pause();
   video.src = '';
-  if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
+  trimState.clipUrl = null;
 }
 
 function toggleClipPlay() {
@@ -2199,8 +2194,8 @@ function initTrimHandles() {
   wrap.addEventListener('touchend', e => {
     if (e.touches.length < 2 && pinchStartDist > 0) {
       pinchStartDist = 0;
-      if (trimState.blobUrl && trimState.duration) {
-        buildFilmstrip(trimState.blobUrl, trimState.duration);
+      if (trimState.clipUrl && trimState.duration) {
+        buildFilmstrip(trimState.clipUrl, trimState.duration);
       }
     }
   }, { passive: true });

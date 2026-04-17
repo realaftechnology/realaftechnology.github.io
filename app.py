@@ -993,7 +993,9 @@ def download_clip(filename):
                 pass
             return response
 
-        return send_file(tmp_path, as_attachment=True, download_name=clip_name, mimetype="video/mp4")
+        # Serve inline (no attachment header) so <video src=""> works natively.
+        # Clients that want a file download use fetch() + saveVideoBlob() on the client side.
+        return send_file(tmp_path, mimetype="video/mp4")
     except Exception as e:
         try:
             os.remove(tmp_path)
