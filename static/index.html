@@ -1373,15 +1373,22 @@ async function deleteEpisode(episodeId) {
 
 async function openVideoEpisode(videoFilename, title, episodeId) {
   toggleSidebar();
-  playVideo(videoFilename, title, 0);
 
   currentQuery = title;
   chatHistory = [];
   hasResults = true;
 
-  const area = document.getElementById('results-area');
+  const src = `/api/video/${encodeURIComponent(videoFilename)}`;
   const safeTitle = title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const area = document.getElementById('results-area');
   area.innerHTML = `
+    <div style="border-radius:var(--radius-lg);overflow:hidden;margin-bottom:8px;background:#000;line-height:0">
+      <video id="inline-video-player" controls playsinline preload="metadata"
+        style="width:100%;display:block;max-height:260px;object-fit:contain;background:#000">
+        <source src="${src}" type="video/mp4">
+      </video>
+    </div>
     <div class="section-header">AI Summary</div>
     <div id="ai-section">
       <div class="ai-card">
@@ -1408,10 +1415,8 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
         toggle.style.display = 'inline-flex';
         toggle.innerHTML = `View Transcript (${results.length}) &#8964;`;
       }
-      const safeFilename = videoFilename.replace(/'/g, "\\'");
-      const safeT = title.replace(/'/g, "\\'");
       const transcriptHtml = results.map(r => {
-        const playBtn = `<button class="play-btn" onclick="playVideo('${safeFilename}','${safeT}',${r.start_secs})">▶ ${r.timestamp}</button>`;
+        const playBtn = `<button class="play-btn" onclick="seekInlineVideo(${r.start_secs})">▶ ${r.timestamp}</button>`;
         const snippet = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         return `<div class="result-card">
           <div class="result-meta-row">
@@ -1433,6 +1438,14 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
     const el = document.getElementById('ai-content');
     if (el) el.textContent = 'Failed to load transcript.';
   }
+}
+
+function seekInlineVideo(secs) {
+  const v = document.getElementById('inline-video-player');
+  if (!v) return;
+  v.currentTime = secs;
+  v.play();
+  scrollToTop();
 }
 
 async function runAnalysisForVideo(title, results) {
