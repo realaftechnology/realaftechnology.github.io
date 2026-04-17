@@ -1389,7 +1389,10 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
         <source src="${src}" type="video/mp4">
       </video>
     </div>
-    <div class="section-header">AI Summary</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px">
+      <div class="section-header" style="padding:0">AI Summary</div>
+      <button onclick="deleteEpisode('${episodeId}')" style="background:none;border:none;color:var(--label-quaternary);font-size:12px;cursor:pointer;padding:4px 0;font-family:var(--sf)" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--label-quaternary)'">Delete video</button>
+    </div>
     <div id="ai-section">
       <div class="ai-card">
         <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
@@ -1455,7 +1458,7 @@ async function runAnalysisForVideo(title, results) {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ query: `Summarize this episode: "${title}"`, results: results.slice(0, 20) })
+      body: JSON.stringify({ query: `Summarize this video: "${title}"`, results: results.slice(0, 20) })
     });
     await consumeStream(res,
       (text) => { el.innerHTML = marked.parse(text); },
