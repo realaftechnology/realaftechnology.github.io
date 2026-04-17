@@ -1056,42 +1056,82 @@ def _list_gdrive_folder(url):
         raise RuntimeError(f"Cannot extract folder ID from URL: {url}")
     folder_id = m.group(1)
 
-    # ── Try gdown's internal directory structure API ─────────────────────────
-    # gdown 5.x exposes _get_directory_structure in download_folder module
+    # ── Attempt 1: gdown internal API ────────────────────────────────────────
+    # gdown 5.x exposes _get_directory_structure; try several call signatures
+    # because the API changed between minor versions.
     try:
-        import gdown.download_folder as _gdf  # noqa
+        import gdown.download_folder as _gdf
         if hasattr(_gdf, "_get_directory_structure"):
-            raw = _gdf._get_directory_structure(
-                folder_id, use_cookies=False, remaining_ok=True
-            )
-            return _flatten_gdrive_tree(raw)
+            fn = _gdf._get_directory_structure
+            for kwargs in [
+                dict(use_cookies=False, remaining_ok=True),
+                dict(use_cookies=False),
+                {},
+            ]:
+                try:
+                    raw = fn(folder_id, **kwargs)
+                    files = _flatten_gdrive_tree(raw)
+                    if files:
+                        return files
+                    break          # got a result (empty folder) — stop trying
+                except TypeError:
+                    continue       # wrong signature, try next
     except Exception:
         pass
 
-    # ── Fallback: parse the public folder HTML page ───────────────────────────
-    # Google Drive embeds file metadata as escaped JSON in the page source.
+    # ── Attempt 2: requests session with cookies (gdown already depends on it) ─
+    # Fetching the folder page via a session with a prior cookie handshake gives
+    # Google enough signal to return full file metadata in the HTML.
+    try:
+        import requests as _req
+        sess = _req.Session()
+        sess.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        })
+        # Warm up cookies
+        try:
+            sess.get("https://drive.google.com", timeout=10)
+        except Exception:
+            pass
+
+        for folder_url in [
+            f"https://drive.google.com/drive/folders/{folder_id}",
+            f"https://drive.google.com/drive/folders/{folder_id}?hl=en",
+        ]:
+            try:
+                resp = sess.get(folder_url, timeout=25)
+                html = resp.text
+                files = _parse_drive_html(html)
+                if files:
+                    return files
+            except Exception:
+                continue
+    except ImportError:
+        pass
+
+    # ── Attempt 3: urllib fallback (no session) ───────────────────────────────
     try:
         import urllib.request as _ur
         req = _ur.Request(
             f"https://drive.google.com/drive/folders/{folder_id}",
-            headers={"User-Agent": "Mozilla/5.0"}
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                )
+            },
         )
-        with _ur.urlopen(req, timeout=20) as resp:
+        with _ur.urlopen(req, timeout=25) as resp:
             html = resp.read().decode("utf-8", errors="replace")
-
-        # Extract file IDs and names from the embedded data blob.
-        # Pattern: ["FILE_ID","FILE_NAME","mime/type" ...]
-        entries = re.findall(
-            r'\["([a-zA-Z0-9_-]{25,})",\s*"([^"]+\.[a-zA-Z0-9]{2,4})"',
-            html
-        )
-        result = [
-            {"id": fid, "name": fname}
-            for fid, fname in entries
-            if fname.lower().endswith(_VIDEO_EXTS)
-        ]
-        if result:
-            return result
+        files = _parse_drive_html(html)
+        if files:
+            return files
     except Exception:
         pass
 
@@ -1101,21 +1141,82 @@ def _list_gdrive_folder(url):
     )
 
 
-def _flatten_gdrive_tree(node):
-    """Recursively flatten a gdown directory tree into a list of video file dicts."""
+def _parse_drive_html(html):
+    """
+    Extract video file IDs and names from a Google Drive folder HTML page.
+    Google embeds file metadata in several JSON-like patterns; we try them all.
+    Returns list of {'id': str, 'name': str} or empty list.
+    """
+    seen = set()
     result = []
 
+    def _add(fid, fname):
+        key = (fid, fname)
+        if key not in seen and fname.lower().endswith(_VIDEO_EXTS):
+            seen.add(key)
+            result.append({"id": fid, "name": fname})
+
+    fid_re = r'[a-zA-Z0-9_-]{25,}'
+    ext_re = r'[^"\'\\]{1,200}\.[a-zA-Z0-9]{2,4}'
+
+    # Pattern A: ["FILE_ID","FILENAME",...] — array literal in data blob
+    for fid, fname in re.findall(
+        rf'\["({fid_re})",\s*"({ext_re})"', html
+    ):
+        _add(fid, fname)
+
+    # Pattern B: "id":"FILE_ID","name":"FILENAME" — JSON object keys
+    for fid, fname in re.findall(
+        rf'"id"\s*:\s*"({fid_re})"[^}}]{{0,200}}"name"\s*:\s*"({ext_re})"',
+        html,
+    ):
+        _add(fid, fname)
+
+    # Pattern C: data-id="FILE_ID" title="FILENAME" — HTML attributes
+    for fid, fname in re.findall(
+        rf'data-id="({fid_re})"[^>]{{0,200}}title="({ext_re})"',
+        html,
+    ):
+        _add(fid, fname)
+
+    # Pattern D: reversed — name before id in JSON
+    for fname, fid in re.findall(
+        rf'"name"\s*:\s*"({ext_re})"[^}}]{{0,200}}"id"\s*:\s*"({fid_re})"',
+        html,
+    ):
+        _add(fid, fname)
+
+    return result
+
+
+def _flatten_gdrive_tree(node):
+    """
+    Recursively flatten a gdown directory-structure result into video file dicts.
+    Handles dicts, lists, and gdown's custom file-info objects (gdown 5.x).
+    """
+    result = []
+
+    def _attr(obj, key):
+        if isinstance(obj, dict):
+            return obj.get(key)
+        return getattr(obj, key, None)
+
     def _walk(n):
-        if isinstance(n, dict):
-            is_folder = n.get("is_folder", False) or n.get("type") == "folder"
-            if not is_folder and n.get("id") and n.get("name"):
-                if n["name"].lower().endswith(_VIDEO_EXTS):
-                    result.append({"id": n["id"], "name": n["name"]})
-            for child in n.get("children", []):
-                _walk(child)
-        elif isinstance(n, list):
+        if n is None:
+            return
+        if isinstance(n, (list, tuple)):
             for item in n:
                 _walk(item)
+            return
+        is_folder = _attr(n, "is_folder") or _attr(n, "type") == "folder"
+        fid  = _attr(n, "id")
+        name = _attr(n, "name")
+        if not is_folder and fid and name:
+            if str(name).lower().endswith(_VIDEO_EXTS):
+                result.append({"id": str(fid), "name": str(name)})
+        children = _attr(n, "children") or []
+        for child in (children if isinstance(children, (list, tuple)) else [children]):
+            _walk(child)
 
     _walk(node)
     return result
