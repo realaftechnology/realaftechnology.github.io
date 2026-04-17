@@ -1263,7 +1263,7 @@ def _drive_download_one(job, gdown, file_id_or_url, tmp_dir, msg_q):
         else file_id_or_url
     )
     try:
-        out = gdown.download(url, tmp_dir + os.sep, quiet=True, fuzzy=True)
+        out = gdown.download(url, tmp_dir + os.sep, quiet=True)
     except Exception as e:
         _job_log(job, "error",
                  f"Download failed: {e} — make sure link is 'Anyone with the link'", msg_q)
