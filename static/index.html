@@ -104,13 +104,7 @@ body {
   display: none;
   flex-direction: column;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* 100dvh = dynamic viewport height: shrinks automatically when the iOS
-     keyboard opens (Safari 15.4+). Falls back to bottom:0 on older browsers. */
-  height: 100dvh;
+  inset: 0;
   align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -455,9 +449,15 @@ body {
 .result-text mark { background: transparent; color: var(--orange); font-weight: 500; }
 
 /* ── BOTTOM INPUT AREA ── */
+/* Independent fixed position — keyboard JS only translates this element,
+   nothing else on screen moves when the keyboard opens. */
 .input-area {
-  flex-shrink: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 12px 20px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -525,7 +525,7 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
-.scroll-bottom-pad { height: 20px; }
+.scroll-bottom-pad { height: 90px; }
 
 /* ── UPLOAD MODAL ── */
 .modal-overlay {
@@ -2572,30 +2572,27 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// iOS keyboard handling.
-// Modern iOS (Safari 15.4+): `height: 100dvh` in CSS handles this natively —
-// the dynamic viewport unit shrinks automatically when the keyboard opens, no JS needed.
-// Older iOS fallback: use visualViewport resize to set an explicit height.
-const mainScreen = document.getElementById('main-screen');
-const _dvhSupported = CSS.supports('height', '100dvh');
-if (!_dvhSupported && window.visualViewport) {
-  let _vpRaf = null;
-  const onViewport = () => {
-    if (_vpRaf) return;
-    _vpRaf = requestAnimationFrame(() => {
-      _vpRaf = null;
-      const vvh = window.visualViewport.height;
-      mainScreen.style.height = vvh > 100 ? vvh + 'px' : '';
+// Keyboard handling: ONLY the input bar moves — nothing else on screen shifts.
+// .input-area is position:fixed on its own. When the keyboard opens we just
+// translateY it upward by the keyboard height. The rest of the app is untouched.
+const _inputArea = document.querySelector('.input-area');
+if (window.visualViewport) {
+  let _kbRaf = null;
+  const _syncKeyboard = () => {
+    if (_kbRaf) return;
+    _kbRaf = requestAnimationFrame(() => {
+      _kbRaf = null;
+      // Keyboard height = layout viewport minus visual viewport (minus any
+      // visual viewport scroll offset iOS might have added).
+      const kh = window.innerHeight
+                 - window.visualViewport.height
+                 - window.visualViewport.offsetTop;
+      _inputArea.style.transform = kh > 50 ? `translateY(${-kh}px)` : '';
     });
   };
-  window.visualViewport.addEventListener('resize', onViewport);
+  window.visualViewport.addEventListener('resize', _syncKeyboard);
+  window.visualViewport.addEventListener('scroll', _syncKeyboard);
 }
-// Prevent iOS from jumping the visual viewport when focusing the textarea.
-// iOS Safari briefly scrolls the visual viewport to bring the input into view;
-// window.scrollTo(0,0) resets that offset instantly.
-document.getElementById('search-input').addEventListener('focus', () => {
-  requestAnimationFrame(() => window.scrollTo(0, 0));
-});
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
   if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
