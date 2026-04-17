@@ -781,6 +781,29 @@ body {
   align-items: center;
   justify-content: center;
   background: #000;
+  position: relative;
+}
+#clip-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  background: #000;
+  z-index: 2;
+}
+#clip-loading .clip-spinner {
+  width: 26px; height: 26px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+#clip-loading .clip-loading-label {
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
 }
 .clip-video-wrap video { max-width: 100%; max-height: 100%; display: block; }
 .clip-trim-area {
@@ -798,7 +821,8 @@ body {
 }
 #clip-filmstrip-canvas {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -951,6 +975,10 @@ body {
     <button class="clip-header-btn" id="clip-save-btn" style="color:var(--red);font-weight:600;text-align:right" onclick="downloadTrimmedClip()">Save</button>
   </div>
   <div class="clip-video-wrap">
+    <div id="clip-loading" style="display:none">
+      <div class="clip-spinner"></div>
+      <div class="clip-loading-label">Preparing clip…</div>
+    </div>
     <video id="clip-video" playsinline webkit-playsinline></video>
   </div>
   <div class="clip-trim-area">
@@ -971,8 +999,8 @@ body {
     </div>
   </div>
   <div class="clip-actions">
-    <button class="clip-action-btn clip-play-btn" id="clip-play-btn" onclick="toggleClipPlay()">▶ Play</button>
-    <button class="clip-action-btn clip-dl-btn" onclick="downloadTrimmedClip()">↓ Download</button>
+    <button class="clip-action-btn clip-play-btn" id="clip-play-btn" onclick="toggleClipPlay()">Play</button>
+    <button class="clip-action-btn clip-dl-btn" onclick="downloadTrimmedClip()">Download</button>
   </div>
 </div>
 
@@ -1850,7 +1878,13 @@ async function runAnalysisForVideo(title, results) {
 
 // ── CLIP VIEWER & TRIMMER ─────────────────────────────────────────────────────
 
-const trimState = { filename: null, duration: 0, startFrac: 0, endFrac: 1, dragging: null };
+const trimState = {
+  filename: null, duration: 0, startFrac: 0, endFrac: 1, dragging: null,
+  clipOffset: 0,    // absolute start time in original video where loaded clip begins
+  viewStart: 0,     // visible fraction of clip timeline (for zoom)
+  viewEnd: 1,
+  blobUrl: null     // revocable blob URL for pre-generated clip
+};
 
 function fmtSecs(s) {
   s = Math.max(0, Math.floor(s));
@@ -1877,25 +1911,60 @@ function maybeAddViewClipButton(containerEl, text) {
 }
 
 async function openClipViewer(filename, startSecs) {
-  trimState.filename = filename;
-  trimState.startFrac = 0;
-  trimState.endFrac = 1;
-  const viewer = document.getElementById('clip-viewer');
-  const video  = document.getElementById('clip-video');
-  video.src = `/api/video/${encodeURIComponent(filename)}`;
-  video.load();
+  // Reset state
+  trimState.filename   = filename;
+  trimState.startFrac  = 0;
+  trimState.endFrac    = 1;
+  trimState.viewStart  = 0;
+  trimState.viewEnd    = 1;
+  trimState.clipOffset = 0;
+  if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
+
+  const viewer  = document.getElementById('clip-viewer');
+  const video   = document.getElementById('clip-video');
+  const loading = document.getElementById('clip-loading');
+
+  // Show viewer immediately with loading state
   viewer.classList.add('open');
-  // Wait for duration
-  await new Promise(r => video.readyState >= 1 ? r() : video.addEventListener('loadedmetadata', r, { once: true }));
-  trimState.duration = video.duration || 0;
-  video.currentTime = startSecs;
-  // Default selection: ±90s around the timestamp
-  if (trimState.duration > 0) {
-    trimState.startFrac = Math.max(0, (startSecs - 90) / trimState.duration);
-    trimState.endFrac   = Math.min(1, (startSecs + 90) / trimState.duration);
+  loading.style.display = 'flex';
+  video.style.opacity = '0';
+
+  // Pre-generate a 4-minute window around the timestamp
+  const preStart    = Math.max(0, startSecs - 120);
+  const preDuration = 240;
+  trimState.clipOffset = preStart;
+
+  try {
+    const res = await fetch(`/api/clip/${encodeURIComponent(filename)}?start=${preStart}&duration=${preDuration}`);
+    if (!res.ok) throw new Error('clip fetch failed');
+    const blob = await res.blob();
+    trimState.blobUrl = URL.createObjectURL(blob);
+
+    video.src = trimState.blobUrl;
+    video.load();
+    await new Promise(r => video.readyState >= 1 ? r() : video.addEventListener('loadedmetadata', r, { once: true }));
+    trimState.duration = video.duration || 0;
+
+    // Selection: ±90s around the target, expressed as fractions of the loaded clip
+    if (trimState.duration > 0) {
+      const posInClip     = startSecs - preStart;
+      trimState.startFrac = Math.max(0, (posInClip - 90) / trimState.duration);
+      trimState.endFrac   = Math.min(1, (posInClip + 90) / trimState.duration);
+    }
+
+    // Seek to start of selection
+    video.currentTime = trimState.startFrac * trimState.duration;
+
+    loading.style.display = 'none';
+    video.style.opacity   = '1';
+
+    updateTrimUI();
+    updateFilmstripZoom();
+    buildFilmstrip(trimState.blobUrl, trimState.duration);
+  } catch(e) {
+    loading.querySelector('.clip-loading-label').textContent = 'Failed to load clip.';
+    loading.querySelector('.clip-spinner').style.display = 'none';
   }
-  updateTrimUI();
-  buildFilmstrip(video.src, trimState.duration);
 }
 
 function closeClipViewer() {
@@ -1903,6 +1972,7 @@ function closeClipViewer() {
   document.getElementById('clip-viewer').classList.remove('open');
   video.pause();
   video.src = '';
+  if (trimState.blobUrl) { URL.revokeObjectURL(trimState.blobUrl); trimState.blobUrl = null; }
 }
 
 function toggleClipPlay() {
@@ -1920,10 +1990,13 @@ function updateTrimUI() {
   const wrap = document.getElementById('clip-filmstrip-wrap');
   if (!wrap) return;
   const W = wrap.offsetWidth, HW = 18;
-  const lx = trimState.startFrac * W;
-  const rx = trimState.endFrac * W;
-  document.getElementById('clip-dim-left').style.width   = lx + 'px';
-  document.getElementById('clip-dim-right').style.width  = (W - rx) + 'px';
+  const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+  // Convert a timeline fraction to a pixel x position within the visible wrap
+  const fracToX = f => Math.max(0, Math.min(W, (f - vs) / span * W));
+  const lx = fracToX(trimState.startFrac);
+  const rx = fracToX(trimState.endFrac);
+  document.getElementById('clip-dim-left').style.width    = lx + 'px';
+  document.getElementById('clip-dim-right').style.width   = Math.max(0, W - rx) + 'px';
   document.getElementById('clip-handle-left').style.left  = lx + 'px';
   document.getElementById('clip-handle-right').style.left = (rx - HW) + 'px';
   const selL = lx + HW, selW = Math.max(0, rx - lx - HW * 2);
@@ -1931,11 +2004,20 @@ function updateTrimUI() {
     document.getElementById(id).style.left  = selL + 'px';
     document.getElementById(id).style.width = selW + 'px';
   });
-  const s = trimState.startFrac * trimState.duration;
-  const e = trimState.endFrac   * trimState.duration;
+  // Time labels show absolute timestamps in the original video
+  const s = trimState.clipOffset + trimState.startFrac * trimState.duration;
+  const e = trimState.clipOffset + trimState.endFrac   * trimState.duration;
   document.getElementById('clip-start-label').textContent = fmtSecs(s);
   document.getElementById('clip-dur-label').textContent   = fmtSecs(e - s);
   document.getElementById('clip-end-label').textContent   = fmtSecs(e);
+}
+
+function updateFilmstripZoom() {
+  const canvas = document.getElementById('clip-filmstrip-canvas');
+  if (!canvas) return;
+  const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+  canvas.style.width = (100 / span) + '%';
+  canvas.style.left  = -(vs / span * 100) + '%';
 }
 
 async function buildFilmstrip(videoSrc, duration) {
@@ -1964,31 +2046,35 @@ async function downloadTrimmedClip() {
   const orig = btn.textContent;
   btn.textContent = 'Preparing…';
   btn.disabled = true;
-  const start    = trimState.startFrac * trimState.duration;
+  // Absolute positions in the original video
+  const absStart = trimState.clipOffset + trimState.startFrac * trimState.duration;
   const duration = (trimState.endFrac - trimState.startFrac) * trimState.duration;
   try {
-    const res = await fetch(`/api/clip/${encodeURIComponent(trimState.filename)}?start=${start}&duration=${duration}`);
+    const res = await fetch(`/api/clip/${encodeURIComponent(trimState.filename)}?start=${absStart}&duration=${duration}`);
     if (!res.ok) throw new Error('Failed');
-    await saveVideoBlob(await res.blob(), `clip_${Math.floor(start)}s.mp4`);
+    await saveVideoBlob(await res.blob(), `clip_${Math.floor(absStart)}s.mp4`);
     closeClipViewer();
   } catch { alert('Download failed.'); }
   finally { btn.textContent = orig; btn.disabled = false; }
 }
 
 function initTrimHandles() {
-  const wrap = document.getElementById('clip-filmstrip-wrap');
-  const lh   = document.getElementById('clip-handle-left');
-  const rh   = document.getElementById('clip-handle-right');
+  const wrap  = document.getElementById('clip-filmstrip-wrap');
+  const lh    = document.getElementById('clip-handle-left');
+  const rh    = document.getElementById('clip-handle-right');
   const video = document.getElementById('clip-video');
-  const getX = e => e.touches ? e.touches[0].clientX : e.clientX;
+  const getX  = e => e.touches ? e.touches[0].clientX : e.clientX;
 
+  // ── Handle drag ──────────────────────────────────────────────────────────────
   const onMove = e => {
     if (!trimState.dragging) return;
     e.preventDefault();
     const rect = wrap.getBoundingClientRect();
-    const frac = Math.max(0, Math.min(1, (getX(e) - rect.left) / rect.width));
+    const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+    // Map pixel position to timeline fraction accounting for current zoom
+    const frac = Math.max(0, Math.min(1, vs + (getX(e) - rect.left) / rect.width * span));
     if (trimState.dragging === 'left')  trimState.startFrac = Math.min(frac, trimState.endFrac - 0.01);
-    else                                 trimState.endFrac   = Math.max(frac, trimState.startFrac + 0.01);
+    else                                trimState.endFrac   = Math.max(frac, trimState.startFrac + 0.01);
     updateTrimUI();
     video.currentTime = (trimState.dragging === 'left' ? trimState.startFrac : trimState.endFrac) * trimState.duration;
   };
@@ -2003,17 +2089,54 @@ function initTrimHandles() {
   document.addEventListener('mouseup',    endDrag);
   document.addEventListener('touchend',   endDrag);
 
+  // ── Pinch-to-zoom on filmstrip ────────────────────────────────────────────
+  let pinchStartDist = 0, pinchStartVS = 0, pinchStartVE = 1, pinchMidFrac = 0.5;
+
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length !== 2) return;
+    const t0 = e.touches[0], t1 = e.touches[1];
+    pinchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    pinchStartVS = trimState.viewStart;
+    pinchStartVE = trimState.viewEnd;
+    const rect  = wrap.getBoundingClientRect();
+    const midX  = (t0.clientX + t1.clientX) / 2;
+    const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+    pinchMidFrac = vs + ((midX - rect.left) / rect.width) * span;
+  }, { passive: true });
+
+  wrap.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !pinchStartDist) return;
+    e.preventDefault();
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const dist  = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    const scale = pinchStartDist / dist; // spread fingers → dist↑ → scale<1 → span shrinks → zoom in
+    const startSpan = pinchStartVE - pinchStartVS;
+    const newSpan   = Math.max(0.05, Math.min(1, startSpan * scale));
+    // Keep pinchMidFrac at the same screen position
+    const ratio  = newSpan / startSpan;
+    let newVS = pinchMidFrac - (pinchMidFrac - pinchStartVS) * ratio;
+    let newVE = newVS + newSpan;
+    if (newVS < 0) { newVE -= newVS; newVS = 0; }
+    if (newVE > 1) { newVS -= (newVE - 1); newVE = 1; }
+    trimState.viewStart = Math.max(0, newVS);
+    trimState.viewEnd   = Math.min(1, newVE);
+    updateTrimUI();
+    updateFilmstripZoom();
+  }, { passive: false });
+
+  // ── Playhead tracking ────────────────────────────────────────────────────────
   video.addEventListener('timeupdate', () => {
     if (!trimState.duration) return;
     const frac = video.currentTime / trimState.duration;
-    const W = wrap.offsetWidth;
-    document.getElementById('clip-playhead').style.left = (frac * W) + 'px';
+    const W    = wrap.offsetWidth;
+    const vs = trimState.viewStart, span = trimState.viewEnd - vs;
+    document.getElementById('clip-playhead').style.left = ((frac - vs) / span * W) + 'px';
     if (video.currentTime >= trimState.endFrac * trimState.duration) {
       video.pause();
     }
   });
-  video.addEventListener('play',  () => document.getElementById('clip-play-btn').textContent = '⏸ Pause');
-  video.addEventListener('pause', () => document.getElementById('clip-play-btn').textContent = '▶ Play');
+  video.addEventListener('play',  () => document.getElementById('clip-play-btn').textContent = 'Pause');
+  video.addEventListener('pause', () => document.getElementById('clip-play-btn').textContent = 'Play');
 }
 initTrimHandles();
 
