@@ -6,13 +6,16 @@ import os
 import json
 import sqlite3
 import re
+import subprocess
 import urllib.request
 import urllib.error
-from flask import Flask, request, jsonify, session, send_from_directory, Response, stream_with_context
+from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context
 from functools import wraps
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
 
 DB_PATH       = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "db.sqlite"))
 OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
@@ -107,6 +110,12 @@ def get_db():
         return None
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    # Ensure video_path column exists (migration for older dbs)
+    try:
+        conn.execute("ALTER TABLE episodes ADD COLUMN video_path TEXT")
+        conn.commit()
+    except Exception:
+        pass
     return conn
 
 
@@ -168,14 +177,14 @@ def semantic_search(query, limit=50, episode_filter=None):
         where, params = ep_filter_clauses(episode_filter)
         rows = conn.execute(f"""
             SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
-                   e.title AS episode_title, e.filename
+                   e.title AS episode_title, e.filename, e.video_path
             FROM segments s JOIN episodes e ON e.id = s.episode_id
             WHERE s.embedding IS NOT NULL AND {where}
         """, params).fetchall()
     else:
         rows = conn.execute("""
             SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
-                   e.title AS episode_title, e.filename
+                   e.title AS episode_title, e.filename, e.video_path
             FROM segments s JOIN episodes e ON e.id = s.episode_id
             WHERE s.embedding IS NOT NULL
         """).fetchall()
@@ -197,7 +206,7 @@ def keyword_search(query, limit=50):
     try:
         rows = conn.execute("""
             SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
-                   e.title AS episode_title, e.filename, fts.rank
+                   e.title AS episode_title, e.filename, e.video_path, fts.rank
             FROM fts_segments fts
             JOIN segments s ON s.rowid = fts.rowid
             JOIN episodes e ON e.id = s.episode_id
@@ -207,7 +216,7 @@ def keyword_search(query, limit=50):
     except:
         rows = conn.execute("""
             SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
-                   e.title AS episode_title, e.filename, 0 AS rank
+                   e.title AS episode_title, e.filename, e.video_path, 0 AS rank
             FROM segments s JOIN episodes e ON e.id = s.episode_id
             WHERE s.text LIKE ? LIMIT ?
         """, (f"%{query}%", limit)).fetchall()
@@ -239,7 +248,7 @@ def episode_search(ep_number):
     where, params = ep_filter_clauses(ep_number)
     rows = conn.execute(f"""
         SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
-               e.title AS episode_title, e.filename, 0 AS rank
+               e.title AS episode_title, e.filename, e.video_path, 0 AS rank
         FROM segments s JOIN episodes e ON e.id = s.episode_id
         WHERE {where}
         ORDER BY s.start_secs ASC
@@ -255,14 +264,17 @@ def clean_ep_label(episode_title):
 
 
 def format_result(row, score):
+    video_path = row["video_path"] if "video_path" in row.keys() else None
     return {
-        "episode_title": row["episode_title"],
-        "filename":      row["filename"] or "",
-        "speaker":       row["speaker"] or "",
-        "timestamp":     row["timestamp"] or "00:00",
-        "start_secs":    row["start_secs"] or 0,
-        "text":          row["text"],
-        "score":         round(float(score), 4),
+        "episode_title":  row["episode_title"],
+        "filename":       row["filename"] or "",
+        "speaker":        row["speaker"] or "",
+        "timestamp":      row["timestamp"] or "00:00",
+        "start_secs":     row["start_secs"] or 0,
+        "text":           row["text"],
+        "score":          round(float(score), 4),
+        "has_video":      bool(video_path),
+        "video_filename": os.path.basename(video_path) if video_path else None,
     }
 
 
@@ -379,13 +391,15 @@ def episodes_list():
     conn = get_db()
     if not conn: return jsonify({"episodes": []})
     rows = conn.execute("""
-        SELECT e.id, e.title, COUNT(s.id) as segment_count
+        SELECT e.id, e.title, e.video_path, COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
         GROUP BY e.id ORDER BY e.id DESC
     """).fetchall()
     conn.close()
     return jsonify({"episodes": [
-        {"id": r["id"], "title": r["title"], "segments": r["segment_count"]}
+        {"id": r["id"], "title": r["title"], "segments": r["segment_count"],
+         "has_video": bool(r["video_path"]),
+         "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None}
         for r in rows
     ]})
 
@@ -611,6 +625,192 @@ def followup():
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ── VIDEO ─────────────────────────────────────────────────────────────────────
+
+def videos_dir():
+    return os.path.join(os.path.dirname(DB_PATH), "videos")
+
+
+def secs_to_timestamp(secs):
+    secs = int(secs)
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
+def extract_audio(video_path, audio_path):
+    """Extract audio from video to mp3 using ffmpeg."""
+    result = subprocess.run(
+        ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-ab", "64k", "-y", audio_path],
+        capture_output=True, timeout=120
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg error: {result.stderr.decode()[:200]}")
+
+
+def whisper_transcribe(audio_path):
+    """Transcribe audio via OpenAI Whisper API. Returns verbose_json dict."""
+    with open(audio_path, "rb") as f:
+        audio_data = f.read()
+    boundary = "Boundary" + os.urandom(8).hex()
+    filename = os.path.basename(audio_path)
+
+    def part(name, value):
+        return (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode()
+
+    body = (
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
+        f"Content-Type: audio/mpeg\r\n\r\n"
+    ).encode() + audio_data + b"\r\n"
+    body += part("model", "whisper-1")
+    body += part("response_format", "verbose_json")
+    body += f"--{boundary}--\r\n".encode()
+
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/audio/transcriptions",
+        data=body,
+        headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read())
+
+
+def get_embeddings_batch_local(texts):
+    if not OPENAI_KEY or not texts:
+        return [None] * len(texts)
+    payload = json.dumps({"model": "text-embedding-3-small", "input": [t[:8000] for t in texts]}).encode()
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/embeddings",
+        data=payload,
+        headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+            return [item["embedding"] for item in sorted(data["data"], key=lambda x: x["index"])]
+    except Exception as e:
+        print(f"Embedding failed: {e}")
+        return [None] * len(texts)
+
+
+def ingest_video_episode(conn, episode_id, title, video_path, whisper_result):
+    """Store a video episode from Whisper output into the db."""
+    cur = conn.cursor()
+    cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
+    cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+    cur.execute(
+        "INSERT INTO episodes (id, title, filename, video_path) VALUES (?, ?, ?, ?)",
+        (episode_id, title, os.path.basename(video_path), video_path)
+    )
+
+    raw = [
+        {"timestamp": secs_to_timestamp(seg["start"]), "start_secs": float(seg["start"]), "text": seg["text"].strip()}
+        for seg in whisper_result.get("segments", []) if seg.get("text", "").strip()
+    ]
+    if not raw:
+        conn.commit()
+        return 0
+
+    # Chunk into ~400-word segments
+    chunks, current_text, current_ts, current_secs, word_count = [], "", "", 0.0, 0
+    for seg in raw:
+        words = seg["text"].split()
+        if word_count + len(words) > 400 and current_text:
+            chunks.append({"timestamp": current_ts, "start_secs": current_secs, "text": current_text.strip()})
+            current_text, word_count = "", 0
+        if not current_text:
+            current_ts, current_secs = seg["timestamp"], seg["start_secs"]
+        current_text += " " + seg["text"]
+        word_count += len(words)
+    if current_text.strip():
+        chunks.append({"timestamp": current_ts, "start_secs": current_secs, "text": current_text.strip()})
+
+    embeddings = get_embeddings_batch_local([c["text"] for c in chunks])
+    for chunk, emb in zip(chunks, embeddings):
+        cur.execute(
+            "INSERT INTO segments (episode_id, speaker, timestamp, start_secs, text, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (episode_id, "", chunk["timestamp"], chunk["start_secs"], chunk["text"], json.dumps(emb) if emb else None)
+        )
+        cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", (episode_id, chunk["text"]))
+    conn.commit()
+    return len(chunks)
+
+
+@app.route("/api/upload-video", methods=["POST"])
+@requires_auth
+def upload_video():
+    if not OPENAI_KEY:
+        return jsonify({"error": "OpenAI API key required for transcription"}), 400
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected"}), 400
+
+    vdir = videos_dir()
+    os.makedirs(vdir, exist_ok=True)
+    filename = secure_filename(file.filename)
+    video_path = os.path.join(vdir, filename)
+    file.save(video_path)
+
+    audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
+    try:
+        extract_audio(video_path, audio_path)
+        result = whisper_transcribe(audio_path)
+        episode_id = filename.rsplit(".", 1)[0]
+        title = request.form.get("title", "").strip() or episode_id
+        conn = get_db()
+        count = ingest_video_episode(conn, episode_id, title, video_path, result)
+        # Rebuild FTS
+        cur = conn.cursor()
+        cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+        for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
+            cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "episode_id": episode_id, "chunks": count, "title": title})
+    except Exception as e:
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+
+
+@app.route("/api/video/<path:filename>")
+@requires_auth
+def serve_video(filename):
+    vdir = videos_dir()
+    file_path = os.path.join(vdir, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Not found"}), 404
+    return send_file(file_path, mimetype="video/mp4", conditional=True)
+
+
+@app.route("/api/delete-episode/<episode_id>", methods=["DELETE"])
+@requires_auth
+def delete_episode_endpoint(episode_id):
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    cur = conn.cursor()
+    ep = conn.execute("SELECT video_path FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+    cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
+    cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+    cur.execute("INSERT INTO fts_segments(fts_segments) VALUES('delete-all')")
+    for row in conn.execute("SELECT episode_id, text FROM segments").fetchall():
+        cur.execute("INSERT INTO fts_segments (episode_id, text) VALUES (?, ?)", row)
+    conn.commit()
+    conn.close()
+    if ep and ep["video_path"] and os.path.exists(ep["video_path"]):
+        try:
+            os.remove(ep["video_path"])
+        except Exception:
+            pass
+    return jsonify({"ok": True})
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────────────────────

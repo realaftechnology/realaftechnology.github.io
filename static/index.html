@@ -518,6 +518,143 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
 .scroll-bottom-pad { height: 20px; }
+
+/* ── UPLOAD MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 400;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+}
+.modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.modal-field {
+  width: 100%;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  margin-bottom: 10px;
+  -webkit-appearance: none;
+}
+.modal-field::placeholder { color: var(--label-tertiary); }
+.file-drop {
+  border: 1.5px dashed var(--separator);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: border-color 0.15s;
+}
+.file-drop:hover { border-color: var(--red); }
+.file-drop.has-file { border-color: var(--red); background: rgba(255,69,58,0.06); }
+.file-drop-label { font-size: 14px; color: var(--label-tertiary); }
+.file-drop-label strong { color: var(--label-secondary); }
+.modal-row { display: flex; gap: 10px; }
+.modal-btn {
+  flex: 1;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--sf);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.modal-btn-primary { background: var(--red); color: #fff; }
+.modal-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.modal-btn-cancel { background: var(--bg-tertiary); color: var(--label-secondary); }
+.modal-status { font-size: 13px; color: var(--label-secondary); margin-top: 10px; min-height: 18px; text-align: center; }
+
+/* ── VIDEO PLAYER PANEL ── */
+.video-panel {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #000;
+  z-index: 350;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+.video-panel.open { transform: translateY(0); }
+.video-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border-top: 0.5px solid var(--separator);
+  flex-shrink: 0;
+}
+.video-panel-title { font-size: 13px; font-weight: 600; color: var(--label); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-panel-ts { font-family: var(--sf-mono); font-size: 12px; color: var(--red); margin: 0 12px; flex-shrink: 0; }
+.video-panel-close { background: none; border: none; color: var(--label-tertiary); font-size: 18px; cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; }
+.video-panel video { width: 100%; flex: 1; min-height: 0; display: block; background: #000; }
+.play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,69,58,0.12);
+  border: none;
+  border-radius: 6px;
+  color: var(--red);
+  font-family: var(--sf);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin-left: 8px;
+  flex-shrink: 0;
+  -webkit-appearance: none;
+}
+.play-btn:hover { background: rgba(255,69,58,0.22); }
+.upload-btn {
+  background: none;
+  border: none;
+  color: var(--label-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.upload-btn:hover { color: var(--label); }
+.delete-ep-btn {
+  background: none;
+  border: none;
+  color: var(--label-quaternary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.delete-ep-btn:hover { color: var(--red); }
 </style>
 </head>
 <body>
@@ -530,6 +667,33 @@ body {
     <button class="login-btn" onclick="doLogin()">Continue</button>
     <div class="login-error" id="login-error"></div>
   </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal-box">
+    <div class="modal-title">Upload Video</div>
+    <input class="modal-field" type="text" id="upload-title" placeholder="Episode title (optional)">
+    <div class="file-drop" id="file-drop" onclick="document.getElementById('video-file-input').click()">
+      <div class="file-drop-label" id="file-drop-label"><strong>Choose MP4</strong> or drag and drop</div>
+      <input type="file" id="video-file-input" accept=".mp4" style="display:none" onchange="onFileSelected(this)">
+    </div>
+    <div class="modal-row">
+      <button class="modal-btn modal-btn-cancel" onclick="closeUploadModal()">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="upload-submit-btn" onclick="submitUpload()" disabled>Upload</button>
+    </div>
+    <div class="modal-status" id="upload-status"></div>
+  </div>
+</div>
+
+<!-- VIDEO PLAYER PANEL -->
+<div class="video-panel" id="video-panel">
+  <div class="video-panel-header">
+    <span class="video-panel-title" id="video-panel-title"></span>
+    <span class="video-panel-ts" id="video-panel-ts"></span>
+    <button class="video-panel-close" onclick="closeVideoPanel()">✕</button>
+  </div>
+  <video id="video-player" controls playsinline></video>
 </div>
 
 <!-- MAIN -->
@@ -557,6 +721,9 @@ body {
       </button>
       <div class="app-title" style="flex:1" onclick="resetApp()"><span>AF</span>BRAIN</div>
       <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
+      <button class="upload-btn" onclick="openUploadModal()" title="Upload video">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="10" width="16" height="7" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M9 1v8M6 4l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
   </div>
 
@@ -690,9 +857,16 @@ function renderEpisodeList(episodes) {
     const subtitle = formatEpSubtitle(ep.title);
     const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
     const isActive = lockedEpisode === num;
-    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
-      <div class="ep-item-num">Ep ${num}</div>
-      <div class="ep-item-title">${subtitle}</div>
+    const videoIcon = ep.has_video ? '<span style="color:var(--red);font-size:10px;margin-left:4px">▶</span>' : '';
+    const deleteBtn = ep.has_video
+      ? `<button class="delete-ep-btn" onclick="event.stopPropagation();deleteEpisode('${ep.id}')" title="Delete episode">✕</button>`
+      : '';
+    return `<div class="ep-item${isActive ? ' active' : ''}" style="display:flex;align-items:center;gap:4px" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
+      <div style="flex:1;min-width:0">
+        <div class="ep-item-num">Ep ${num}${videoIcon}</div>
+        <div class="ep-item-title">${subtitle}</div>
+      </div>
+      ${deleteBtn}
     </div>`;
   }).join('');
 }
@@ -813,10 +987,13 @@ function renderResults(query, results, autoExpand = false) {
     const epShort = r.episode_title.replace(/\.(mp3|mp4|m4a)$/i, '').substring(0, 60);
     const snippet = highlightText(r.text, query);
     const speaker = r.speaker ? `<div class="result-speaker">${r.speaker}</div>` : '';
+    const playBtn = r.has_video
+      ? `<button class="play-btn" onclick="playVideo('${r.video_filename}','${r.episode_title.replace(/'/g,"\\'")}',${r.start_secs})">▶ ${r.timestamp}</button>`
+      : '';
     transcriptHtml += `<div class="result-card">
       <div class="result-meta-row">
         <span class="result-ep">${epShort}</span>
-        <span class="result-ts">${r.timestamp}</span>
+        ${r.has_video ? playBtn : `<span class="result-ts">${r.timestamp}</span>`}
       </div>
       ${speaker}
       <div class="result-text">${snippet}</div>
@@ -972,6 +1149,119 @@ async function doFollowup(question) {
   } catch(e) {
     const item = document.getElementById(itemId);
     if (item) item.querySelector('.chat-a-body').textContent = 'Request failed.';
+  }
+}
+
+// ── UPLOAD ───────────────────────────────────────────────────────────────────
+
+let selectedVideoFile = null;
+
+function openUploadModal() {
+  selectedVideoFile = null;
+  document.getElementById('upload-title').value = '';
+  document.getElementById('file-drop-label').innerHTML = '<strong>Choose MP4</strong> or drag and drop';
+  document.getElementById('file-drop').classList.remove('has-file');
+  document.getElementById('upload-submit-btn').disabled = true;
+  document.getElementById('upload-status').textContent = '';
+  document.getElementById('upload-modal').classList.add('open');
+}
+
+function closeUploadModal() {
+  document.getElementById('upload-modal').classList.remove('open');
+}
+
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedVideoFile = file;
+  document.getElementById('file-drop-label').innerHTML = `<strong>${file.name}</strong><br><span style="font-size:12px">${(file.size/1024/1024).toFixed(1)} MB</span>`;
+  document.getElementById('file-drop').classList.add('has-file');
+  document.getElementById('upload-submit-btn').disabled = false;
+  if (!document.getElementById('upload-title').value) {
+    document.getElementById('upload-title').value = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+  }
+}
+
+// Drag and drop
+const fileDrop = document.getElementById('file-drop');
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.style.borderColor = 'var(--red)'; });
+fileDrop.addEventListener('dragleave', () => { fileDrop.style.borderColor = ''; });
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDrop.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.toLowerCase().endsWith('.mp4')) {
+    document.getElementById('video-file-input').files = e.dataTransfer.files;
+    onFileSelected(document.getElementById('video-file-input'));
+  }
+});
+
+async function submitUpload() {
+  if (!selectedVideoFile) return;
+  const btn = document.getElementById('upload-submit-btn');
+  const status = document.getElementById('upload-status');
+  btn.disabled = true;
+  status.textContent = 'Uploading...';
+  const title = document.getElementById('upload-title').value.trim();
+  const form = new FormData();
+  form.append('file', selectedVideoFile);
+  if (title) form.append('title', title);
+  try {
+    status.innerHTML = '<span class="spinner" style="display:inline-block"></span> Uploading and transcribing...';
+    const res = await fetch('/api/upload-video', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    status.textContent = `Done — ${data.chunks} segment${data.chunks !== 1 ? 's' : ''} indexed.`;
+    setTimeout(() => {
+      closeUploadModal();
+      loadStats();
+    }, 1500);
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── VIDEO PLAYER ──────────────────────────────────────────────────────────────
+
+function playVideo(filename, title, startSecs) {
+  const panel = document.getElementById('video-panel');
+  const player = document.getElementById('video-player');
+  const panelTitle = document.getElementById('video-panel-title');
+  const panelTs = document.getElementById('video-panel-ts');
+  const src = `/api/video/${encodeURIComponent(filename)}`;
+  panelTitle.textContent = title.replace(/\.(mp4|mp3|m4a|docx)$/i, '');
+  panelTs.textContent = new Date(startSecs * 1000).toISOString().substr(11, 8).replace(/^00:/, '');
+  if (player.src !== src) {
+    player.src = src;
+    player.load();
+  }
+  player.currentTime = startSecs;
+  player.play();
+  panel.classList.add('open');
+}
+
+function closeVideoPanel() {
+  const panel = document.getElementById('video-panel');
+  const player = document.getElementById('video-player');
+  panel.classList.remove('open');
+  player.pause();
+}
+
+// ── DELETE EPISODE ────────────────────────────────────────────────────────────
+
+async function deleteEpisode(episodeId) {
+  if (!confirm(`Delete this episode and its video? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/api/delete-episode/${encodeURIComponent(episodeId)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Delete failed');
+    loadStats();
+    loadEpisodeList();
+    resetApp(false, false);
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
   }
 }
 
