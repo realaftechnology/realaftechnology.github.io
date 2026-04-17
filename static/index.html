@@ -1746,8 +1746,7 @@ async function openVideoEpisode(videoFilename, title, episodeId) {
     </div>
     <div id="ai-section">
       <button class="get-summary-btn" id="get-summary-btn" onclick="loadVideoSummary()">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v4M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Get AI Summary
+        Get AFBrain Summary
       </button>
       <button class="view-transcripts-btn" id="transcripts-toggle" style="display:none" onclick="toggleTranscripts()">
         View Transcript &#8964;
@@ -1923,6 +1922,12 @@ async function openClipViewer(filename, startSecs) {
   const viewer  = document.getElementById('clip-viewer');
   const video   = document.getElementById('clip-video');
   const loading = document.getElementById('clip-loading');
+
+  // Stop any other playing videos before opening
+  ['video-player', 'inline-video-player'].forEach(id => {
+    const v = document.getElementById(id);
+    if (v) { v.pause(); }
+  });
 
   // Show viewer immediately with loading state
   viewer.classList.add('open');

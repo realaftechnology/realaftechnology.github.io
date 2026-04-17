@@ -978,7 +978,7 @@ def download_clip(filename):
 
     try:
         result = subprocess.run(
-            ["ffmpeg", "-i", video_path, "-ss", str(start), "-t", str(duration),
+            ["ffmpeg", "-ss", str(start), "-i", video_path, "-t", str(duration),
              "-c", "copy", "-y", tmp_path],
             capture_output=True, timeout=120
         )
