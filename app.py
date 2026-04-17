@@ -1051,16 +1051,42 @@ def _list_gdrive_folder(url):
     folder_id = m.group(1)
     errors = []
 
-    # ── Attempt 1: intercept gdown's download_folder ─────────────────────────
-    # gdown/download_folder.py does `from .download import download` at the
-    # module level, so `gdown.download_folder.download` is the function it
-    # calls for every file. We replace that reference temporarily to capture
-    # file IDs/names without downloading anything.
-    #
-    # Critical: gdown calls download(url="...", output="...") with url as a
-    # keyword argument — the mock MUST name the first param `url` to match.
+    # ── Attempt 1: gdown skip_download (gdown ≥5.x proper API) ──────────────
+    # download_folder(skip_download=True) returns List[GoogleDriveFileToDownload]
+    # namedtuples with fields (id, path, local_path) — no files are written to disk.
     try:
         import gdown as _gdown
+        files = _gdown.download_folder(url, skip_download=True, quiet=True, remaining_ok=True)
+        if files is not None:
+            result = []
+            for f in files:
+                fid  = getattr(f, 'id', None)
+                path = getattr(f, 'path', None) or getattr(f, 'local_path', None)
+                name = os.path.basename(str(path)) if path else None
+                if fid and name and name.lower().endswith(_VIDEO_EXTS):
+                    result.append({"id": str(fid), "name": name})
+            if result:
+                return result
+            if files:
+                errors.append(
+                    f"gdown skip_download: found {len(files)} file(s) but none matched "
+                    f"video extensions {_VIDEO_EXTS}"
+                )
+            else:
+                errors.append("gdown skip_download: folder appears empty")
+        else:
+            errors.append("gdown skip_download: returned None — folder may be private or rate-limited")
+    except TypeError as e:
+        # skip_download not available in this gdown build — fall through
+        errors.append(f"gdown skip_download not supported by installed version: {e}")
+    except Exception as e:
+        errors.append(f"gdown skip_download: {e}")
+
+    # ── Attempt 2: monkey-patch gdown's per-file download function ───────────
+    # gdown/download_folder.py imports `download` at module level; replacing it
+    # temporarily lets us capture file IDs/names without downloading anything.
+    try:
+        import gdown as _gdown2
         import gdown.download_folder as _gdf
 
         if hasattr(_gdf, "download"):
@@ -1074,7 +1100,6 @@ def _list_gdrive_folder(url):
                 fname = os.path.basename(output) if output else None
                 if fid and fname:
                     _found.append({"id": fid, "name": fname})
-                # Create a zero-byte placeholder so gdown doesn't error out
                 if output:
                     try:
                         os.makedirs(
@@ -1088,7 +1113,7 @@ def _list_gdrive_folder(url):
             _gdf.download = _mock_dl
             _tmp = os.path.join(tempfile.gettempdir(), f"gd_list_{folder_id}")
             try:
-                _gdown.download_folder(url, output=_tmp, quiet=True, remaining_ok=True)
+                _gdown2.download_folder(url, output=_tmp, quiet=True, remaining_ok=True)
             except Exception as e:
                 errors.append(f"gdown intercept download_folder: {e}")
             finally:
@@ -1099,37 +1124,15 @@ def _list_gdrive_folder(url):
             if result:
                 return result
             if _found:
-                # Files were found but none are video — return all so the caller
-                # can surface a clearer error
                 errors.append(
-                    f"gdown found {len(_found)} file(s) but none matched video extensions"
+                    f"gdown intercept: found {len(_found)} file(s) but none matched video extensions"
                 )
+            else:
+                errors.append("gdown intercept: no files captured — gdown may have errored silently")
         else:
-            errors.append("gdown.download_folder has no 'download' attribute")
+            errors.append("gdown.download_folder has no 'download' attribute in this build")
     except Exception as e:
         errors.append(f"gdown intercept: {e}")
-
-    # ── Attempt 2: use gdown's own session to fetch the folder page ───────────
-    try:
-        import gdown.download_folder as _gdf2
-        _get_sess = getattr(_gdf2, "_get_session", None)
-        if _get_sess is None:
-            import gdown.download as _gd2
-            _get_sess = getattr(_gd2, "_get_session", None)
-        if _get_sess:
-            sess = _get_sess(use_cookies=False)
-            resp = sess.get(
-                f"https://drive.google.com/drive/folders/{folder_id}?hl=en",
-                timeout=25,
-            )
-            files = _parse_drive_html(resp.text)
-            if files:
-                return files
-            errors.append("gdown session fetch: folder page returned no video files")
-        else:
-            errors.append("gdown: no _get_session found")
-    except Exception as e:
-        errors.append(f"gdown session fetch: {e}")
 
     raise RuntimeError(
         "Could not list folder contents — all methods failed.\n"

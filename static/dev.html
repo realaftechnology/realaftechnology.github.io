@@ -469,6 +469,12 @@ async function deleteEpisode(id, title, hasVideo) {
 }
 
 // ── Main refresh ──────────────────────────────────────────────────────────────
+// Cache last-rendered JSON so we only touch the DOM when data actually changes.
+let _lastActiveJson  = '';
+let _lastPastJson    = '';
+let _lastSearchJson  = '';
+let _prevActiveCount = -1;
+
 async function refresh() {
   try {
     const resp = await fetch('/api/dev/status');
@@ -501,12 +507,31 @@ async function refresh() {
     badge.style.display = activeCount ? '' : 'none';
     if (activeCount) badge.textContent = activeCount + ' running';
 
-    renderJobs(data.jobs||[], 'active-jobs', true);
-    renderJobs(data.jobs||[], 'past-jobs',   false);
-    renderSearchHistory(data.searches||[]);
+    // Only re-render jobs/search sections when data actually changed —
+    // this prevents the "active imports" section from flashing every 4s.
+    const activeJobs  = (data.jobs||[]).filter(j => j.status === 'running');
+    const pastJobs    = (data.jobs||[]).filter(j => j.status !== 'running');
+    const activeJson  = JSON.stringify(activeJobs);
+    const pastJson    = JSON.stringify(pastJobs);
+    const searchJson  = JSON.stringify((data.searches||[]).slice(0, 20)); // compare top 20
 
-    // Episodes: only load once; reload if active import just finished
-    if (!_epsLoaded || activeCount === 0) renderEpisodes();
+    if (activeJson !== _lastActiveJson) {
+      _lastActiveJson = activeJson;
+      renderJobs(data.jobs||[], 'active-jobs', true);
+    }
+    if (pastJson !== _lastPastJson) {
+      _lastPastJson = pastJson;
+      renderJobs(data.jobs||[], 'past-jobs', false);
+    }
+    if (searchJson !== _lastSearchJson) {
+      _lastSearchJson = searchJson;
+      renderSearchHistory(data.searches||[]);
+    }
+
+    // Episodes: only load once; reload when an active import finishes
+    const justFinished = _prevActiveCount > 0 && activeCount === 0;
+    if (!_epsLoaded || justFinished) renderEpisodes();
+    _prevActiveCount = activeCount;
 
     const dot = document.getElementById('refresh-dot');
     dot.classList.remove('stale');
