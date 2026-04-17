@@ -790,20 +790,27 @@ body {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   background: #000;
   z-index: 2;
-}
-#clip-loading .clip-spinner {
-  width: 26px; height: 26px;
-  border: 2px solid rgba(255,255,255,0.15);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
 }
 #clip-loading .clip-loading-label {
   color: rgba(255,255,255,0.5);
   font-size: 13px;
+}
+.clip-progress-track {
+  width: 220px;
+  height: 3px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.clip-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #fff;
+  border-radius: 2px;
+  transition: width 0.15s linear;
 }
 .clip-video-wrap video { max-width: 100%; max-height: 100%; display: block; }
 .clip-trim-area {
@@ -976,8 +983,10 @@ body {
   </div>
   <div class="clip-video-wrap">
     <div id="clip-loading" style="display:none">
-      <div class="clip-spinner"></div>
-      <div class="clip-loading-label">Preparing clip…</div>
+      <div class="clip-loading-label" id="clip-loading-label">Preparing clip…</div>
+      <div class="clip-progress-track">
+        <div class="clip-progress-bar" id="clip-progress-bar"></div>
+      </div>
     </div>
     <video id="clip-video" playsinline webkit-playsinline></video>
   </div>
@@ -1879,10 +1888,12 @@ async function runAnalysisForVideo(title, results) {
 
 const trimState = {
   filename: null, duration: 0, startFrac: 0, endFrac: 1, dragging: null,
-  clipOffset: 0,    // absolute start time in original video where loaded clip begins
-  viewStart: 0,     // visible fraction of clip timeline (for zoom)
+  clipOffset: 0,      // absolute start time in original video where loaded clip begins
+  viewStart: 0,       // visible fraction of clip timeline (for zoom)
   viewEnd: 1,
-  blobUrl: null     // revocable blob URL for pre-generated clip
+  blobUrl: null,      // revocable blob URL for pre-generated clip
+  filmstripVS: 0,     // viewStart at time of last filmstrip draw
+  filmstripVE: 1      // viewEnd at time of last filmstrip draw
 };
 
 function fmtSecs(s) {
@@ -1931,6 +1942,10 @@ async function openClipViewer(filename, startSecs) {
 
   // Show viewer immediately with loading state
   viewer.classList.add('open');
+  const progressBar = document.getElementById('clip-progress-bar');
+  const loadingLabel = document.getElementById('clip-loading-label');
+  if (progressBar) progressBar.style.width = '0%';
+  if (loadingLabel) loadingLabel.textContent = 'Preparing clip…';
   loading.style.display = 'flex';
   video.style.opacity = '0';
 
@@ -1942,7 +1957,25 @@ async function openClipViewer(filename, startSecs) {
   try {
     const res = await fetch(`/api/clip/${encodeURIComponent(filename)}?start=${preStart}&duration=${preDuration}`);
     if (!res.ok) throw new Error('clip fetch failed');
-    const blob = await res.blob();
+
+    // Stream with download progress
+    const contentLength = res.headers.get('Content-Length');
+    const total = contentLength ? parseInt(contentLength) : 0;
+    const progressBar = document.getElementById('clip-progress-bar');
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total && progressBar) {
+        progressBar.style.width = Math.min(94, Math.round(received / total * 100)) + '%';
+      }
+    }
+    if (progressBar) progressBar.style.width = '100%';
+    const blob = new Blob(chunks, { type: 'video/mp4' });
     trimState.blobUrl = URL.createObjectURL(blob);
 
     video.src = trimState.blobUrl;
@@ -2018,32 +2051,65 @@ function updateTrimUI() {
 }
 
 function updateFilmstripZoom() {
+  // Applies CSS zoom/pan relative to the last-drawn filmstrip range.
+  // Gives immediate visual feedback during a pinch; buildFilmstrip redraws
+  // sharp frames once the gesture ends.
   const canvas = document.getElementById('clip-filmstrip-canvas');
   if (!canvas) return;
-  const vs = trimState.viewStart, span = trimState.viewEnd - vs;
-  canvas.style.width = (100 / span) + '%';
-  canvas.style.left  = -(vs / span * 100) + '%';
+  const dVS   = trimState.filmstripVS ?? 0;
+  const dVE   = trimState.filmstripVE ?? 1;
+  const dSpan = dVE - dVS;
+  const vs    = trimState.viewStart, span = trimState.viewEnd - vs;
+  // Relative to the drawn range
+  const relVS   = (vs   - dVS) / dSpan;
+  const relSpan = span / dSpan;
+  canvas.style.width = (100 / relSpan) + '%';
+  canvas.style.left  = -(relVS / relSpan * 100) + '%';
 }
 
 async function buildFilmstrip(videoSrc, duration) {
   const canvas = document.getElementById('clip-filmstrip-canvas');
   const wrap   = document.getElementById('clip-filmstrip-wrap');
-  const ctx    = canvas.getContext('2d');
+  if (!canvas || !wrap || !videoSrc || !duration) return;
+  const vs = trimState.viewStart, ve = trimState.viewEnd;
+  const ctx = canvas.getContext('2d');
   const FH = 60, FW = 54;
   const n  = Math.max(1, Math.floor(wrap.offsetWidth / FW));
+
+  // Size canvas to natural wrap width; drawn content = vs..ve range
   canvas.width  = wrap.offsetWidth;
   canvas.height = FH;
+  // While rebuilding, CSS must be 100%/0 so the draw positions are correct
+  canvas.style.width = '100%';
+  canvas.style.left  = '0';
+
   const tmp = document.createElement('video');
-  tmp.muted = true;
-  tmp.src   = videoSrc;
-  tmp.preload = 'auto';
-  await new Promise(r => tmp.readyState >= 1 ? r() : tmp.addEventListener('loadedmetadata', r, { once: true }));
+  tmp.muted    = true;
+  tmp.preload  = 'auto';
+  tmp.src      = videoSrc;
+
+  // Wait until we can seek (readyState ≥ HAVE_METADATA)
+  if (tmp.readyState < 1) {
+    await new Promise(r => tmp.addEventListener('loadedmetadata', r, { once: true }));
+  }
+
+  // Helper: seek and wait with a per-frame timeout so we never hang
+  const seekFrame = (t) => new Promise(resolve => {
+    const tid = setTimeout(resolve, 2500);
+    tmp.addEventListener('seeked', () => { clearTimeout(tid); resolve(); }, { once: true });
+    tmp.currentTime = t;
+  });
+
   for (let i = 0; i < n; i++) {
-    tmp.currentTime = (i / n) * duration;
-    await new Promise(r => tmp.addEventListener('seeked', r, { once: true }));
+    const frac = vs + (i / n) * (ve - vs);
+    await seekFrame(frac * duration);
     ctx.drawImage(tmp, i * FW, 0, FW, FH);
   }
   tmp.src = '';
+
+  // Record what range was drawn so CSS zoom can stay relative
+  trimState.filmstripVS = vs;
+  trimState.filmstripVE = ve;
 }
 
 async function downloadTrimmedClip() {
@@ -2126,8 +2192,18 @@ function initTrimHandles() {
     trimState.viewStart = Math.max(0, newVS);
     trimState.viewEnd   = Math.min(1, newVE);
     updateTrimUI();
-    updateFilmstripZoom();
+    updateFilmstripZoom(); // CSS preview during gesture
   }, { passive: false });
+
+  // When fingers lift, redraw filmstrip at correct resolution for the new range
+  wrap.addEventListener('touchend', e => {
+    if (e.touches.length < 2 && pinchStartDist > 0) {
+      pinchStartDist = 0;
+      if (trimState.blobUrl && trimState.duration) {
+        buildFilmstrip(trimState.blobUrl, trimState.duration);
+      }
+    }
+  }, { passive: true });
 
   // ── Playhead tracking ────────────────────────────────────────────────────────
   video.addEventListener('timeupdate', () => {
