@@ -746,6 +746,7 @@ body {
   inset: 0;
   background: #000;
   z-index: 600;
+  overflow: hidden;
   flex-direction: column;
 }
 #clip-viewer.open { display: flex; }
@@ -981,6 +982,17 @@ body {
 
 <!-- CLIP VIEWER / TRIMMER -->
 <div id="clip-viewer">
+  <!-- Clip saved confirmation overlay -->
+  <div id="clip-saved-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:28px">
+    <div style="text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <svg width="26" height="20" viewBox="0 0 26 20" fill="none"><path d="M2 10L10 18L24 2" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px">Clip Saved</div>
+    </div>
+    <button onclick="closeClipViewer()" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-family:var(--sf);font-size:16px;font-weight:600;cursor:pointer;padding:0 36px;height:50px;border-radius:var(--radius);-webkit-appearance:none;letter-spacing:-0.1px">Return To Chat</button>
+  </div>
+
   <div class="clip-header">
     <button class="clip-header-btn" onclick="closeClipViewer()">Cancel</button>
     <span class="clip-header-title">Trim Clip</span>
@@ -2006,6 +2018,8 @@ function closeClipViewer() {
   video.pause();
   video.src = '';
   trimState.clipUrl = null;
+  const overlay = document.getElementById('clip-saved-overlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 function toggleClipPlay() {
@@ -2119,7 +2133,9 @@ async function downloadTrimmedClip() {
     const res = await fetch(`/api/clip/${encodeURIComponent(trimState.filename)}?start=${absStart}&duration=${duration}`);
     if (!res.ok) throw new Error('Failed');
     await saveVideoBlob(await res.blob(), `clip_${Math.floor(absStart)}s.mp4`);
-    closeClipViewer();
+    // Show "Clip Saved" confirmation overlay
+    const overlay = document.getElementById('clip-saved-overlay');
+    if (overlay) overlay.style.display = 'flex';
   } catch { alert('Download failed.'); }
   finally { btn.textContent = orig; btn.disabled = false; }
 }
