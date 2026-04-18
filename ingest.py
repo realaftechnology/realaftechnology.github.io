@@ -292,21 +292,22 @@ def main():
         print(f"📁 Created '{TRANSCRIPTS_DIR}' folder. Drop your .docx files in there and re-run.")
         sys.exit(0)
 
+    conn = sqlite3.connect(DB_PATH)
+    init_db(conn)
+
     docx_files = [
         f for f in os.listdir(TRANSCRIPTS_DIR)
         if f.lower().endswith(".docx")
     ]
 
     if not docx_files:
-        print(f"No .docx files found in '{TRANSCRIPTS_DIR}'. Add some and re-run.")
+        print(f"No .docx files found in '{TRANSCRIPTS_DIR}' — nothing to ingest.")
+        conn.close()
         sys.exit(0)
 
     if not OPENAI_API_KEY:
         print("⚠️  No OPENAI_API_KEY set — keyword search only, no semantic search.")
         print("    Set it for AI-powered semantic search.\n")
-
-    conn = sqlite3.connect(DB_PATH)
-    init_db(conn)
 
     print(f"Found {len(docx_files)} transcript(s) to ingest\n")
 
