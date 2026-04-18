@@ -1591,15 +1591,20 @@ function renderSuggestions() {
   if (!el) return;
   const shuffled = [..._allSuggestions].sort(() => Math.random() - 0.5).slice(0, 8);
   el.innerHTML = shuffled.map(s =>
-    `<button class="suggestion-chip" onclick="runSuggestion(this.textContent)">${s}</button>`
+    `<button class="suggestion-chip" data-q="${s.replace(/"/g, '&quot;')}">${s}</button>`
   ).join('');
 }
 
-function runSuggestion(text) {
+// Single delegated listener — no inline onclick, avoids this.textContent issues
+document.getElementById('suggestion-bar').addEventListener('click', e => {
+  const chip = e.target.closest('.suggestion-chip');
+  if (!chip) return;
+  const q = chip.dataset.q;
+  if (!q) return;
   clearInterval(_quoteTimer);
-  document.getElementById('search-input').value = text;
+  document.getElementById('search-input').value = q;
   handleSubmit();
-}
+});
 
 // ── DELETE EPISODE (main app) ─────────────────────────────────────────────────
 async function deleteEpisode(episodeId) {
