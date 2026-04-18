@@ -328,13 +328,21 @@ body {
   font-style: normal;
   transition: opacity 0.6s ease;
 }
-/* ── SUGGESTION CHIPS ── */
-.suggestion-chips {
+/* ── SUGGESTION BAR (above input, horizontal scroll) ── */
+#suggestion-bar {
+  width: 100%;
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: 8px;
-  justify-content: center;
-  padding: 20px 0 8px;
+  padding: 8px 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+}
+#suggestion-bar::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) {
+  #suggestion-bar { padding-left: 20px; }
 }
 .suggestion-chip {
   background: var(--bg-secondary);
@@ -347,8 +355,9 @@ body {
   transition: background 0.15s, color 0.15s;
   -webkit-user-select: none;
   user-select: none;
-  line-height: 1.3;
-  text-align: left;
+  white-space: nowrap;
+  flex-shrink: 0;
+  scroll-snap-align: start;
 }
 .suggestion-chip:hover { background: var(--fill); color: var(--label); }
 .suggestion-chip:active { opacity: 0.7; }
@@ -1280,11 +1289,13 @@ body {
           <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
           <div class="quote-ep" id="quote-ep"></div>
         </div>
-        <div class="suggestion-chips" id="suggestion-chips"></div>
       </div>
     </div>
     <div class="scroll-bottom-pad"></div>
   </div>
+
+  <!-- Suggestion chips: horizontal scroll bar anchored above input -->
+  <div id="suggestion-bar"></div>
 
   <!-- Input bar is in-flow inside #main-screen flex column.
        It naturally sits above the keyboard because _pinHeight shrinks
@@ -1516,8 +1527,9 @@ function resetApp(clearLock = true, focusInput = true) {
         <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
         <div class="quote-ep" id="quote-ep"></div>
       </div>
-      <div class="suggestion-chips" id="suggestion-chips"></div>
     </div>`;
+  const bar = document.getElementById('suggestion-bar');
+  if (bar) bar.style.display = 'flex';
   initEmptyState();
   if (focusInput) document.getElementById('search-input').focus();
 }
@@ -1576,9 +1588,9 @@ const _allSuggestions = [
 ];
 
 function renderSuggestions() {
-  const el = document.getElementById('suggestion-chips');
+  const el = document.getElementById('suggestion-bar');
   if (!el) return;
-  const shuffled = [..._allSuggestions].sort(() => Math.random() - 0.5).slice(0, 5);
+  const shuffled = [..._allSuggestions].sort(() => Math.random() - 0.5).slice(0, 8);
   el.innerHTML = shuffled.map(s =>
     `<button class="suggestion-chip" onclick="runSuggestion(this.textContent)">${s}</button>`
   ).join('');
@@ -1621,6 +1633,8 @@ function handleSubmit() {
 
 async function doSearch(query, episodeFilter) {
   clearInterval(_quoteTimer);
+  const bar = document.getElementById('suggestion-bar');
+  if (bar) bar.style.display = 'none';
   currentQuery = query; chatHistory = []; hasResults = false;
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Searching...</div>';
