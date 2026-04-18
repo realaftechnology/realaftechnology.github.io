@@ -3459,6 +3459,8 @@ async function toggleVoiceRecording() {
         document.getElementById('voice-btn').style.display = 'flex';
       }
       initEmptyState();
+      loadEpisodeList();
+      loadVoiceNotes();
       document.getElementById('search-input').focus();
     } else {
       document.getElementById('login-screen').style.opacity = '1';

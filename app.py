@@ -880,9 +880,13 @@ def whisper_transcribe(audio_path):
     def part(name, value):
         return (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode()
 
+    ext = os.path.splitext(filename)[1].lower()
+    mime_map = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".webm": "audio/webm",
+                ".mp4": "audio/mp4", ".m4a": "audio/mp4", ".ogg": "audio/ogg"}
+    content_type = mime_map.get(ext, "audio/mpeg")
     body = (
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
-        f"Content-Type: audio/mpeg\r\n\r\n"
+        f"Content-Type: {content_type}\r\n\r\n"
     ).encode() + audio_data + b"\r\n"
     body += part("model", "whisper-1")
     body += part("response_format", "verbose_json")
