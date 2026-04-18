@@ -1108,32 +1108,55 @@ def upload_video():
     video_path = os.path.join(vdir, filename)
     file.save(video_path)
 
-    audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
-    try:
-        ffmpeg_ok = extract_audio(video_path, audio_path)
-        if not ffmpeg_ok:
-            # ffmpeg unavailable — only allow small files
-            if os.path.getsize(video_path) > 24 * 1024 * 1024:
-                raise RuntimeError("ffmpeg is required to process files larger than 24MB.")
-            result = whisper_transcribe(video_path)
-        else:
-            # Chunked transcription handles any length
-            result = whisper_transcribe_chunked(audio_path)
-        episode_id = filename.rsplit(".", 1)[0]
-        title = request.form.get("title", "").strip() or episode_id
-        conn = get_db()
-        count = ingest_video_episode(conn, episode_id, title, video_path, result)
-        _rebuild_fts(conn)
-        conn.commit()
-        conn.close()
-        return jsonify({"ok": True, "episode_id": episode_id, "chunks": count, "title": title})
-    except Exception as e:
-        if os.path.exists(video_path):
-            os.remove(video_path)
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if audio_path and os.path.exists(audio_path):
-            os.remove(audio_path)
+    episode_id = filename.rsplit(".", 1)[0]
+    title = request.form.get("title", "").strip() or episode_id
+
+    # Stub row so the episode is tracked immediately
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
+        "VALUES (?, ?, ?, ?, ?, 'transcribing')",
+        (episode_id, title, filename, video_path, datetime.now().strftime('%Y-%m-%d'))
+    )
+    conn.commit()
+    conn.close()
+
+    def _transcribe_bg(ep_id, ep_title, vid_path):
+        audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
+        try:
+            ffmpeg_ok = extract_audio(vid_path, audio_path)
+            if not ffmpeg_ok:
+                if os.path.getsize(vid_path) > 24 * 1024 * 1024:
+                    raise RuntimeError("ffmpeg required for files larger than 24MB")
+                result = whisper_transcribe(vid_path)
+            else:
+                result = whisper_transcribe_chunked(audio_path)
+            db = get_db()
+            ingest_video_episode(db, ep_id, ep_title, vid_path, result)
+            db.execute("UPDATE episodes SET transcribe_status = 'done' WHERE id = ?", (ep_id,))
+            _rebuild_fts(db)
+            db.commit()
+            db.close()
+            print(f"[upload] {ep_id}: transcription done", flush=True)
+        except Exception as exc:
+            print(f"[upload] {ep_id}: transcription failed: {exc}", flush=True)
+            try:
+                db = get_db()
+                if db:
+                    db.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (ep_id,))
+                    db.commit()
+                    db.close()
+            except Exception:
+                pass
+        finally:
+            if os.path.exists(audio_path):
+                try:
+                    os.remove(audio_path)
+                except Exception:
+                    pass
+
+    threading.Thread(target=_transcribe_bg, args=(episode_id, title, video_path), daemon=True).start()
+    return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 
 @app.route("/api/voice-notes")
