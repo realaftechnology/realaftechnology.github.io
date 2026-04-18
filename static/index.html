@@ -3077,13 +3077,12 @@ async function toggleVoiceRecording() {
     const fd   = new FormData();
     fd.append('audio', blob, `recording.${ext}`);
 
-    _voiceStatus('Transcribing\u2026');
+    _voiceStatus('Uploading\u2026');
     try {
       const res  = await fetch('/api/voice-note', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
-      _voiceStatus('Saved!', 2500);
-      loadEpisodeList();
+      _voiceStatus('Saved!', 1500);
     } catch(e) {
       _voiceStatus(`Error: ${e.message}`, 4000);
     }

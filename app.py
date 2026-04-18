@@ -263,6 +263,7 @@ def get_db():
             first_login TEXT DEFAULT (datetime('now')),
             last_login  TEXT DEFAULT (datetime('now'))
         )""",
+        "ALTER TABLE episodes ADD COLUMN transcribe_status TEXT",
     ]:
         try:
             conn.execute(stmt)
@@ -581,6 +582,7 @@ def episodes_list():
     rows = conn.execute("""
         SELECT e.id, e.title, e.video_path, e.uploaded_at, COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
+        WHERE e.transcribe_status IS NULL OR e.transcribe_status = 'done'
         GROUP BY e.id ORDER BY e.id DESC
     """).fetchall()
     conn.close()
@@ -1134,6 +1136,38 @@ def upload_video():
             os.remove(audio_path)
 
 
+def _transcribe_voice_note_bg(episode_id, title, raw_path):
+    """Background thread: convert, transcribe, and store a voice note."""
+    mp3_path = os.path.splitext(raw_path)[0] + ".mp3"
+    stored_path = raw_path
+    try:
+        ffmpeg_ok = extract_audio(raw_path, mp3_path)
+        if ffmpeg_ok:
+            stored_path = mp3_path
+            try:
+                os.remove(raw_path)
+            except Exception:
+                pass
+
+        result = whisper_transcribe(stored_path)
+        conn = get_db()
+        ingest_video_episode(conn, episode_id, title, stored_path, result)
+        conn.execute("UPDATE episodes SET transcribe_status = 'done' WHERE id = ?", (episode_id,))
+        _rebuild_fts(conn)
+        conn.commit()
+        conn.close()
+        print(f"[voice-note] {episode_id}: transcription complete", flush=True)
+    except Exception as e:
+        print(f"[voice-note] {episode_id}: transcription failed — {e}", flush=True)
+        try:
+            conn = get_db()
+            conn.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (episode_id,))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+
 @app.route("/api/voice-note", methods=["POST"])
 @requires_auth
 def voice_note():
@@ -1156,31 +1190,24 @@ def voice_note():
     raw_path = os.path.join(vdir, f"{episode_id}{orig_ext}")
     audio_file.save(raw_path)
 
-    mp3_path = os.path.join(vdir, f"{episode_id}.mp3")
-    stored_path = raw_path
-    try:
-        ffmpeg_ok = extract_audio(raw_path, mp3_path)
-        if ffmpeg_ok:
-            stored_path = mp3_path
-            try:
-                os.remove(raw_path)
-            except Exception:
-                pass
+    # Create stub episode row immediately so it's tracked even if the process restarts
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
+        "VALUES (?, ?, ?, ?, ?, 'transcribing')",
+        (episode_id, title, os.path.basename(raw_path), raw_path, now.strftime('%Y-%m-%d'))
+    )
+    conn.commit()
+    conn.close()
 
-        result = whisper_transcribe(stored_path)
-        conn = get_db()
-        count = ingest_video_episode(conn, episode_id, title, stored_path, result)
-        _rebuild_fts(conn)
-        conn.commit()
-        conn.close()
-        return jsonify({"ok": True, "episode_id": episode_id, "title": title, "chunks": count})
-    except Exception as e:
-        for p in [raw_path, mp3_path]:
-            try:
-                os.remove(p)
-            except Exception:
-                pass
-        return jsonify({"error": str(e)}), 500
+    # Transcription runs in the background — client gets 200 immediately
+    threading.Thread(
+        target=_transcribe_voice_note_bg,
+        args=(episode_id, title, raw_path),
+        daemon=True
+    ).start()
+
+    return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 
 @app.route("/api/drive-sources", methods=["GET"])
