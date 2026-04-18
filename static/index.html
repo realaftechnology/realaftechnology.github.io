@@ -699,6 +699,25 @@ body {
 }
 #voice-status.visible { opacity: 1; max-height: 24px; }
 
+#voice-save-row {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+#voice-save-row button {
+  flex: 1;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--sf);
+}
+#voice-save-btn { background: var(--red); color: #fff; }
+#voice-discard-btn { background: var(--bg-secondary); color: var(--label-secondary); }
+
 /* ── SPINNER ── */
 .scroll-bottom-pad { height: 12px; }
 
@@ -1428,6 +1447,10 @@ body {
         <button class="input-submit" onclick="toggleVoiceRecording()" aria-label="Stop recording">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><rect x="0" y="0" width="12" height="12" rx="2"/></svg>
         </button>
+      </div>
+      <div id="voice-save-row">
+        <button id="voice-save-btn" onclick="savePendingVoiceNote()">Save</button>
+        <button id="voice-discard-btn" onclick="discardPendingVoiceNote()">Discard</button>
       </div>
       <div class="input-bar">
         <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
@@ -3111,17 +3134,128 @@ async function loadVoiceNotes() {
   }
 }
 
-function openVoiceNote(encodedId, safeTitle) {
+async function openVoiceNote(encodedId, safeTitle) {
   const id = decodeURIComponent(encodedId);
   toggleSidebar();
   lockedEpisode = id;
   chatHistory = [];
+  currentVideoContext = null;
+  hasResults = true;
+
   const label = safeTitle.startsWith('VOICENOTE_') ? _formatVNTitle(safeTitle) : safeTitle;
+  currentQuery = label;
   document.getElementById('locked-label').textContent = label;
   document.getElementById('locked-pill').style.display = '';
   document.getElementById('search-input').placeholder = `Ask about \u201c${label}\u201d\u2026`;
-  resetApp(false);
-  document.getElementById('search-input').focus();
+
+  const safeLabel = label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const audioSrc  = `/api/audio/${encodeURIComponent(id)}`;
+
+  const area = document.getElementById('results-area');
+  area.innerHTML = `
+    <div style="border-radius:var(--radius-lg);overflow:hidden;margin-bottom:8px;background:var(--bg-secondary);padding:12px">
+      <audio id="inline-audio-player" controls preload="metadata" style="width:100%;display:block;outline:none">
+        <source src="${audioSrc}">
+      </audio>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px">
+      <div class="section-header" style="padding:0">Voice Note</div>
+      <button onclick="deleteVoiceNoteFromView('${encodeURIComponent(id)}','${safeLabel}')"
+        style="background:none;border:none;color:var(--label-quaternary);font-size:12px;cursor:pointer;padding:4px 0;font-family:var(--sf)"
+        onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--label-quaternary)'">Delete recording</button>
+    </div>
+    <div id="ai-section">
+      <button class="get-summary-btn" id="get-summary-btn" onclick="loadVideoSummary()">Get AFBrain Summary</button>
+      <button class="view-transcripts-btn" id="transcripts-toggle" style="display:none" onclick="toggleTranscripts()">View Transcript &#8964;</button>
+      <div class="transcripts-panel" id="transcripts-panel"></div>
+      <div id="chat-thread"></div>
+    </div>`;
+  scrollToTop();
+
+  try {
+    const res = await fetch(`/api/episode-segments/${encodeURIComponent(id)}`);
+    const data = await res.json();
+    const results = data.results || [];
+    currentResults = results;
+
+    if (results.length > 0) {
+      const toggle = document.getElementById('transcripts-toggle');
+      if (toggle) {
+        toggle.style.display = 'inline-flex';
+        toggle.innerHTML = `View Transcript (${results.length}) &#8964;`;
+      }
+      const transcriptHtml = results.map(r => {
+        const playBtn = `<button class="play-btn" onclick="seekInlineAudio(${r.start_secs})">&#9654; ${r.timestamp}</button>`;
+        const snippet = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<div class="result-card">
+          <div class="result-meta-row">
+            <span class="result-ep">${safeLabel}</span>
+            <span style="display:inline-flex;align-items:center;flex-shrink:0">${playBtn}</span>
+          </div>
+          <div class="result-text">${snippet}</div>
+        </div>`;
+      }).join('');
+      const panel = document.getElementById('transcripts-panel');
+      if (panel) panel.innerHTML = transcriptHtml;
+    }
+  } catch(e) { /* transcript load failed silently */ }
+}
+
+function seekInlineAudio(secs) {
+  const a = document.getElementById('inline-audio-player');
+  if (!a) return;
+  a.currentTime = secs;
+  a.play();
+  scrollToTop();
+}
+
+async function deleteVoiceNoteFromView(encodedId, displayTitle) {
+  const id = decodeURIComponent(encodedId);
+  if (!confirm(`Delete "${displayTitle}"?\nThis will remove the recording and transcript permanently.`)) return;
+  try {
+    const res = await fetch(`/api/delete-episode/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+    lockedEpisode = null;
+    document.getElementById('locked-pill').style.display = 'none';
+    document.getElementById('search-input').placeholder = 'Ask anything\u2026';
+    resetApp(false);
+    loadVoiceNotes();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+async function savePendingVoiceNote() {
+  if (!_pendingVoiceBlob) return;
+  const blob = _pendingVoiceBlob;
+  const ext  = _pendingVoiceExt;
+  _pendingVoiceBlob = null;
+  _pendingVoiceExt  = '';
+
+  document.getElementById('voice-save-row').style.display = 'none';
+  document.querySelector('.input-bar').style.display = 'flex';
+
+  const fd = new FormData();
+  fd.append('audio', blob, `recording.${ext}`);
+
+  _voiceStatus('Uploading\u2026');
+  try {
+    const res  = await fetch('/api/voice-note', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
+    _voiceStatus('Saved!', 1500);
+    loadVoiceNotes();
+  } catch(e) {
+    _voiceStatus(`Error: ${e.message}`, 4000);
+  }
+}
+
+function discardPendingVoiceNote() {
+  _pendingVoiceBlob = null;
+  _pendingVoiceExt  = '';
+  document.getElementById('voice-save-row').style.display = 'none';
+  document.querySelector('.input-bar').style.display = 'flex';
+  _voiceStatus('Discarded', 1500);
 }
 
 async function renameVoiceNote(encodedId, currentTitle) {
@@ -3157,11 +3291,13 @@ async function deleteVoiceNote(encodedId, displayTitle) {
 
 // ── VOICE NOTE ───────────────────────────────────────────────────────────────
 
-let _voiceRecorder = null;
-let _voiceChunks   = [];
-let _voiceActive   = false;
-let _audioCtx      = null;
-let _waveRaf       = null;
+let _voiceRecorder    = null;
+let _voiceChunks      = [];
+let _voiceActive      = false;
+let _audioCtx         = null;
+let _waveRaf          = null;
+let _pendingVoiceBlob = null;
+let _pendingVoiceExt  = '';
 
 function _voiceStatus(msg, autohideMs) {
   const el = document.getElementById('voice-status');
@@ -3217,11 +3353,11 @@ function _startWaveform(stream) {
   draw();
 }
 
-function _stopWaveform() {
+function _stopWaveform(restoreInputBar = true) {
   if (_waveRaf) { cancelAnimationFrame(_waveRaf); _waveRaf = null; }
   if (_audioCtx) { _audioCtx.close(); _audioCtx = null; }
   document.getElementById('voice-waveform-row').style.display = 'none';
-  document.querySelector('.input-bar').style.display = 'flex';
+  if (restoreInputBar) document.querySelector('.input-bar').style.display = 'flex';
 }
 
 async function toggleVoiceRecording() {
@@ -3244,25 +3380,17 @@ async function toggleVoiceRecording() {
 
   _voiceRecorder.ondataavailable = e => { if (e.data.size > 0) _voiceChunks.push(e.data); };
 
-  _voiceRecorder.onstop = async () => {
+  _voiceRecorder.onstop = () => {
     _voiceActive = false;
     stream.getTracks().forEach(t => t.stop());
-    _stopWaveform();
+    _stopWaveform(false); // keep input-bar hidden — save/discard row takes over
 
-    const ext  = mimeType.includes('webm') ? 'webm' : 'mp4';
-    const blob = new Blob(_voiceChunks, { type: mimeType });
-    const fd   = new FormData();
-    fd.append('audio', blob, `recording.${ext}`);
+    const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
+    _pendingVoiceBlob = new Blob(_voiceChunks, { type: mimeType });
+    _pendingVoiceExt  = ext;
+    _voiceChunks = [];
 
-    _voiceStatus('Uploading\u2026');
-    try {
-      const res  = await fetch('/api/voice-note', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
-      _voiceStatus('Saved!', 1500);
-    } catch(e) {
-      _voiceStatus(`Error: ${e.message}`, 4000);
-    }
+    document.getElementById('voice-save-row').style.display = 'flex';
   };
 
   _voiceRecorder.start();
