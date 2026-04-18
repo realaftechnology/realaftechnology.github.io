@@ -1549,12 +1549,43 @@ def random_quote():
         row = conn.execute(
             "SELECT s.text, e.title FROM segments s "
             "JOIN episodes e ON s.episode_id = e.id "
-            "WHERE length(s.text) > 80 AND length(s.text) < 400 "
-            "ORDER BY RANDOM() LIMIT 1"
-        ).fetchone()
+            "WHERE length(s.text) > 120 AND length(s.text) < 380 "
+            # Exclude show outros and housekeeping
+            "AND s.text NOT LIKE '%show the show%' "
+            "AND s.text NOT LIKE '%hoe show%' "
+            "AND s.text NOT LIKE '%see you tonight%' "
+            "AND s.text NOT LIKE '%see you tomorrow%' "
+            "AND s.text NOT LIKE '%CTI live%' "
+            "AND s.text NOT LIKE '%tonight at 7%' "
+            "AND s.text NOT LIKE '%7 p.m%' "
+            "AND s.text NOT LIKE '%subscribe%' "
+            "AND s.text NOT LIKE '%like and share%' "
+            "AND s.text NOT LIKE '%share the show%' "
+            "AND s.text NOT LIKE '%leave a review%' "
+            "AND s.text NOT LIKE '%iTunes%' "
+            "AND s.text NOT LIKE '%Spotify%' "
+            "AND s.text NOT LIKE '%check out%' "
+            "AND s.text NOT LIKE '%.com%' "
+            "AND s.text NOT LIKE '%sign up%' "
+            "AND s.text NOT LIKE '%we appreciate%' "
+            "AND s.text NOT LIKE '%thank you for%' "
+            "AND s.text NOT LIKE '%thanks for%' "
+            "AND s.text NOT LIKE '%tune in%' "
+            "AND s.text NOT LIKE '%next week%' "
+            "ORDER BY RANDOM() LIMIT 20"
+        ).fetchall()
         conn.close()
+        # Prefer segments with more sentence structure (periods mid-text)
         if row:
-            return jsonify({"quote": row["text"].strip(), "episode": row["title"]})
+            import random
+            # Score: bonus for internal punctuation (more complete thought)
+            def _score(r):
+                t = r["text"]
+                return t.count('.') + t.count('!') + t.count('?')
+            weighted = sorted(row, key=_score, reverse=True)
+            # Pick randomly from top half so we don't always show the longest
+            pick = random.choice(weighted[:max(1, len(weighted)//2)])
+            return jsonify({"quote": pick["text"].strip(), "episode": pick["title"]})
         return jsonify({"quote": "", "episode": ""})
     except Exception:
         return jsonify({"quote": "", "episode": ""})
