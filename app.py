@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import time
 import threading
+import traceback
 import queue as queue_module
 import uuid
 import urllib.request
@@ -1140,6 +1141,7 @@ def upload_video():
             print(f"[upload] {ep_id}: transcription done", flush=True)
         except Exception as exc:
             print(f"[upload] {ep_id}: transcription failed: {exc}", flush=True)
+            traceback.print_exc()
             try:
                 db = get_db()
                 if db:
