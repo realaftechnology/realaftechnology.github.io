@@ -1411,14 +1411,17 @@ function renderEpisodeList(episodes) {
     list.innerHTML = '<div style="padding:20px;color:var(--label-tertiary);font-size:13px">No episodes.</div>';
     return;
   }
-  // Split into video (Drive imports) and regular (numbered) episodes
+  const isVN = ep => (ep.video_filename || ep.id || '').toUpperCase().startsWith('VOICENOTE_');
+  // Split into video (Drive imports), regular (numbered), and voice notes
   const numDesc = (a, b) => {
     const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
     const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
     return nb - na;
   };
-  const videoEps   = episodes.filter(ep => ep.has_video).sort(numDesc);
-  const regularEps = episodes.filter(ep => !ep.has_video).sort(numDesc);
+  const videoEps    = episodes.filter(ep => ep.has_video && !isVN(ep)).sort(numDesc);
+  const regularEps  = episodes.filter(ep => !ep.has_video && !isVN(ep)).sort(numDesc);
+  const voiceNoteEps = episodes.filter(ep => isVN(ep)).sort((a, b) =>
+    new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
 
   const renderVideo = ep => {
     const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
@@ -1428,7 +1431,7 @@ function renderEpisodeList(episodes) {
     const isActive = lockedEpisode === epId;
     return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
       <div style="flex:1;min-width:0">
-        <div class="ep-item-video-title">▶ ${ep.title.replace(/</g,'&lt;')}</div>
+        <div class="ep-item-video-title">&#9654; ${ep.title.replace(/</g,'&lt;')}</div>
         <div class="ep-item-title">${dateLabel}</div>
       </div>
     </div>`;
@@ -1447,12 +1450,28 @@ function renderEpisodeList(episodes) {
     </div>`;
   };
 
+  const renderVoiceNote = ep => {
+    const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
+    const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Voice Note';
+    const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
+    const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
+    const displayTitle = ep.title.replace(/^VOICENOTE_/i, '').replace(/\.(mp3|mp4|m4a|wav|m4v)$/i, '').replace(/[_-]/g, ' ').trim() || ep.title;
+    const isActive = lockedEpisode === epId;
+    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+      <div style="flex:1;min-width:0">
+        <div class="ep-item-video-title">${displayTitle.replace(/</g,'&lt;')}</div>
+        <div class="ep-item-title">${dateLabel}</div>
+      </div>
+    </div>`;
+  };
+
   const sectionLabel = (text) =>
     `<div style="padding:10px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--label-tertiary);text-transform:uppercase">${text}</div>`;
 
   list.innerHTML =
-    (videoEps.length   ? sectionLabel('Video / Audio') + videoEps.map(renderVideo).join('')     : '') +
-    (regularEps.length ? sectionLabel('Episodes')      + regularEps.map(renderRegular).join('') : '');
+    (videoEps.length    ? sectionLabel('Video / Audio') + videoEps.map(renderVideo).join('')       : '') +
+    (regularEps.length  ? sectionLabel('Episodes')      + regularEps.map(renderRegular).join('')   : '') +
+    (voiceNoteEps.length ? sectionLabel('Voice Notes')  + voiceNoteEps.map(renderVoiceNote).join('') : '');
 }
 
 function filterEpisodes(query) {

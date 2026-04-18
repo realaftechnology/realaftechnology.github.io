@@ -303,13 +303,24 @@
     </div>
   </div>
 
-  <!-- Episodes -->
+  <!-- Video Episodes -->
   <div class="section">
-    <div class="section-title">All Episodes <span class="badge" id="ep-badge"></span></div>
+    <div class="section-title">Video Episodes <span class="badge" id="ep-badge"></span></div>
     <div class="card-wrap">
       <table class="ep-table">
         <thead><tr><th>Title</th><th>Type</th><th>Segments</th><th>Imported</th><th></th></tr></thead>
         <tbody id="ep-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Voice Notes -->
+  <div class="section">
+    <div class="section-title">Voice Notes <span class="badge" id="vn-badge"></span></div>
+    <div class="card-wrap">
+      <table class="ep-table">
+        <thead><tr><th>Title</th><th>Type</th><th>Segments</th><th>Imported</th><th></th></tr></thead>
+        <tbody id="vn-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -492,12 +503,14 @@ function showLoginScreen() {
 let _epsLoaded = false;
 function renderEpisodes() {
   fetch('/api/episodes').then(r => r.json()).then(d => {
-    const eps = d.episodes || [];
+    const allEps = d.episodes || [];
     _epsLoaded = true;
-    document.getElementById('ep-badge').textContent = eps.length;
-    const tbody = document.getElementById('ep-tbody');
-    if (!eps.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No episodes</td></tr>'; return; }
-    tbody.innerHTML = eps.map(ep => `
+    const isVN = ep => (ep.video_filename || ep.id || '').toUpperCase().startsWith('VOICENOTE_');
+    const videoEps = allEps.filter(ep => !isVN(ep));
+    const vnEps    = allEps.filter(ep => isVN(ep));
+    document.getElementById('ep-badge').textContent = videoEps.length;
+    document.getElementById('vn-badge').textContent = vnEps.length;
+    const renderRow = ep => `
       <tr id="ep-row-${esc(ep.id)}">
         <td>
           <span id="ep-title-${esc(ep.id)}">${esc(ep.title || ep.id)}</span>
@@ -507,7 +520,11 @@ function renderEpisodes() {
         <td style="color:var(--text2)">${ep.segments}</td>
         <td style="color:var(--text3)">${ep.uploaded_at || '—'}</td>
         <td><button class="del-btn" onclick="deleteEpisode('${esc(ep.id)}','${esc(ep.title||ep.id)}',${ep.has_video})" title="Delete">✕</button></td>
-      </tr>`).join('');
+      </tr>`;
+    document.getElementById('ep-tbody').innerHTML =
+      videoEps.length ? videoEps.map(renderRow).join('') : '<tr><td colspan="5" class="empty">No episodes</td></tr>';
+    document.getElementById('vn-tbody').innerHTML =
+      vnEps.length ? vnEps.map(renderRow).join('') : '<tr><td colspan="5" class="empty">No voice notes</td></tr>';
   }).catch(() => {});
 }
 
