@@ -26,6 +26,8 @@ from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'   # allow cookie in cross-site WebView redirects (Capacitor iOS)
+app.config['SESSION_COOKIE_SECURE'] = True        # required when SameSite=None
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB max upload
 # Trust the Railway/Heroku reverse proxy so url_for() produces https:// URLs
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -162,14 +164,48 @@ def requires_auth(f):
 def google_login():
     if not _google_oauth:
         return "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your environment.", 503
+    import secrets as _secrets
+    state = _secrets.token_urlsafe(32)
+    # Store state in DB so the callback can verify it without relying on the session cookie.
+    # This is necessary for iOS WKWebView (Capacitor), which drops the session cookie
+    # during the cross-site Google redirect, causing authlib's session-based CSRF check to fail.
+    conn = get_db()
+    if conn:
+        conn.execute("INSERT OR REPLACE INTO oauth_states (state, created_at) VALUES (?, datetime('now'))", (state,))
+        conn.commit()
+        conn.close()
     redirect_uri = url_for("google_callback", _external=True)
-    return _google_oauth.authorize_redirect(redirect_uri)
+    return _google_oauth.authorize_redirect(redirect_uri, state=state)
 
 
 @app.route("/auth/google/callback")
 def google_callback():
     if not _google_oauth:
         return redirect("/")
+
+    # Verify state from DB (bypasses Flask session CSRF check for iOS WKWebView compatibility)
+    state = request.args.get("state", "")
+    conn = get_db()
+    state_valid = False
+    if conn:
+        row = conn.execute(
+            "SELECT state FROM oauth_states WHERE state=? AND created_at > datetime('now', '-10 minutes')",
+            (state,)
+        ).fetchone()
+        if row:
+            state_valid = True
+            conn.execute("DELETE FROM oauth_states WHERE state=?", (state,))
+            conn.commit()
+        conn.close()
+
+    if not state_valid:
+        return "OAuth error: invalid or expired state — please try signing in again.", 400
+
+    # Inject state into session so authlib's built-in CSRF check passes.
+    # (The session cookie may be absent in WKWebView, but setting it here within
+    #  the same request is enough for authorize_access_token() to succeed.)
+    session[f"_state_google_{state}"] = {"data": {"state": state, "redirect_uri": url_for("google_callback", _external=True)}}
+
     try:
         token = _google_oauth.authorize_access_token()
     except Exception as e:
@@ -265,6 +301,11 @@ def get_db():
             last_login  TEXT DEFAULT (datetime('now'))
         )""",
         "ALTER TABLE episodes ADD COLUMN transcribe_status TEXT",
+        # Short-lived OAuth state tokens (used instead of Flask session to support iOS WKWebView)
+        """CREATE TABLE IF NOT EXISTS oauth_states (
+            state      TEXT PRIMARY KEY,
+            created_at TEXT DEFAULT (datetime('now'))
+        )""",
     ]:
         try:
             conn.execute(stmt)
