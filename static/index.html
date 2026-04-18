@@ -104,7 +104,10 @@ body {
   display: none;
   flex-direction: column;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
   align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -2694,14 +2697,21 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keyboard: #main-screen shrinks to visualViewport.height when the keyboard
-// opens, so the in-flow input bar naturally rides just above the keyboard.
-// Header stays fixed at top. No translateY needed.
+// Keyboard: track the visual viewport exactly — both its height AND its
+// offsetTop (which iOS changes when it scrolls to show a focused input).
+// #main-screen follows the visual viewport so the in-flow input bar always
+// sits at the bottom of the visible area, just above the keyboard.
 const _mainScreen = document.getElementById('main-screen');
 
 function _pinHeight() {
-  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  _mainScreen.style.height = h + 'px';
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    _mainScreen.style.top    = vv.offsetTop + 'px';
+    _mainScreen.style.height = vv.height    + 'px';
+  } else {
+    _mainScreen.style.top    = '0px';
+    _mainScreen.style.height = window.innerHeight + 'px';
+  }
 }
 _pinHeight();
 window.addEventListener('resize', _pinHeight, { passive: true });

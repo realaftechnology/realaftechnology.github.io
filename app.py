@@ -164,6 +164,11 @@ def get_db():
             results   INTEGER DEFAULT 0,
             searched_at TEXT DEFAULT (datetime('now'))
         )""",
+        # Tombstone: prevents ingest.py from re-adding episodes deleted via the app
+        """CREATE TABLE IF NOT EXISTS deleted_episodes (
+            id         TEXT PRIMARY KEY,
+            deleted_at TEXT
+        )""",
     ]:
         try:
             conn.execute(stmt)
@@ -1465,6 +1470,11 @@ def delete_episode_endpoint(episode_id):
     ep = conn.execute("SELECT video_path, filename FROM episodes WHERE id = ?", (episode_id,)).fetchone()
     cur.execute("DELETE FROM segments WHERE episode_id = ?", (episode_id,))
     cur.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+    # Tombstone prevents ingest.py from re-adding this episode on next deploy
+    cur.execute(
+        "INSERT OR REPLACE INTO deleted_episodes (id, deleted_at) VALUES (?, ?)",
+        (episode_id, datetime.now().isoformat())
+    )
     _rebuild_fts(conn)
     conn.commit()
     conn.close()
@@ -1475,17 +1485,6 @@ def delete_episode_endpoint(episode_id):
             os.remove(ep["video_path"])
         except Exception:
             pass
-
-    # Delete transcript .docx so ingest.py doesn't re-create the episode on restart.
-    # episode_id IS the docx filename without extension (set by ingest.py).
-    tdir = _transcripts_dir()
-    for ext in (".docx", ".DOCX"):
-        tp = os.path.join(tdir, episode_id + ext)
-        if os.path.exists(tp):
-            try:
-                os.remove(tp)
-            except Exception:
-                pass
 
     return jsonify({"ok": True})
 
@@ -1508,10 +1507,16 @@ def purge_no_video():
         conn.close()
         return jsonify({"deleted": 0, "ids": []})
 
+    now = datetime.now().isoformat()
     cur = conn.cursor()
     for ep_id in to_delete:
         cur.execute("DELETE FROM segments WHERE episode_id = ?", (ep_id,))
         cur.execute("DELETE FROM episodes WHERE id = ?", (ep_id,))
+        # Tombstone prevents ingest.py from re-adding on next deploy
+        cur.execute(
+            "INSERT OR REPLACE INTO deleted_episodes (id, deleted_at) VALUES (?, ?)",
+            (ep_id, now)
+        )
     _rebuild_fts(conn)
     conn.commit()
     conn.close()

@@ -22,6 +22,12 @@ def init_db(conn):
             file_hash   TEXT
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS deleted_episodes (
+            id         TEXT PRIMARY KEY,
+            deleted_at TEXT
+        )
+    """)
     # Add file_hash column to existing databases that predate this change
     try:
         cur.execute("ALTER TABLE episodes ADD COLUMN file_hash TEXT")
@@ -204,6 +210,14 @@ def ingest_file(conn, filepath):
     filename = os.path.basename(filepath)
     episode_id = filename.replace(".docx", "").replace(".DOCX", "")
     fhash = compute_hash(filepath)
+
+    # Skip episodes the user has explicitly deleted via the app
+    tombstone = cur.execute(
+        "SELECT id FROM deleted_episodes WHERE id = ?", (episode_id,)
+    ).fetchone()
+    if tombstone:
+        print(f"  🗑️  Deleted by user, skipping: {filename}")
+        return 0
 
     # Check if already ingested with same content
     existing = cur.execute(
