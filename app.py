@@ -11,7 +11,6 @@ import shutil
 import tempfile
 import time
 import threading
-import traceback
 import queue as queue_module
 import uuid
 import urllib.request
@@ -912,55 +911,6 @@ def whisper_transcribe(audio_path):
     raise RuntimeError("Whisper API: max retries exceeded after rate limiting")
 
 
-def whisper_transcribe_voice_note(audio_path):
-    """Short-retry Whisper transcription for voice notes: 3→6→12→24s delays, 60s hard deadline."""
-    if not OPENAI_KEY:
-        raise RuntimeError("OPENAI_API_KEY not set — cannot transcribe")
-    with open(audio_path, "rb") as f:
-        audio_data = f.read()
-    boundary = "VNBoundary" + os.urandom(8).hex()
-    filename = os.path.basename(audio_path)
-    ext = os.path.splitext(filename)[1].lower()
-    mime_map = {".webm": "audio/webm", ".mp4": "audio/mp4", ".mp3": "audio/mpeg",
-                ".m4a": "audio/mp4", ".wav": "audio/wav", ".ogg": "audio/ogg"}
-    content_type = mime_map.get(ext, "audio/mpeg")
-
-    def part(name, value):
-        return (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode()
-
-    body = (
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
-        f"Content-Type: {content_type}\r\n\r\n"
-    ).encode() + audio_data + b"\r\n"
-    body += part("model", "whisper-1")
-    body += part("response_format", "verbose_json")
-    body += f"--{boundary}--\r\n".encode()
-
-    deadline = time.time() + 60
-    retry_delays = [3, 6, 12, 24]
-    for attempt in range(5):
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/audio/transcriptions",
-            data=body,
-            headers={"Authorization": f"Bearer {OPENAI_KEY}",
-                     "Content-Type": f"multipart/form-data; boundary={boundary}"}
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=55) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < len(retry_delays):
-                delay = retry_delays[attempt]
-                print(f"[voice-note] rate-limited (429) — waiting {delay}s (retry {attempt+2}/5)", flush=True)
-                e.close()
-                if time.time() + delay > deadline:
-                    raise RuntimeError("Whisper voice note: 60s deadline exceeded")
-                time.sleep(delay)
-                continue
-            raise RuntimeError(f"Whisper API error {e.code}: {e.reason}")
-    raise RuntimeError("Whisper voice note: max retries exceeded")
-
-
 def whisper_transcribe_chunked(audio_path):
     """Transcribe audio, automatically splitting into chunks if it exceeds Whisper's 25MB limit."""
     file_size = os.path.getsize(audio_path)
@@ -1184,106 +1134,6 @@ def upload_video():
     finally:
         if audio_path and os.path.exists(audio_path):
             os.remove(audio_path)
-
-
-def _transcribe_voice_note_bg(episode_id, title, raw_path):
-    """Background thread: convert, transcribe, and store a voice note."""
-    print(f"[voice-note] {episode_id}: background thread started, file={raw_path}", flush=True)
-    mp3_path = os.path.splitext(raw_path)[0] + ".mp3"
-    stored_path = raw_path
-    try:
-        ffmpeg_ok = extract_audio(raw_path, mp3_path)
-        if ffmpeg_ok:
-            stored_path = mp3_path
-            print(f"[voice-note] {episode_id}: converted to mp3 at {mp3_path}", flush=True)
-            try:
-                os.remove(raw_path)
-            except Exception:
-                pass
-        else:
-            print(f"[voice-note] {episode_id}: ffmpeg unavailable, using raw file", flush=True)
-
-        print(f"[voice-note] {episode_id}: starting Whisper transcription", flush=True)
-        result = whisper_transcribe_voice_note(stored_path)
-        print(f"[voice-note] {episode_id}: Whisper done, {len(result.get('segments', []))} segments", flush=True)
-
-        conn = get_db()
-        if not conn:
-            raise RuntimeError("get_db() returned None in background thread")
-        ingest_video_episode(conn, episode_id, title, stored_path, result)
-        conn.execute("UPDATE episodes SET transcribe_status = 'done' WHERE id = ?", (episode_id,))
-        _rebuild_fts(conn)
-        conn.commit()
-        conn.close()
-        print(f"[voice-note] {episode_id}: done and committed to DB", flush=True)
-    except Exception:
-        print(f"[voice-note] {episode_id}: transcription failed:", flush=True)
-        traceback.print_exc()
-        try:
-            conn = get_db()
-            if conn:
-                failed_title = f"{title} (transcription failed)"
-                placeholder = {"segments": [{"start": 0.0, "text": "[Audio recording — transcription unavailable]"}]}
-                ingest_video_episode(conn, episode_id, failed_title, stored_path, placeholder)
-                conn.execute(
-                    "UPDATE episodes SET transcribe_status = 'error', title = ? WHERE id = ?",
-                    (failed_title, episode_id)
-                )
-                _rebuild_fts(conn)
-                conn.commit()
-                conn.close()
-        except Exception:
-            try:
-                conn2 = get_db()
-                if conn2:
-                    conn2.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (episode_id,))
-                    conn2.commit()
-                    conn2.close()
-            except Exception:
-                pass
-
-
-@app.route("/api/voice-note", methods=["POST"])
-@requires_auth
-def voice_note():
-    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
-        return jsonify({"error": "forbidden"}), 403
-    if not OPENAI_KEY:
-        return jsonify({"error": "OpenAI API key required"}), 400
-    if "audio" not in request.files:
-        return jsonify({"error": "No audio file"}), 400
-
-    audio_file = request.files["audio"]
-    now = datetime.now()
-    title = now.strftime("VOICENOTE_%Y%m%d_%H%M%S")
-    episode_id = title
-
-    vdir = videos_dir()
-    os.makedirs(vdir, exist_ok=True)
-
-    orig_ext = os.path.splitext(audio_file.filename or "recording.webm")[1] or ".webm"
-    raw_path = os.path.join(vdir, f"{episode_id}{orig_ext}")
-    audio_file.save(raw_path)
-
-    # Create stub episode row immediately so it's tracked even if the process restarts
-    conn = get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
-        "VALUES (?, ?, ?, ?, ?, 'transcribing')",
-        (episode_id, title, os.path.basename(raw_path), raw_path, now.strftime('%Y-%m-%d'))
-    )
-    conn.commit()
-    conn.close()
-    print(f"[voice-note] {episode_id}: stub episode written to DB, audio saved to {raw_path}", flush=True)
-
-    # Transcription runs in the background — client gets 200 immediately
-    threading.Thread(
-        target=_transcribe_voice_note_bg,
-        args=(episode_id, title, raw_path),
-        daemon=True
-    ).start()
-
-    return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 
 @app.route("/api/voice-notes")

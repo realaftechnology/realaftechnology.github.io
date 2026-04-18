@@ -3235,12 +3235,18 @@ async function savePendingVoiceNote() {
   document.getElementById('voice-save-row').style.display = 'none';
   document.querySelector('.input-bar').style.display = 'flex';
 
-  const fd = new FormData();
-  fd.append('audio', blob, `recording.${ext}`);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const filename = `VOICENOTE_${ts}.${ext}`;
 
-  _voiceStatus('Uploading\u2026');
+  const fd = new FormData();
+  fd.append('file', blob, filename);
+  fd.append('title', `VOICENOTE_${ts}`);
+
+  _voiceStatus('Transcribing\u2026');
   try {
-    const res  = await fetch('/api/voice-note', { method: 'POST', body: fd });
+    const res  = await fetch('/api/upload-video', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
     _voiceStatus('Saved!', 1500);
