@@ -562,7 +562,7 @@ CITATIONS:
             system=system,
             messages=[{"role": "user", "content": user_msg}],
             model="claude-sonnet-4-6",
-            max_tokens=4000,
+            max_tokens=4096,
             temperature=0.4,
         )),
         mimetype="text/event-stream",
@@ -698,7 +698,7 @@ def followup():
             system=system_prompt,
             messages=messages,
             model="claude-sonnet-4-6",
-            max_tokens=1500,
+            max_tokens=4096,
             temperature=0.4,
         )),
         mimetype="text/event-stream",
@@ -1535,6 +1535,45 @@ def delete_episode_endpoint(episode_id):
         except Exception:
             pass
 
+    return jsonify({"ok": True})
+
+
+@app.route("/api/random-quote")
+@requires_auth
+def random_quote():
+    """Return a random transcript segment to display as a rotating quote."""
+    conn = get_db()
+    if not conn:
+        return jsonify({"quote": "", "episode": ""}), 200
+    try:
+        row = conn.execute(
+            "SELECT s.text, e.title FROM segments s "
+            "JOIN episodes e ON s.episode_id = e.id "
+            "WHERE length(s.text) > 80 AND length(s.text) < 400 "
+            "ORDER BY RANDOM() LIMIT 1"
+        ).fetchone()
+        conn.close()
+        if row:
+            return jsonify({"quote": row["text"].strip(), "episode": row["title"]})
+        return jsonify({"quote": "", "episode": ""})
+    except Exception:
+        return jsonify({"quote": "", "episode": ""})
+
+
+@app.route("/api/rename-episode/<episode_id>", methods=["POST"])
+@requires_auth
+def rename_episode(episode_id):
+    """Rename an episode's title."""
+    data = request.get_json() or {}
+    new_title = (data.get("title") or "").strip()
+    if not new_title:
+        return jsonify({"error": "Title required"}), 400
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    conn.execute("UPDATE episodes SET title = ? WHERE id = ?", (new_title, episode_id))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True})
 
 
