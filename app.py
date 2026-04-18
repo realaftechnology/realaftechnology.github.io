@@ -26,7 +26,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB max upload
 
 DB_PATH       = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "db.sqlite"))
-OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used only for embeddings
+OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used for Whisper transcription + embeddings
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "") # used for all AI text generation
 
 # ── Import job registry (in-memory, last 100 jobs) ────────────────────────────
@@ -739,6 +739,9 @@ def extract_audio(video_path, audio_path):
 
 def whisper_transcribe(audio_path):
     """Transcribe a single audio file via OpenAI Whisper API. Must be ≤25MB."""
+    if not OPENAI_KEY:
+        raise RuntimeError("OPENAI_API_KEY not set — cannot transcribe")
+
     with open(audio_path, "rb") as f:
         audio_data = f.read()
     boundary = "Boundary" + os.urandom(8).hex()
@@ -760,8 +763,22 @@ def whisper_transcribe(audio_path):
         data=body,
         headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        return json.loads(resp.read())
+
+    max_retries = 4
+    base_delay  = 15  # seconds; doubles each attempt: 15, 30, 60, 120
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                print(f"[whisper] rate-limited (429) — waiting {delay}s (retry {attempt + 2}/{max_retries})",
+                      flush=True)
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"Whisper API error {e.code}: {e.reason}")
+    raise RuntimeError("Whisper API: max retries exceeded after rate limiting")
 
 
 def whisper_transcribe_chunked(audio_path):
@@ -1235,6 +1252,11 @@ def _ingest_one(job, video_path, filename, msg_q=None):
     with _jobs_lock:
         job["files"].append(file_rec)
     # ──────────────────────────────────────────────────────────────────────────
+
+    if not OPENAI_KEY:
+        _job_log(job, "error",
+                 f"{filename}: OPENAI_API_KEY not configured on server — cannot transcribe", msg_q)
+        return
 
     title      = _clean_drive_title(filename)
     audio_path = video_path.rsplit(".", 1)[0] + "_audio.mp3"
