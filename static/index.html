@@ -525,7 +525,7 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
-.scroll-bottom-pad { height: 90px; }
+.scroll-bottom-pad { height: calc(160px + env(safe-area-inset-bottom, 0px)); }
 
 /* ── UPLOAD MODAL ── */
 .modal-overlay {
@@ -1214,7 +1214,7 @@ body {
 
 <!-- Input bar lives OUTSIDE #main-screen so it is never part of its flex layout.
      position:fixed makes it fully independent of everything else on the page. -->
-<div class="input-area" id="input-area">
+<div class="input-area" id="input-area" style="display:none">
   <div id="locked-pill" style="display:none">
     <div class="locked-ep-pill">
       <span id="locked-label"></span>
@@ -1252,6 +1252,7 @@ async function doLogin() {
       setTimeout(() => {
         login.style.display = 'none';
         main.style.display = 'flex';
+        document.getElementById('input-area').style.display = '';
         requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       }, 200);
       loadStats();
@@ -2717,14 +2718,19 @@ window.addEventListener('resize', _pinHeight, { passive: true });
 
 if (window.visualViewport) {
   let _kbRaf = null;
-  window.visualViewport.addEventListener('resize', () => {
+  const _reposition = () => {
     if (_kbRaf) cancelAnimationFrame(_kbRaf);
     _kbRaf = requestAnimationFrame(() => {
       _kbRaf = null;
-      const kh = window.innerHeight - window.visualViewport.height;
-      _inputArea.style.transform = kh > 50 ? `translateY(${-kh}px)` : '';
+      // Account for both keyboard height AND any page scroll iOS applies
+      // when bringing a focused input into view (visualViewport.offsetTop > 0).
+      const vv = window.visualViewport;
+      const kh = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      _inputArea.style.transform = kh > 10 ? `translateY(${-kh}px)` : '';
     });
-  });
+  };
+  window.visualViewport.addEventListener('resize', _reposition);
+  window.visualViewport.addEventListener('scroll', _reposition);
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
@@ -2740,6 +2746,7 @@ document.body.addEventListener('touchmove', function(e) {
       const main  = document.getElementById('main-screen');
       login.style.display = 'none';
       main.style.display = 'flex';
+      document.getElementById('input-area').style.display = '';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
       document.getElementById('search-input').focus();
