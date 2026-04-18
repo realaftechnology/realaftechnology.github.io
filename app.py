@@ -1099,8 +1099,6 @@ def finalize_upload():
 @app.route("/api/upload-video", methods=["POST"])
 @requires_auth
 def upload_video():
-    if not OPENAI_KEY:
-        return jsonify({"error": "OpenAI API key required for transcription"}), 400
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
     file = request.files["file"]
@@ -1109,24 +1107,32 @@ def upload_video():
 
     vdir = videos_dir()
     os.makedirs(vdir, exist_ok=True)
-    filename = secure_filename(file.filename)
+    filename = secure_filename(file.filename) or f"upload_{int(time.time())}.bin"
     video_path = os.path.join(vdir, filename)
     file.save(video_path)
+    print(f"[upload] saved {filename} ({os.path.getsize(video_path)} bytes) to {video_path}", flush=True)
 
     episode_id = filename.rsplit(".", 1)[0]
     title = request.form.get("title", "").strip() or episode_id
 
-    # Stub row so the episode is tracked immediately
     conn = get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
-        "VALUES (?, ?, ?, ?, ?, 'transcribing')",
-        (episode_id, title, filename, video_path, datetime.now().strftime('%Y-%m-%d'))
-    )
-    conn.commit()
-    conn.close()
+    if conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
+            "VALUES (?, ?, ?, ?, ?, 'transcribing')",
+            (episode_id, title, filename, video_path, datetime.now().strftime('%Y-%m-%d'))
+        )
+        conn.commit()
+        conn.close()
+        print(f"[upload] {episode_id}: stub row created", flush=True)
+    else:
+        print(f"[upload] {episode_id}: WARNING — get_db() returned None, no stub row", flush=True)
 
     def _transcribe_bg(ep_id, ep_title, vid_path):
+        print(f"[upload] {ep_id}: background transcription started", flush=True)
+        if not OPENAI_KEY:
+            print(f"[upload] {ep_id}: OPENAI_API_KEY not set — skipping transcription", flush=True)
+            return
         audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
         try:
             ffmpeg_ok = extract_audio(vid_path, audio_path)
