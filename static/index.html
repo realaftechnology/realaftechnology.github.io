@@ -3225,37 +3225,10 @@ async function deleteVoiceNoteFromView(encodedId, displayTitle) {
   }
 }
 
-function audioBufferToWav(buffer) {
-  const sampleRate = buffer.sampleRate;
-  const samples = buffer.getChannelData(0); // mono
-  const dataLength = samples.length * 2;
-  const arrayBuffer = new ArrayBuffer(44 + dataLength);
-  const view = new DataView(arrayBuffer);
-  function writeString(offset, str) { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);  // PCM
-  view.setUint16(22, 1, true);  // mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true); // 16-bit
-  writeString(36, 'data');
-  view.setUint32(40, dataLength, true);
-  let offset = 44;
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
-}
-
 async function savePendingVoiceNote() {
   if (!_pendingVoiceBlob) return;
-  const rawBlob = _pendingVoiceBlob;
+  const blob = _pendingVoiceBlob;
+  const ext  = _pendingVoiceExt;
   _pendingVoiceBlob = null;
   _pendingVoiceExt  = '';
 
@@ -3266,17 +3239,12 @@ async function savePendingVoiceNote() {
   const pad = n => String(n).padStart(2, '0');
   const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
+  const fd = new FormData();
+  fd.append('file', blob, `VOICENOTE_${ts}.${ext}`);
+  fd.append('title', `VOICENOTE_${ts}`);
+
   _voiceStatus('Saving\u2026');
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const audioBuffer = await audioCtx.decodeAudioData(await rawBlob.arrayBuffer());
-    audioCtx.close();
-    const wavBlob = audioBufferToWav(audioBuffer);
-
-    const fd = new FormData();
-    fd.append('file', wavBlob, `VOICENOTE_${ts}.wav`);
-    fd.append('title', `VOICENOTE_${ts}`);
-
     const res  = await fetch('/api/upload-video', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
@@ -3335,6 +3303,16 @@ let _audioCtx         = null;
 let _waveRaf          = null;
 let _pendingVoiceBlob = null;
 let _pendingVoiceExt  = '';
+let _cachedStream     = null; // reuse across recordings so iOS doesn't re-ask for mic
+
+async function _getAudioStream() {
+  if (_cachedStream && _cachedStream.active) {
+    const tracks = _cachedStream.getAudioTracks();
+    if (tracks.length > 0 && tracks[0].readyState === 'live') return _cachedStream;
+  }
+  _cachedStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  return _cachedStream;
+}
 
 function _voiceStatus(msg, autohideMs) {
   const el = document.getElementById('voice-status');
@@ -3405,7 +3383,7 @@ async function toggleVoiceRecording() {
 
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    stream = await _getAudioStream();
   } catch(e) {
     _voiceStatus('Mic access denied', 3000);
     return;
@@ -3419,7 +3397,7 @@ async function toggleVoiceRecording() {
 
   _voiceRecorder.onstop = () => {
     _voiceActive = false;
-    stream.getTracks().forEach(t => t.stop());
+    // Keep stream alive — reused on next recording so iOS doesn't re-ask permission
     _stopWaveform(false); // keep input-bar hidden — save/discard row takes over
 
     const ext = mimeType.includes('webm') ? 'webm' : 'mp4';

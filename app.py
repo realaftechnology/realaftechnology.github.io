@@ -1827,64 +1827,65 @@ def _score_quote(text):
     if not t:
         return -999
     lower = t.lower()
-    score = 0
 
-    # Housekeeping → discard
+    # ── Hard disqualifiers ────────────────────────────────────────────────────
+    # Must be a complete sentence: starts uppercase, ends with punctuation
+    if not t[0].isupper():
+        return -999
+    if t[-1] not in '.!?':
+        return -999
+
+    # Filler/conjunction start → mid-thought fragment, discard entirely
+    for f in _QUOTE_FILLER_STARTS:
+        if lower.startswith(f):
+            return -999
+
+    # Housekeeping
     for h in _QUOTE_HOUSEKEEPING:
         if h in lower:
             return -999
 
-    # Completeness: starts uppercase, ends with sentence-ending punctuation
-    if t[0].isupper():
-        score += 20
-    else:
-        score -= 35
-
-    if t[-1] in '.!?':
-        score += 20
-    else:
-        score -= 15
-
-    if t[-1] == '!':
-        score += 8   # exclamation adds energy
-
-    # Filler/conjunction start — mid-thought fragment
-    for f in _QUOTE_FILLER_STARTS:
-        if lower.startswith(f):
-            score -= 30
-            break
-
-    # Length sweet spot: 80–240 chars is ideal tweet territory
+    # Tweet-length: 60–260 chars
     n = len(t)
-    if 100 <= n <= 200:
-        score += 25
-    elif 80 <= n <= 240:
-        score += 15
-    elif 60 <= n < 80:
-        score += 5
-    elif n > 280:
-        score -= 10
-    elif n < 50:
-        score -= 30
+    if n < 60 or n > 260:
+        return -999
 
-    # Impact language
+    # Filler body phrases — discard if heavy
+    filler_hits = sum(1 for p in _QUOTE_FILLER_PHRASES if p in lower)
+    if filler_hits >= 2:
+        return -999
+
+    # ── Scoring ───────────────────────────────────────────────────────────────
+    score = 0
+
+    # Length sweet spot
+    if 90 <= n <= 200:
+        score += 30
+    elif 70 <= n < 90 or 200 < n <= 230:
+        score += 15
+    else:
+        score += 5
+
+    # Energy
+    if t[-1] == '!':
+        score += 12
+
+    # Impact language (award each match, not just first)
     for phrase in _QUOTE_IMPACT_PHRASES:
         if phrase in lower:
-            score += 12
-            break   # award once
+            score += 15
 
-    # Filler phrases
-    for phrase in _QUOTE_FILLER_PHRASES:
-        if phrase in lower:
-            score -= 10
+    # Single filler phrase — small penalty
+    if filler_hits == 1:
+        score -= 8
 
-    # Second-person address — Andy talks directly to the listener
-    if ' you ' in lower or lower.startswith('you ') or " your " in lower:
-        score += 8
+    # Direct address to listener
+    if ' you ' in lower or lower.startswith('you ') or ' your ' in lower:
+        score += 10
 
-    # First-person conviction — "I know", "I've", "I did"
-    if lower.startswith("i ") or " i've " in lower or " i know " in lower:
-        score += 5
+    # First-person conviction
+    if lower.startswith('i ') or " i've " in lower or " i know " in lower:
+        score += 6
 
     return score
 
@@ -1918,27 +1919,26 @@ def random_quote():
         rows = conn.execute(
             "SELECT s.text, e.title FROM segments s "
             "JOIN episodes e ON s.episode_id = e.id "
-            "WHERE length(s.text) > 150 "
-            "ORDER BY RANDOM() LIMIT 60"
+            "WHERE length(s.text) > 150 AND e.id NOT LIKE 'VOICENOTE_%' "
+            "ORDER BY RANDOM() LIMIT 120"
         ).fetchall()
         conn.close()
         if not rows:
             return jsonify({"quote": "", "episode": ""})
 
-        # Score every sentence-level candidate across all segments
         all_candidates = []
         for row in rows:
             for excerpt in _extract_quote_candidates(row["text"]):
                 score = _score_quote(excerpt)
-                if score > 15:
+                if score > 0:
                     all_candidates.append((score, excerpt, row["title"]))
 
         if not all_candidates:
             return jsonify({"quote": "", "episode": ""})
 
         all_candidates.sort(key=lambda x: x[0], reverse=True)
-        # Pick randomly from top 8 so rotation feels varied, not repetitive
-        _, quote, episode = random.choice(all_candidates[:8])
+        # Pick randomly from top 12 for variety while keeping quality high
+        _, quote, episode = random.choice(all_candidates[:12])
         return jsonify({"quote": quote, "episode": episode})
     except Exception:
         return jsonify({"quote": "", "episode": ""})
