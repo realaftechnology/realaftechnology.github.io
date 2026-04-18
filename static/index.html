@@ -611,6 +611,51 @@ body {
 .input-submit:active { opacity: 0.7; }
 .input-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ── VOICE FAB ── */
+#voice-fab {
+  display: none;
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  background: var(--red);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(255,69,58,0.45);
+  transition: transform 0.15s;
+  -webkit-appearance: none;
+}
+#voice-fab:active { transform: scale(0.92); }
+#voice-fab.recording {
+  animation: fab-pulse 1.4s ease-in-out infinite;
+}
+@keyframes fab-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,69,58,0.7); }
+  70%  { box-shadow: 0 0 0 16px rgba(255,69,58,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,69,58,0); }
+}
+#voice-status {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 146px);
+  right: 12px;
+  background: var(--bg-secondary);
+  color: var(--label-secondary);
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 12px;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#voice-status.visible { opacity: 1; }
+
 /* ── SPINNER ── */
 .scroll-bottom-pad { height: 12px; }
 
@@ -1333,6 +1378,17 @@ body {
   </div>
 
 </div>
+
+<!-- Voice note FAB (only shown for mattgraham15@gmail.com) -->
+<button id="voice-fab" onclick="toggleVoiceRecording()" aria-label="Record voice note">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+    <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</button>
+<div id="voice-status"></div>
 
 <script>
 let currentResults = [];
@@ -2936,6 +2992,69 @@ document.body.addEventListener('touchmove', function(e) {
   }, { passive: true });
 })();
 
+// ── VOICE NOTE ───────────────────────────────────────────────────────────────
+
+let _voiceRecorder = null;
+let _voiceChunks   = [];
+let _voiceActive   = false;
+
+function _voiceStatus(msg, autohideMs) {
+  const el = document.getElementById('voice-status');
+  el.textContent = msg;
+  el.classList.add('visible');
+  if (autohideMs) setTimeout(() => el.classList.remove('visible'), autohideMs);
+}
+
+async function toggleVoiceRecording() {
+  const fab = document.getElementById('voice-fab');
+
+  if (_voiceActive) {
+    _voiceRecorder.stop();
+    return;
+  }
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(e) {
+    _voiceStatus('Mic access denied', 3000);
+    return;
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+  _voiceRecorder = new MediaRecorder(stream, { mimeType });
+  _voiceChunks = [];
+
+  _voiceRecorder.ondataavailable = e => { if (e.data.size > 0) _voiceChunks.push(e.data); };
+
+  _voiceRecorder.onstop = async () => {
+    fab.classList.remove('recording');
+    _voiceActive = false;
+    stream.getTracks().forEach(t => t.stop());
+
+    const ext  = mimeType.includes('webm') ? 'webm' : 'mp4';
+    const blob = new Blob(_voiceChunks, { type: mimeType });
+    const fd   = new FormData();
+    fd.append('audio', blob, `recording.${ext}`);
+
+    _voiceStatus('Transcribing\u2026');
+    try {
+      const res  = await fetch('/api/voice-note', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
+      _voiceStatus('Saved!', 2500);
+      loadEpisodeList();
+    } catch(e) {
+      _voiceStatus(`Error: ${e.message}`, 4000);
+    }
+  };
+
+  _voiceRecorder.start();
+  _voiceActive = true;
+  fab.classList.add('recording');
+  _voiceStatus('Recording\u2026');
+}
+
 (async function() {
   try {
     const res = await fetch('/api/me');
@@ -2953,6 +3072,10 @@ document.body.addEventListener('touchmove', function(e) {
         img.src = user.picture;
         btn.style.display = 'flex';
         btn.title = `Signed in as ${user.email}\nClick to sign out`;
+      }
+      // Show voice FAB only for authorized user
+      if (user.email === 'mattgraham15@gmail.com') {
+        document.getElementById('voice-fab').style.display = 'flex';
       }
       initEmptyState();
       document.getElementById('search-input').focus();

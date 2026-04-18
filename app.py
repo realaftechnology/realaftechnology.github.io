@@ -1133,6 +1133,55 @@ def upload_video():
             os.remove(audio_path)
 
 
+@app.route("/api/voice-note", methods=["POST"])
+@requires_auth
+def voice_note():
+    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
+        return jsonify({"error": "forbidden"}), 403
+    if not OPENAI_KEY:
+        return jsonify({"error": "OpenAI API key required"}), 400
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file"}), 400
+
+    audio_file = request.files["audio"]
+    now = datetime.now()
+    title = now.strftime("VOICENOTE_%Y%m%d_%H%M%S")
+    episode_id = title
+
+    vdir = videos_dir()
+    os.makedirs(vdir, exist_ok=True)
+
+    orig_ext = os.path.splitext(audio_file.filename or "recording.webm")[1] or ".webm"
+    raw_path = os.path.join(vdir, f"{episode_id}{orig_ext}")
+    audio_file.save(raw_path)
+
+    mp3_path = os.path.join(vdir, f"{episode_id}.mp3")
+    stored_path = raw_path
+    try:
+        ffmpeg_ok = extract_audio(raw_path, mp3_path)
+        if ffmpeg_ok:
+            stored_path = mp3_path
+            try:
+                os.remove(raw_path)
+            except Exception:
+                pass
+
+        result = whisper_transcribe(stored_path)
+        conn = get_db()
+        count = ingest_video_episode(conn, episode_id, title, stored_path, result)
+        _rebuild_fts(conn)
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "episode_id": episode_id, "title": title, "chunks": count})
+    except Exception as e:
+        for p in [raw_path, mp3_path]:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/drive-sources", methods=["GET"])
 @requires_auth
 def get_drive_sources():
