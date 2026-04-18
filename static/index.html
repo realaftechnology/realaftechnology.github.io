@@ -205,8 +205,69 @@ body {
   outline: none;
 }
 .sidebar-search input::placeholder { color: var(--label-tertiary); }
-.sidebar-list { flex: 1; overflow-y: auto; padding: 8px 0; }
-.sidebar-list::-webkit-scrollbar { width: 0; }
+.sidebar-list { padding: 8px 0; }
+.sidebar-scroll { flex: 1; overflow-y: auto; }
+.sidebar-scroll::-webkit-scrollbar { width: 0; }
+
+/* ── VOICE NOTES SIDEBAR ── */
+.vn-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--label-tertiary);
+  text-transform: uppercase;
+  cursor: pointer;
+  border-top: 0.5px solid var(--separator);
+  margin-top: 4px;
+  user-select: none;
+}
+.vn-section-header:hover { color: var(--label-secondary); }
+.vn-chevron { font-size: 10px; transition: transform 0.15s; }
+.vn-chevron.collapsed { transform: rotate(-90deg); }
+#vn-list { padding: 4px 0 16px; }
+.vn-item {
+  padding: 9px 16px;
+  border-radius: 8px;
+  margin: 1px 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.vn-item:hover { background: var(--bg-secondary); }
+.vn-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.vn-item-meta {
+  font-size: 12px;
+  color: var(--label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vn-item-meta.pending { color: var(--orange); font-style: italic; }
+.vn-item-meta.error   { color: var(--red); }
+.vn-item-actions { display: flex; gap: 12px; margin-top: 5px; }
+.vn-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--label-quaternary);
+  padding: 0;
+  font-family: var(--sf);
+  -webkit-appearance: none;
+}
+.vn-action-btn:hover { color: var(--label-secondary); }
+.vn-action-btn.del:hover { color: var(--red); }
 .ep-item {
   padding: 10px 16px;
   cursor: pointer;
@@ -1302,8 +1363,17 @@ body {
     <div class="sidebar-search">
       <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
     </div>
-    <div class="sidebar-list" id="episode-list">
-      <div style="padding:20px;color:var(--label-tertiary);font-size:13px">Loading...</div>
+    <div class="sidebar-scroll">
+      <div class="sidebar-list" id="episode-list">
+        <div style="padding:20px;color:var(--label-tertiary);font-size:13px">Loading...</div>
+      </div>
+      <div id="vn-section">
+        <div class="vn-section-header" onclick="toggleVNSection()">
+          <span>Voice Notes</span>
+          <span class="vn-chevron" id="vn-chevron">▾</span>
+        </div>
+        <div id="vn-list"></div>
+      </div>
     </div>
   </div>
   <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
@@ -1405,6 +1475,7 @@ function toggleSidebar() {
   backdrop.classList.toggle('visible');
   if (opening) {
     loadEpisodeList();
+    loadVoiceNotes();
     document.getElementById('sidebar-search-input').value = '';
   }
 }
@@ -2931,7 +3002,7 @@ if (window.visualViewport) {
 }
 // Prevent body scroll — only scroll-area/sidebar/suggestion-bar should scroll
 document.body.addEventListener('touchmove', function(e) {
-  if (!e.target.closest('.scroll-area, .sidebar-list, #suggestion-bar')) e.preventDefault();
+  if (!e.target.closest('.scroll-area, .sidebar-scroll, .sidebar-list, #suggestion-bar')) e.preventDefault();
 }, { passive: false });
 
 // ── SWIPE GESTURES ────────────────────────────────────────────────────────────
@@ -2977,6 +3048,112 @@ document.body.addEventListener('touchmove', function(e) {
     }
   }, { passive: true });
 })();
+
+// ── VOICE NOTES SIDEBAR ──────────────────────────────────────────────────────
+
+let _vnCollapsed = false;
+
+function toggleVNSection() {
+  _vnCollapsed = !_vnCollapsed;
+  document.getElementById('vn-list').style.display = _vnCollapsed ? 'none' : '';
+  document.getElementById('vn-chevron').classList.toggle('collapsed', _vnCollapsed);
+}
+
+function _formatVNTitle(id) {
+  const m = id.match(/VOICENOTE_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+  if (!m) return id;
+  const [, yr, mo, dy, hr, mn] = m;
+  const d = new Date(+yr, +mo - 1, +dy, +hr, +mn);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+       + ' \u00b7 ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderVoiceNotes(notes) {
+  const list = document.getElementById('vn-list');
+  if (!notes || !notes.length) {
+    list.innerHTML = '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">No voice notes yet.</div>';
+    return;
+  }
+  list.innerHTML = notes.map(n => {
+    const displayTitle = n.title.startsWith('VOICENOTE_') ? _formatVNTitle(n.title) : n.title.replace(/</g, '&lt;');
+    let metaText, metaClass;
+    if (n.status === 'transcribing') {
+      metaText = 'Transcribing\u2026'; metaClass = 'pending';
+    } else if (n.status === 'error') {
+      metaText = 'Transcription failed'; metaClass = 'error';
+    } else if (n.excerpt) {
+      metaText = n.excerpt.replace(/</g, '&lt;'); metaClass = '';
+    } else {
+      metaText = 'No transcript'; metaClass = '';
+    }
+    const eid = encodeURIComponent(n.id);
+    const safeTitle = n.title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const clickable = (n.status === 'done' || n.status === null);
+    return `<div class="vn-item" ${clickable ? `onclick="openVoiceNote('${eid}','${safeTitle}')"` : ''}>
+      <div class="vn-item-title">${displayTitle}</div>
+      <div class="vn-item-meta ${metaClass}">${metaText}</div>
+      <div class="vn-item-actions">
+        <button class="vn-action-btn" onclick="renameVoiceNote('${eid}','${safeTitle}');event.stopPropagation()">Rename</button>
+        <button class="vn-action-btn del" onclick="deleteVoiceNote('${eid}','${displayTitle}');event.stopPropagation()">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadVoiceNotes() {
+  try {
+    const res  = await fetch('/api/voice-notes');
+    const data = await res.json();
+    renderVoiceNotes(data.notes || []);
+  } catch(e) {
+    document.getElementById('vn-list').innerHTML =
+      '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">Failed to load.</div>';
+  }
+}
+
+function openVoiceNote(encodedId, safeTitle) {
+  const id = decodeURIComponent(encodedId);
+  toggleSidebar();
+  lockedEpisode = id;
+  chatHistory = [];
+  const label = safeTitle.startsWith('VOICENOTE_') ? _formatVNTitle(safeTitle) : safeTitle;
+  document.getElementById('locked-label').textContent = label;
+  document.getElementById('locked-pill').style.display = '';
+  document.getElementById('search-input').placeholder = `Ask about \u201c${label}\u201d\u2026`;
+  resetApp(false);
+  document.getElementById('search-input').focus();
+}
+
+async function renameVoiceNote(encodedId, currentTitle) {
+  const id = decodeURIComponent(encodedId);
+  const label = currentTitle.startsWith('VOICENOTE_') ? _formatVNTitle(currentTitle) : currentTitle;
+  const newTitle = prompt('Rename voice note:', label);
+  if (!newTitle || newTitle.trim() === currentTitle || newTitle.trim() === label) return;
+  try {
+    const res  = await fetch(`/api/voice-note/${encodeURIComponent(id)}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Rename failed');
+    loadVoiceNotes();
+  } catch(e) {
+    alert('Rename failed: ' + e.message);
+  }
+}
+
+async function deleteVoiceNote(encodedId, displayTitle) {
+  const id = decodeURIComponent(encodedId);
+  if (!confirm(`Delete "${displayTitle}"?\nThis will remove the transcript and audio file permanently.`)) return;
+  try {
+    const res = await fetch(`/api/delete-episode/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+    loadVoiceNotes();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
 
 // ── VOICE NOTE ───────────────────────────────────────────────────────────────
 

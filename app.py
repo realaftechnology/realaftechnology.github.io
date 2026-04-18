@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import time
 import threading
+import traceback
 import queue as queue_module
 import uuid
 import urllib.request
@@ -1138,32 +1139,43 @@ def upload_video():
 
 def _transcribe_voice_note_bg(episode_id, title, raw_path):
     """Background thread: convert, transcribe, and store a voice note."""
+    print(f"[voice-note] {episode_id}: background thread started, file={raw_path}", flush=True)
     mp3_path = os.path.splitext(raw_path)[0] + ".mp3"
     stored_path = raw_path
     try:
         ffmpeg_ok = extract_audio(raw_path, mp3_path)
         if ffmpeg_ok:
             stored_path = mp3_path
+            print(f"[voice-note] {episode_id}: converted to mp3 at {mp3_path}", flush=True)
             try:
                 os.remove(raw_path)
             except Exception:
                 pass
+        else:
+            print(f"[voice-note] {episode_id}: ffmpeg unavailable, using raw file", flush=True)
 
+        print(f"[voice-note] {episode_id}: starting Whisper transcription", flush=True)
         result = whisper_transcribe(stored_path)
+        print(f"[voice-note] {episode_id}: Whisper done, {len(result.get('segments', []))} segments", flush=True)
+
         conn = get_db()
+        if not conn:
+            raise RuntimeError("get_db() returned None in background thread")
         ingest_video_episode(conn, episode_id, title, stored_path, result)
         conn.execute("UPDATE episodes SET transcribe_status = 'done' WHERE id = ?", (episode_id,))
         _rebuild_fts(conn)
         conn.commit()
         conn.close()
-        print(f"[voice-note] {episode_id}: transcription complete", flush=True)
-    except Exception as e:
-        print(f"[voice-note] {episode_id}: transcription failed — {e}", flush=True)
+        print(f"[voice-note] {episode_id}: done and committed to DB", flush=True)
+    except Exception:
+        print(f"[voice-note] {episode_id}: transcription failed:", flush=True)
+        traceback.print_exc()
         try:
             conn = get_db()
-            conn.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (episode_id,))
-            conn.commit()
-            conn.close()
+            if conn:
+                conn.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (episode_id,))
+                conn.commit()
+                conn.close()
         except Exception:
             pass
 
@@ -1199,6 +1211,7 @@ def voice_note():
     )
     conn.commit()
     conn.close()
+    print(f"[voice-note] {episode_id}: stub episode written to DB, audio saved to {raw_path}", flush=True)
 
     # Transcription runs in the background — client gets 200 immediately
     threading.Thread(
@@ -1208,6 +1221,80 @@ def voice_note():
     ).start()
 
     return jsonify({"ok": True, "episode_id": episode_id, "title": title})
+
+
+@app.route("/api/voice-notes")
+@requires_auth
+def voice_notes_list():
+    conn = get_db()
+    if not conn:
+        return jsonify({"notes": []})
+    rows = conn.execute("""
+        SELECT e.id, e.title, e.video_path, e.uploaded_at, e.transcribe_status,
+               COUNT(s.id) as segment_count,
+               (SELECT text FROM segments WHERE episode_id = e.id ORDER BY start_secs ASC LIMIT 1) as excerpt
+        FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
+        WHERE e.id LIKE 'VOICENOTE_%'
+        GROUP BY e.id ORDER BY e.id DESC
+    """).fetchall()
+    conn.close()
+    return jsonify({"notes": [
+        {
+            "id":            r["id"],
+            "title":         r["title"],
+            "status":        r["transcribe_status"] or "done",
+            "segments":      r["segment_count"],
+            "excerpt":       (r["excerpt"] or "").strip()[:120],
+            "uploaded_at":   r["uploaded_at"],
+            "audio_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
+        }
+        for r in rows
+    ]})
+
+
+@app.route("/api/voice-note/<episode_id>/rename", methods=["POST"])
+@requires_auth
+def rename_voice_note(episode_id):
+    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json() or {}
+    new_title = (data.get("title") or "").strip()
+    if not new_title:
+        return jsonify({"error": "Title required"}), 400
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    ep = conn.execute("SELECT video_path FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+    if not ep:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    old_path = ep["video_path"]
+    new_filename = None
+    new_path = None
+    if old_path and os.path.exists(old_path):
+        ext = os.path.splitext(old_path)[1]
+        base = secure_filename(new_title) or episode_id
+        new_filename = base + ext
+        new_path = os.path.join(os.path.dirname(old_path), new_filename)
+        counter = 1
+        while os.path.exists(new_path) and new_path != old_path:
+            new_filename = f"{base}_{counter}{ext}"
+            new_path = os.path.join(os.path.dirname(old_path), new_filename)
+            counter += 1
+        if new_path != old_path:
+            os.rename(old_path, new_path)
+
+    if new_path and new_filename:
+        conn.execute(
+            "UPDATE episodes SET title = ?, filename = ?, video_path = ? WHERE id = ?",
+            (new_title, new_filename, new_path, episode_id)
+        )
+    else:
+        conn.execute("UPDATE episodes SET title = ? WHERE id = ?", (new_title, episode_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/drive-sources", methods=["GET"])
