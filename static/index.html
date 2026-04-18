@@ -338,6 +338,7 @@ body {
   padding: 8px 16px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
   flex-shrink: 0;
 }
 #suggestion-bar::-webkit-scrollbar { display: none; }
@@ -2891,9 +2892,9 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', _pinHeight, { passive: true });
   window.visualViewport.addEventListener('scroll', _pinHeight, { passive: true });
 }
-// Prevent body scroll — only scroll-area/sidebar should scroll
+// Prevent body scroll — only scroll-area/sidebar/suggestion-bar should scroll
 document.body.addEventListener('touchmove', function(e) {
-  if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
+  if (!e.target.closest('.scroll-area, .sidebar-list, #suggestion-bar')) e.preventDefault();
 }, { passive: false });
 
 // ── SWIPE GESTURES ────────────────────────────────────────────────────────────
