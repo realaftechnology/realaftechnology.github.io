@@ -449,21 +449,21 @@ body {
 .result-text mark { background: transparent; color: var(--orange); font-weight: 500; }
 
 /* ── BOTTOM INPUT AREA ── */
-/* Independent fixed position — keyboard JS only translates this element,
-   nothing else on screen moves when the keyboard opens. */
+/* In-flow at bottom of #main-screen flex column.
+   When keyboard opens, _pinHeight sets #main-screen height to
+   visualViewport.height so this element naturally rides above the keyboard. */
 .input-area {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px 20px;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  width: 100%;
+  flex-shrink: 0;
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
-  width: 100%;
+}
+.input-area-inner {
   max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px);
 }
 .input-bar {
   display: flex;
@@ -525,7 +525,7 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
-.scroll-bottom-pad { height: calc(160px + env(safe-area-inset-bottom, 0px)); }
+.scroll-bottom-pad { height: 12px; }
 
 /* ── UPLOAD MODAL ── */
 .modal-overlay {
@@ -1209,22 +1209,24 @@ body {
     <div class="scroll-bottom-pad"></div>
   </div>
 
-
-</div>
-
-<!-- Input bar lives OUTSIDE #main-screen so it is never part of its flex layout.
-     position:fixed makes it fully independent of everything else on the page. -->
-<div class="input-area" id="input-area" style="display:none">
-  <div id="locked-pill" style="display:none">
-    <div class="locked-ep-pill">
-      <span id="locked-label"></span>
-      <button onclick="clearLockedEpisode()">✕</button>
+  <!-- Input bar is in-flow inside #main-screen flex column.
+       It naturally sits above the keyboard because _pinHeight shrinks
+       #main-screen to visualViewport.height when the keyboard opens. -->
+  <div class="input-area" id="input-area">
+    <div class="input-area-inner">
+      <div id="locked-pill" style="display:none">
+        <div class="locked-ep-pill">
+          <span id="locked-label"></span>
+          <button onclick="clearLockedEpisode()">✕</button>
+        </div>
+      </div>
+      <div class="input-bar">
+        <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
+        <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+      </div>
     </div>
   </div>
-  <div class="input-bar">
-    <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
-    <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
-  </div>
+
 </div>
 
 <script>
@@ -1252,7 +1254,6 @@ async function doLogin() {
       setTimeout(() => {
         login.style.display = 'none';
         main.style.display = 'flex';
-        document.getElementById('input-area').style.display = '';
         requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       }, 200);
       loadStats();
@@ -2693,44 +2694,20 @@ function scrollToTop() {
   if (s) setTimeout(() => s.scrollTop = 0, 50);
 }
 
-// Keyboard: only the input bar moves, nothing else.
-//
-// #main-screen is pinned to an explicit px height = window.innerHeight.
-// This is the layout viewport height and never changes when the keyboard
-// opens, so the flex layout inside never reflows or shifts.
-//
-// .input-area lives outside #main-screen (position:fixed, bottom:0).
-// On visualViewport resize we translateY it up by the keyboard height.
-//
-// NO scroll listener, NO window.scrollTo reset — those were causing a
-// second resize event that zeroed out the transform (bar behind keyboard)
-// and then the bar double-shifted when the user scrolled.
+// Keyboard: #main-screen shrinks to visualViewport.height when the keyboard
+// opens, so the in-flow input bar naturally rides just above the keyboard.
+// Header stays fixed at top. No translateY needed.
 const _mainScreen = document.getElementById('main-screen');
-const _inputArea  = document.getElementById('input-area');
 
 function _pinHeight() {
-  _mainScreen.style.height = window.innerHeight + 'px';
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  _mainScreen.style.height = h + 'px';
 }
 _pinHeight();
-// Re-pin on real resize (device rotation etc.) — keyboard open/close
-// does NOT change window.innerHeight so this won't thrash during typing.
 window.addEventListener('resize', _pinHeight, { passive: true });
-
 if (window.visualViewport) {
-  let _kbRaf = null;
-  const _reposition = () => {
-    if (_kbRaf) cancelAnimationFrame(_kbRaf);
-    _kbRaf = requestAnimationFrame(() => {
-      _kbRaf = null;
-      // Account for both keyboard height AND any page scroll iOS applies
-      // when bringing a focused input into view (visualViewport.offsetTop > 0).
-      const vv = window.visualViewport;
-      const kh = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      _inputArea.style.transform = kh > 10 ? `translateY(${-kh}px)` : '';
-    });
-  };
-  window.visualViewport.addEventListener('resize', _reposition);
-  window.visualViewport.addEventListener('scroll', _reposition);
+  window.visualViewport.addEventListener('resize', _pinHeight, { passive: true });
+  window.visualViewport.addEventListener('scroll', _pinHeight, { passive: true });
 }
 // Prevent body scroll — only scroll-area/sidebar should scroll
 document.body.addEventListener('touchmove', function(e) {
@@ -2746,7 +2723,6 @@ document.body.addEventListener('touchmove', function(e) {
       const main  = document.getElementById('main-screen');
       login.style.display = 'none';
       main.style.display = 'flex';
-      document.getElementById('input-area').style.display = '';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
       document.getElementById('search-input').focus();
