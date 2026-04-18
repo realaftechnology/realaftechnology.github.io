@@ -885,15 +885,15 @@ def whisper_transcribe(audio_path):
     body += part("response_format", "verbose_json")
     body += f"--{boundary}--\r\n".encode()
 
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/audio/transcriptions",
-        data=body,
-        headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
-    )
-
-    max_retries = 4
-    base_delay  = 15  # seconds; doubles each attempt: 15, 30, 60, 120
+    max_retries = 5  # attempts: delays 15, 30, 60, 120s on 429
+    base_delay  = 15
     for attempt in range(max_retries):
+        # Fresh Request each attempt so urllib doesn't reuse a stale connection
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/audio/transcriptions",
+            data=body,
+            headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
+        )
         try:
             with urllib.request.urlopen(req, timeout=300) as resp:
                 return json.loads(resp.read())
@@ -902,6 +902,7 @@ def whisper_transcribe(audio_path):
                 delay = base_delay * (2 ** attempt)
                 print(f"[whisper] rate-limited (429) — waiting {delay}s (retry {attempt + 2}/{max_retries})",
                       flush=True)
+                e.close()  # release the error response before sleeping
                 time.sleep(delay)
                 continue
             raise RuntimeError(f"Whisper API error {e.code}: {e.reason}")

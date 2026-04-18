@@ -611,14 +611,20 @@ body {
 .input-submit:active { opacity: 0.7; }
 .input-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* ── VOICE RECORD BUTTON ── */
-#voice-btn.recording {
-  animation: voice-pulse 1.4s ease-in-out infinite;
+/* ── VOICE WAVEFORM ── */
+#voice-waveform-row {
+  display: none;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 6px;
+  gap: 8px;
+  min-height: 44px;
 }
-@keyframes voice-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255,69,58,0.7); }
-  70%  { box-shadow: 0 0 0 8px rgba(255,69,58,0); }
-  100% { box-shadow: 0 0 0 0 rgba(255,69,58,0); }
+#voice-waveform {
+  flex: 1;
+  height: 32px;
+  display: block;
 }
 #voice-status {
   font-size: 12px;
@@ -1346,6 +1352,12 @@ body {
           <span id="locked-label"></span>
           <button onclick="clearLockedEpisode()">✕</button>
         </div>
+      </div>
+      <div id="voice-waveform-row">
+        <canvas id="voice-waveform"></canvas>
+        <button class="input-submit" onclick="toggleVoiceRecording()" aria-label="Stop recording">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><rect x="0" y="0" width="12" height="12" rx="2"/></svg>
+        </button>
       </div>
       <div class="input-bar">
         <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
@@ -2971,6 +2983,8 @@ document.body.addEventListener('touchmove', function(e) {
 let _voiceRecorder = null;
 let _voiceChunks   = [];
 let _voiceActive   = false;
+let _audioCtx      = null;
+let _waveRaf       = null;
 
 function _voiceStatus(msg, autohideMs) {
   const el = document.getElementById('voice-status');
@@ -2979,9 +2993,61 @@ function _voiceStatus(msg, autohideMs) {
   if (autohideMs) setTimeout(() => el.classList.remove('visible'), autohideMs);
 }
 
-async function toggleVoiceRecording() {
-  const fab = document.getElementById('voice-btn');
+function _startWaveform(stream) {
+  const waveRow = document.getElementById('voice-waveform-row');
+  const inputBar = document.querySelector('.input-bar');
 
+  // Read input bar width before hiding it, then swap
+  const barW = inputBar.offsetWidth;
+  waveRow.style.display = 'flex';
+  inputBar.style.display = 'none';
+
+  const canvas = document.getElementById('voice-waveform');
+  const dpr = window.devicePixelRatio || 1;
+  // canvas.offsetWidth is now valid (flex:1 inside visible row)
+  canvas.width  = Math.round((canvas.offsetWidth || barW) * dpr);
+  canvas.height = Math.round(32 * dpr);
+
+  _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const analyser = _audioCtx.createAnalyser();
+  analyser.fftSize = 128; // 64 frequency bins
+  _audioCtx.createMediaStreamSource(stream).connect(analyser); // no output = no feedback
+
+  const bufLen  = analyser.frequencyBinCount;
+  const freqData = new Uint8Array(bufLen);
+  const ctx2d   = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const numBars = 28;
+  const step    = Math.floor(bufLen / numBars);
+  const barPx   = Math.floor((W / numBars) * 0.6);
+  const gapPx   = Math.floor((W / numBars) * 0.4);
+
+  function draw() {
+    if (!_voiceActive) return;
+    _waveRaf = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(freqData);
+    ctx2d.clearRect(0, 0, W, H);
+    for (let i = 0; i < numBars; i++) {
+      const val   = freqData[i * step];
+      const ratio = val / 255;
+      const bH    = Math.max(3 * dpr, ratio * H);
+      const x     = i * (barPx + gapPx);
+      const y     = (H - bH) / 2;
+      ctx2d.fillStyle = `rgba(255,69,58,${0.3 + ratio * 0.7})`;
+      ctx2d.fillRect(x, y, barPx, bH);
+    }
+  }
+  draw();
+}
+
+function _stopWaveform() {
+  if (_waveRaf) { cancelAnimationFrame(_waveRaf); _waveRaf = null; }
+  if (_audioCtx) { _audioCtx.close(); _audioCtx = null; }
+  document.getElementById('voice-waveform-row').style.display = 'none';
+  document.querySelector('.input-bar').style.display = 'flex';
+}
+
+async function toggleVoiceRecording() {
   if (_voiceActive) {
     _voiceRecorder.stop();
     return;
@@ -3002,9 +3068,9 @@ async function toggleVoiceRecording() {
   _voiceRecorder.ondataavailable = e => { if (e.data.size > 0) _voiceChunks.push(e.data); };
 
   _voiceRecorder.onstop = async () => {
-    fab.classList.remove('recording');
     _voiceActive = false;
     stream.getTracks().forEach(t => t.stop());
+    _stopWaveform();
 
     const ext  = mimeType.includes('webm') ? 'webm' : 'mp4';
     const blob = new Blob(_voiceChunks, { type: mimeType });
@@ -3025,7 +3091,7 @@ async function toggleVoiceRecording() {
 
   _voiceRecorder.start();
   _voiceActive = true;
-  fab.classList.add('recording');
+  _startWaveform(stream);
   _voiceStatus('Recording\u2026');
 }
 
