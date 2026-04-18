@@ -161,6 +161,45 @@
 
   .empty { text-align: center; padding: 36px; color: var(--text3); font-size: 13px; }
   .card-wrap { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
+
+  /* Rename */
+  .rename-btn {
+    background: none; border: none; color: var(--text3); font-size: 12px;
+    cursor: pointer; padding: 3px 5px; border-radius: 4px; line-height: 1;
+    opacity: 0; transition: opacity 0.12s, color 0.12s;
+    vertical-align: middle; margin-left: 4px;
+  }
+  .ep-table tr:hover .rename-btn { opacity: 1; }
+  .rename-btn:hover { color: var(--orange); }
+  .rename-input {
+    background: var(--bg3); border: 1px solid var(--orange); border-radius: 6px;
+    color: var(--text1); font-family: inherit; font-size: 13px;
+    padding: 3px 8px; outline: none; width: 100%; box-sizing: border-box;
+  }
+
+  /* Upload section */
+  .upload-card {
+    background: var(--bg2); border-radius: var(--radius); padding: 16px 20px;
+  }
+  .upload-card textarea {
+    width: 100%; box-sizing: border-box; height: 72px;
+    background: var(--bg3); border: 1px solid var(--sep); border-radius: 8px;
+    color: var(--text1); font-family: var(--mono); font-size: 12px;
+    padding: 8px 10px; resize: none; outline: none; margin-top: 10px;
+  }
+  .upload-card textarea:focus { border-color: var(--orange); }
+  .import-btn {
+    margin-top: 10px; background: var(--red); color: #fff; border: none;
+    border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .import-btn:disabled { opacity: 0.5; cursor: default; }
+  .import-log {
+    margin-top: 10px; background: var(--bg3); border-radius: 8px;
+    padding: 10px 12px; max-height: 160px; overflow-y: auto;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6;
+    color: var(--text2); display: none;
+  }
 </style>
 </head>
 <body>
@@ -184,6 +223,10 @@
   </div>
   <div class="header-right">
     <div class="refresh-dot stale" id="refresh-dot"></div>
+    <button onclick="document.getElementById('import-section').scrollIntoView({behavior:'smooth'})"
+      style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+      + Import
+    </button>
     <a href="/" class="back-btn">← Back to App</a>
   </div>
 </div>
@@ -235,6 +278,22 @@
         </tr></thead>
         <tbody id="search-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Drive Import -->
+  <div class="section" id="import-section">
+    <div class="section-title">Drive Import</div>
+    <div class="upload-card">
+      <div style="font-size:13px;color:var(--text2);line-height:1.5">
+        Paste a Google Drive folder or file URL (must be shared as <strong style="color:var(--text1)">"Anyone with the link"</strong>). One URL per line.
+      </div>
+      <textarea id="dev-drive-urls" placeholder="https://drive.google.com/drive/folders/…"></textarea>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <button class="import-btn" id="dev-import-btn" onclick="devStartImport()">Import</button>
+        <span id="dev-import-status" style="font-size:12px;color:var(--text3)"></span>
+      </div>
+      <div class="import-log" id="dev-import-log"></div>
     </div>
   </div>
 
@@ -454,7 +513,10 @@ function renderEpisodes() {
     if (!eps.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No episodes</td></tr>'; return; }
     tbody.innerHTML = eps.map(ep => `
       <tr id="ep-row-${esc(ep.id)}">
-        <td>${esc(ep.title || ep.id)}</td>
+        <td>
+          <span id="ep-title-${esc(ep.id)}">${esc(ep.title || ep.id)}</span>
+          <button class="rename-btn" title="Rename" onclick="startRename('${esc(ep.id)}','${esc(ep.title||ep.id)}')">✎</button>
+        </td>
         <td><span class="type-badge ${ep.has_video ? 'type-video' : 'type-transcript'}">${ep.has_video ? 'Video' : 'Transcript'}</span></td>
         <td style="color:var(--text2)">${ep.segments}</td>
         <td style="color:var(--text3)">${ep.uploaded_at || '—'}</td>
@@ -477,6 +539,84 @@ async function deleteEpisode(id, title, hasVideo) {
   } catch(e) {
     alert('Delete failed: ' + e.message);
   }
+}
+
+// ── Rename episode ────────────────────────────────────────────────────────────
+function startRename(id, currentTitle) {
+  const titleEl = document.getElementById(`ep-title-${id}`);
+  if (!titleEl) return;
+  const input = document.createElement('input');
+  input.className = 'rename-input';
+  input.value = currentTitle;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function save() {
+    const newTitle = input.value.trim();
+    if (!newTitle || newTitle === currentTitle) { input.replaceWith(titleEl); return; }
+    try {
+      const res = await fetch(`/api/rename-episode/${encodeURIComponent(id)}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: newTitle})
+      });
+      if (!res.ok) throw new Error('Failed');
+      titleEl.textContent = newTitle;
+    } catch { titleEl.textContent = currentTitle; }
+    input.replaceWith(titleEl);
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { input.replaceWith(titleEl); }
+  });
+  input.addEventListener('blur', save);
+}
+
+// ── Drive import (dev) ────────────────────────────────────────────────────────
+let _devImportES = null;
+
+function devStartImport() {
+  const urls = document.getElementById('dev-drive-urls').value.trim();
+  if (!urls) return;
+  const btn    = document.getElementById('dev-import-btn');
+  const status = document.getElementById('dev-import-status');
+  const log    = document.getElementById('dev-import-log');
+  btn.disabled = true;
+  log.style.display = 'block';
+  log.innerHTML = '';
+  status.textContent = 'Importing…';
+
+  if (_devImportES) _devImportES.close();
+  const params = new URLSearchParams({urls});
+  _devImportES = new EventSource(`/api/drive-import?${params}`);
+
+  _devImportES.onmessage = e => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'done') {
+        status.textContent = 'Done.';
+        btn.disabled = false;
+        _devImportES.close();
+        _epsLoaded = false;
+        refresh();
+        return;
+      }
+      if (d.msg) {
+        const line = document.createElement('div');
+        line.style.color = d.type === 'error' ? '#ff453a' : d.type === 'warn' ? '#ff9f0a' : 'inherit';
+        line.textContent = d.msg;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+      }
+    } catch {}
+  };
+  _devImportES.onerror = () => {
+    status.textContent = 'Connection lost.';
+    btn.disabled = false;
+    _devImportES.close();
+  };
 }
 
 // ── Main refresh ──────────────────────────────────────────────────────────────

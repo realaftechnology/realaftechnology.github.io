@@ -267,8 +267,30 @@ body {
 }
 .app-title:active { opacity: 0.7; }
 .app-title span { color: var(--red); }
-.ep-badge { font-size: 13px; color: var(--label-secondary); }
-.ep-badge strong { color: var(--red); font-weight: 600; }
+.new-chat-btn {
+  background: none;
+  border: none;
+  color: var(--label-secondary);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.new-chat-btn:hover { color: var(--label); background: var(--bg-secondary); }
+.new-chat-btn:active { opacity: 0.6; }
+
+/* ── DESKTOP SIDEBAR ALWAYS OPEN ── */
+@media (min-width: 768px) {
+  .sidebar { left: 0 !important; box-shadow: none; }
+  .sidebar-close { display: none; }
+  #sidebar-backdrop { display: none !important; }
+  #main-screen { padding-left: 280px; }
+  .sidebar-btn { display: none; }
+}
 
 /* ── SCROLL AREA ── */
 .scroll-area {
@@ -281,16 +303,75 @@ body {
 }
 .scroll-area::-webkit-scrollbar { width: 0; }
 
-/* ── EMPTY ── */
-.empty-state { text-align: center; padding: 80px 20px; }
-.empty-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 36px;
-  letter-spacing: 1px;
-  color: var(--label-secondary);
-  margin-bottom: 10px;
+/* ── EMPTY / QUOTE ── */
+.empty-state { text-align: center; padding: 60px 20px 20px; }
+.quote-block {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
 }
-.empty-sub { font-size: 15px; color: var(--label-tertiary); line-height: 1.5; }
+.quote-text {
+  font-size: 18px;
+  font-style: italic;
+  color: var(--label-secondary);
+  line-height: 1.55;
+  max-width: 520px;
+  transition: opacity 0.6s ease;
+}
+.quote-ep {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--label-tertiary);
+  font-style: normal;
+  transition: opacity 0.6s ease;
+}
+/* ── SUGGESTION CHIPS ── */
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 20px 0 8px;
+}
+.suggestion-chip {
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--separator);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--label-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+  line-height: 1.3;
+  text-align: left;
+}
+.suggestion-chip:hover { background: var(--fill); color: var(--label); }
+.suggestion-chip:active { opacity: 0.7; }
+/* ── BRAIN LOADER ── */
+@keyframes brain-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.brain-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 10px;
+}
+.brain-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: brain-pulse 1.2s ease-in-out infinite;
+}
+.brain-dot:nth-child(2) { animation-delay: 0.2s; }
+.brain-dot:nth-child(3) { animation-delay: 0.4s; }
+.loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
 
 /* ── SECTION HEADER ── */
 .section-header {
@@ -516,18 +597,6 @@ body {
 .input-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── SPINNER ── */
-.spinner {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid var(--fill);
-  border-top-color: var(--red);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  vertical-align: middle;
-  margin-right: 8px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-row { display: flex; align-items: center; padding: 14px 0; font-size: 14px; color: var(--label-tertiary); }
 .scroll-bottom-pad { height: 12px; }
 
 /* ── UPLOAD MODAL ── */
@@ -1194,19 +1263,24 @@ body {
       <button class="sidebar-btn" onclick="toggleSidebar()">
         <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
       </button>
-      <div class="app-title" style="flex:1" onclick="resetApp()" translate="no"><span>AF</span>BRAIN</div>
-      <div class="ep-badge"><strong id="ep-count">—</strong> episodes</div>
-      <button class="upload-btn" onclick="openUploadModal()" title="Upload video">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="10" width="16" height="7" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M9 1v8M6 4l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="app-title" style="flex:1" translate="no"><span>AF</span>BRAIN</div>
+      <button class="new-chat-btn" onclick="resetApp()" title="New chat">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M3 10C3 6.134 6.134 3 10 3s7 3.134 7 7-3.134 7-7 7H3.5L3 17v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M10 7v6M7 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
       </button>
     </div>
   </div>
 
   <div class="scroll-area" id="scroll-area">
     <div id="results-area">
-      <div class="empty-state">
-        <div class="empty-title">Search Andy's Mind</div>
-        <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
+      <div class="empty-state" id="empty-state">
+        <div class="quote-block" id="quote-block">
+          <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
+          <div class="quote-ep" id="quote-ep"></div>
+        </div>
+        <div class="suggestion-chips" id="suggestion-chips"></div>
       </div>
     </div>
     <div class="scroll-bottom-pad"></div>
@@ -1269,12 +1343,7 @@ async function doLogin() {
 }
 
 async function loadStats() {
-  try {
-    const res = await fetch('/api/stats');
-    if (!res.ok) return;
-    const data = await res.json();
-    document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
-  } catch(e) {}
+  // ep-count element removed; stats now loaded via initEmptyState / sidebar
 }
 
 // ── SIDEBAR ──────────────────────────────────────────────────────────────────
@@ -1442,11 +1511,95 @@ function resetApp(clearLock = true, focusInput = true) {
   }
   searchInput.value = ''; searchInput.style.height = 'auto';
   document.getElementById('results-area').innerHTML = `
-    <div class="empty-state">
-      <div class="empty-title">Search Andy's Mind</div>
-      <div class="empty-sub">Ask about episodes, predictions, stories, quotes, or any topic Andy has covered.</div>
+    <div class="empty-state" id="empty-state">
+      <div class="quote-block" id="quote-block">
+        <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
+        <div class="quote-ep" id="quote-ep"></div>
+      </div>
+      <div class="suggestion-chips" id="suggestion-chips"></div>
     </div>`;
+  initEmptyState();
   if (focusInput) document.getElementById('search-input').focus();
+}
+
+// ── ROTATING QUOTES ───────────────────────────────────────────────────────────
+let _quoteTimer = null;
+
+async function fetchAndShowQuote() {
+  const textEl = document.getElementById('quote-text');
+  const epEl   = document.getElementById('quote-ep');
+  if (!textEl || !epEl) return;
+  try {
+    const res  = await fetch('/api/random-quote');
+    const data = await res.json();
+    if (!data.quote) return;
+    textEl.style.opacity = '0';
+    epEl.style.opacity   = '0';
+    setTimeout(() => {
+      textEl.textContent = '\u201C' + data.quote + '\u201D';
+      epEl.textContent   = data.episode || '';
+      textEl.style.opacity = '1';
+      epEl.style.opacity   = '1';
+    }, 600);
+  } catch {}
+}
+
+function initEmptyState() {
+  clearInterval(_quoteTimer);
+  fetchAndShowQuote();
+  _quoteTimer = setInterval(fetchAndShowQuote, 8000);
+  renderSuggestions();
+}
+
+// ── SEARCH SUGGESTIONS ────────────────────────────────────────────────────────
+const _allSuggestions = [
+  "What does Andy say about discipline?",
+  "Best Andy stories about failure",
+  "Andy's advice on starting a business",
+  "What motivates Andy Frisella?",
+  "Andy on mental toughness",
+  "How does Andy define success?",
+  "Andy's take on social media",
+  "What is the MFCEO mindset?",
+  "Andy on relationships and loyalty",
+  "Andy's daily routine and habits",
+  "What does Andy say about haters?",
+  "Andy on building a team",
+  "Andy's advice for entrepreneurs",
+  "What does Andy say about fear?",
+  "Andy on health and fitness",
+  "Andy's thoughts on money and wealth",
+  "How Andy bounced back from adversity",
+  "Andy on leadership",
+  "What is the 75 Hard challenge?",
+  "Andy on taking action vs. planning",
+];
+
+function renderSuggestions() {
+  const el = document.getElementById('suggestion-chips');
+  if (!el) return;
+  const shuffled = [..._allSuggestions].sort(() => Math.random() - 0.5).slice(0, 5);
+  el.innerHTML = shuffled.map(s =>
+    `<button class="suggestion-chip" onclick="runSuggestion(this.textContent)">${s}</button>`
+  ).join('');
+}
+
+function runSuggestion(text) {
+  clearInterval(_quoteTimer);
+  document.getElementById('search-input').value = text;
+  handleSubmit();
+}
+
+// ── DELETE EPISODE (main app) ─────────────────────────────────────────────────
+async function deleteEpisode(episodeId) {
+  if (!confirm('Delete this episode and its video file permanently?')) return;
+  try {
+    const res = await fetch(`/api/delete-episode/${encodeURIComponent(episodeId)}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+    resetApp();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
 }
 
 const searchInput = document.getElementById('search-input');
@@ -1467,9 +1620,10 @@ function handleSubmit() {
 }
 
 async function doSearch(query, episodeFilter) {
+  clearInterval(_quoteTimer);
   currentQuery = query; chatHistory = []; hasResults = false;
   const area = document.getElementById('results-area');
-  area.innerHTML = '<div class="loading-row"><span class="spinner"></span>Searching...</div>';
+  area.innerHTML = '<div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Searching...</div>';
   try {
     const body = { query };
     const ep = episodeFilter || lockedEpisode;
@@ -1525,7 +1679,7 @@ function renderResults(query, results, autoExpand = false) {
   <div id="ai-section">
     <div class="ai-card">
       <div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>
-      <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Analyzing transcripts...</div></div>
+      <div id="ai-content" class="ai-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
       ${btnLabel}
@@ -1645,7 +1799,7 @@ async function doFollowup(question) {
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
     <div class="chat-q-label">&ldquo;${question.replace(/"/g, '&quot;')}&rdquo;</div>
-    <div class="chat-a-body"><div class="loading-row"><span class="spinner"></span>Thinking...</div></div>
+    <div class="chat-a-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Thinking...</div></div>
   </div>`;
   scrollToBottom();
   try {
@@ -2110,7 +2264,7 @@ function loadVideoSummary() {
   card.style.marginBottom = '8px';
   card.innerHTML = `
     <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
-    <div id="ai-content" class="ai-body"><div class="loading-row"><span class="spinner"></span>Generating summary...</div></div>`;
+    <div id="ai-content" class="ai-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Generating summary...</div></div>`;
   btn.replaceWith(card);
   runAnalysisForVideo(currentQuery, currentResults);
 }
@@ -2724,6 +2878,50 @@ document.body.addEventListener('touchmove', function(e) {
   if (!e.target.closest('.scroll-area, .sidebar-list')) e.preventDefault();
 }, { passive: false });
 
+// ── SWIPE GESTURES ────────────────────────────────────────────────────────────
+(function() {
+  let _tx = 0, _ty = 0, _swiping = false;
+  const THRESHOLD = 60, ANGLE = 35;
+
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    _tx = e.touches[0].clientX;
+    _ty = e.touches[0].clientY;
+    _swiping = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!_swiping) return;
+    _swiping = false;
+    const dx = e.changedTouches[0].clientX - _tx;
+    const dy = e.changedTouches[0].clientY - _ty;
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+
+    // Swipe down on scroll area — dismiss keyboard
+    if (dy > THRESHOLD && absDx < absDy * Math.tan(ANGLE * Math.PI / 180)) {
+      if (e.target.closest('.scroll-area')) {
+        document.getElementById('search-input').blur();
+      }
+      return;
+    }
+
+    // Only horizontal swipes from here
+    if (absDx < THRESHOLD || absDy > absDx * Math.tan(ANGLE * Math.PI / 180)) return;
+
+    const sidebar = document.getElementById('sidebar');
+    const isOpen  = sidebar.classList.contains('open');
+
+    // Right swipe from left edge — open sidebar (mobile only)
+    if (dx > 0 && _tx < 40 && !isOpen && window.innerWidth < 768) {
+      toggleSidebar();
+    }
+    // Left swipe — close sidebar (mobile only)
+    if (dx < 0 && isOpen && window.innerWidth < 768) {
+      toggleSidebar();
+    }
+  }, { passive: true });
+})();
+
 (async function() {
   try {
     const res = await fetch('/api/stats');
@@ -2734,7 +2932,7 @@ document.body.addEventListener('touchmove', function(e) {
       login.style.display = 'none';
       main.style.display = 'flex';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
-      document.getElementById('ep-count').textContent = data.episodes.toLocaleString();
+      initEmptyState();
       document.getElementById('search-input').focus();
     } else {
       const login = document.getElementById('login-screen');
