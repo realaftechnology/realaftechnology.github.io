@@ -17,17 +17,50 @@ import urllib.request
 import urllib.error
 from collections import deque
 from datetime import datetime
-from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request, render_template_string
+from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request, render_template_string, redirect, url_for
 from functools import wraps
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "afbrain-secret-change-this")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB max upload
+# Trust the Railway/Heroku reverse proxy so url_for() produces https:// URLs
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 DB_PATH       = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "db.sqlite"))
 OPENAI_KEY    = os.environ.get("OPENAI_API_KEY", "")   # used for Whisper transcription + embeddings
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "") # used for all AI text generation
+
+# ── GOOGLE OAUTH ──────────────────────────────────────────────────────────────
+# Required env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# Access control (at least one must be set, or all Google accounts are allowed):
+#   ALLOWED_EMAILS  — comma-separated list, e.g. "matt@example.com,andy@example.com"
+#   ALLOWED_DOMAIN  — email domain, e.g. "andyfrisella.com"
+# Google Cloud Console setup:
+#   1. Create a project at console.cloud.google.com
+#   2. Enable the "Google+ API" or "People API" under APIs & Services
+#   3. OAuth consent screen → External → add test users (or publish)
+#   4. Credentials → Create OAuth 2.0 Client ID (Web application)
+#   5. Authorized redirect URIs: https://<your-railway-domain>/auth/google/callback
+#   6. Copy Client ID and Client Secret into Railway env vars
+
+GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+ALLOWED_EMAILS = {e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()}
+ALLOWED_DOMAIN = os.environ.get("ALLOWED_DOMAIN", "").strip().lower()
+
+oauth = OAuth(app)
+_google_oauth = None
+if GOOGLE_CLIENT_ID:
+    _google_oauth = oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
 
 # ── Import job registry (in-memory, last 100 jobs) ────────────────────────────
 _jobs      = deque(maxlen=100)
@@ -118,25 +151,78 @@ Every title must be grounded in what is actually in the transcript — no fabric
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get("authenticated"):
+        if not session.get("user"):
             return jsonify({"error": "unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated
 
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    password = os.environ.get("AFBRAIN_PASSWORD", "CHANGEME")
-    data = request.get_json()
-    if data.get("password") == password:
-        session["authenticated"] = True
-        return jsonify({"ok": True})
-    return jsonify({"error": "Invalid password"}), 403
+@app.route("/auth/google")
+def google_login():
+    if not _google_oauth:
+        return "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your environment.", 503
+    redirect_uri = url_for("google_callback", _external=True)
+    return _google_oauth.authorize_redirect(redirect_uri)
 
 
-@app.route("/api/debug-pw")
-def debug_pw():
-    return jsonify({"pw": os.environ.get("AFBRAIN_PASSWORD"), "default": "CHANGEME"})
+@app.route("/auth/google/callback")
+def google_callback():
+    if not _google_oauth:
+        return redirect("/")
+    try:
+        token = _google_oauth.authorize_access_token()
+    except Exception as e:
+        return f"OAuth error: {e}", 400
+
+    user_info = token.get("userinfo") or {}
+    email     = (user_info.get("email") or "").lower()
+    google_id = user_info.get("sub", "")
+    name      = user_info.get("name", "")
+    picture   = user_info.get("picture", "")
+
+    # Allowlist check — if neither var is set, all Google accounts are permitted
+    allowed = False
+    if ALLOWED_EMAILS and email in ALLOWED_EMAILS:
+        allowed = True
+    elif ALLOWED_DOMAIN and email.endswith("@" + ALLOWED_DOMAIN):
+        allowed = True
+    elif not ALLOWED_EMAILS and not ALLOWED_DOMAIN:
+        allowed = True
+
+    if not allowed:
+        return render_template_string("""<!doctype html>
+<html><head><title>Access Denied</title></head>
+<body style="background:#000;color:#fff;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center">
+<div>
+  <div style="font-size:48px;font-weight:700;color:#ff453a;margin-bottom:12px">Access Denied</div>
+  <p style="color:rgba(235,235,245,0.6);margin-bottom:24px">{{ email }} is not authorized to access AFBrain.</p>
+  <a href="/" style="color:#ff453a;text-decoration:none;font-weight:600">← Try again</a>
+</div>
+</body></html>""", email=email), 403
+
+    # Upsert user record
+    conn = get_db()
+    if conn:
+        conn.execute("""
+            INSERT INTO users (google_id, email, name, picture, first_login, last_login)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(google_id) DO UPDATE SET
+                name=excluded.name, picture=excluded.picture, last_login=datetime('now')
+        """, (google_id, email, name, picture))
+        conn.commit()
+        conn.close()
+
+    session.permanent = True
+    session["user"] = {"google_id": google_id, "email": email, "name": name, "picture": picture}
+    return redirect("/")
+
+
+@app.route("/api/me")
+def api_me():
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "not authenticated"}), 401
+    return jsonify(user)
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -168,6 +254,14 @@ def get_db():
         """CREATE TABLE IF NOT EXISTS deleted_episodes (
             id         TEXT PRIMARY KEY,
             deleted_at TEXT
+        )""",
+        """CREATE TABLE IF NOT EXISTS users (
+            google_id   TEXT PRIMARY KEY,
+            email       TEXT NOT NULL,
+            name        TEXT,
+            picture     TEXT,
+            first_login TEXT DEFAULT (datetime('now')),
+            last_login  TEXT DEFAULT (datetime('now'))
         )""",
     ]:
         try:

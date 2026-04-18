@@ -68,36 +68,41 @@ body {
   margin-bottom: 40px;
 }
 .login-logo span { color: var(--red); }
-.login-field {
-  background: var(--bg-secondary);
-  border: none;
-  border-radius: var(--radius);
-  color: var(--label);
-  font-family: var(--sf);
-  font-size: 17px;
-  padding: 14px 16px;
-  width: 100%;
-  outline: none;
-  margin-bottom: 12px;
-  -webkit-appearance: none;
-}
-.login-field::placeholder { color: var(--label-tertiary); }
-.login-btn {
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   width: 100%;
   height: 50px;
-  background: var(--red);
+  background: #fff;
   border: none;
   border-radius: var(--radius);
-  color: #fff;
+  color: #1f1f1f;
   font-family: var(--sf);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  -webkit-appearance: none;
+  text-decoration: none;
   transition: opacity 0.15s;
+  -webkit-appearance: none;
 }
-.login-btn:active { opacity: 0.8; }
+.google-btn:active { opacity: 0.8; }
 .login-error { color: var(--red); font-size: 13px; margin-top: 12px; min-height: 18px; }
+.user-avatar-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: none;
+  align-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.user-avatar-btn:active { opacity: 0.7; }
 
 /* ── MAIN LAYOUT ── */
 #main-screen {
@@ -1117,8 +1122,16 @@ body {
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo" translate="no"><span>AF</span>BRAIN</div>
-    <input class="login-field" type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
-    <button class="login-btn" onclick="doLogin()">Continue</button>
+    <a href="/auth/google" class="google-btn">
+      <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        <path fill="none" d="M0 0h48v48H0z"/>
+      </svg>
+      Sign in with Google
+    </a>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -1280,6 +1293,9 @@ body {
           <path d="M10 7v6M7 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
+      <button id="user-avatar-btn" class="user-avatar-btn" onclick="handleLogout()" title="Sign out">
+        <img id="user-avatar" src="" width="28" height="28" style="border-radius:50%;object-fit:cover;display:block">
+      </button>
     </div>
   </div>
 
@@ -1328,30 +1344,9 @@ let lockedEpisode = null;
 let allEpisodes = [];
 let currentVideoContext = null; // {filename} set when AI response can reference a known video
 
-document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-async function doLogin() {
-  const pw = document.getElementById('pw-input').value;
-  const err = document.getElementById('login-error');
-  err.textContent = '';
-  try {
-    const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
-    if (res.ok) {
-      const login = document.getElementById('login-screen');
-      const main  = document.getElementById('main-screen');
-      login.style.opacity = '0';
-      setTimeout(() => {
-        login.style.display = 'none';
-        main.style.display = 'flex';
-        requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
-      }, 200);
-      loadStats();
-      document.getElementById('search-input').focus();
-    } else {
-      err.textContent = 'Incorrect password.';
-      document.getElementById('pw-input').value = '';
-    }
-  } catch(e) { err.textContent = 'Connection error.'; }
+async function handleLogout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
 }
 
 async function loadStats() {
@@ -2943,19 +2938,26 @@ document.body.addEventListener('touchmove', function(e) {
 
 (async function() {
   try {
-    const res = await fetch('/api/stats');
+    const res = await fetch('/api/me');
     if (res.ok) {
-      const data = await res.json();
+      const user = await res.json();
       const login = document.getElementById('login-screen');
       const main  = document.getElementById('main-screen');
       login.style.display = 'none';
       main.style.display = 'flex';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
+      // Show user avatar in header
+      if (user.picture) {
+        const btn = document.getElementById('user-avatar-btn');
+        const img = document.getElementById('user-avatar');
+        img.src = user.picture;
+        btn.style.display = 'flex';
+        btn.title = `Signed in as ${user.email}\nClick to sign out`;
+      }
       initEmptyState();
       document.getElementById('search-input').focus();
     } else {
-      const login = document.getElementById('login-screen');
-      login.style.opacity = '1';
+      document.getElementById('login-screen').style.opacity = '1';
     }
   } catch(e) {
     document.getElementById('login-screen').style.opacity = '1';
