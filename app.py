@@ -1490,6 +1490,34 @@ def delete_episode_endpoint(episode_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/purge-no-video", methods=["DELETE"])
+@requires_auth
+def purge_no_video():
+    """Delete all episodes (and their segments) that have no video file on disk."""
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+
+    rows = conn.execute("SELECT id, video_path FROM episodes").fetchall()
+    to_delete = [
+        r["id"] for r in rows
+        if not r["video_path"] or not os.path.exists(r["video_path"])
+    ]
+
+    if not to_delete:
+        conn.close()
+        return jsonify({"deleted": 0, "ids": []})
+
+    cur = conn.cursor()
+    for ep_id in to_delete:
+        cur.execute("DELETE FROM segments WHERE episode_id = ?", (ep_id,))
+        cur.execute("DELETE FROM episodes WHERE id = ?", (ep_id,))
+    _rebuild_fts(conn)
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": len(to_delete), "ids": to_delete})
+
+
 @app.route("/api/clip/<path:filename>")
 @requires_auth
 def download_clip(filename):

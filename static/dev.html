@@ -249,6 +249,17 @@
     </div>
   </div>
 
+  <div class="section" style="border-top:1px solid var(--border);padding-top:20px">
+    <div class="section-title" style="color:#ff453a">Danger Zone</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="purge-btn" onclick="purgeNoVideo()"
+        style="background:#ff453a;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Delete transcripts without video
+      </button>
+      <div id="purge-result" style="font-size:13px;color:var(--text2);display:flex;align-items:center"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -584,6 +595,26 @@ fetch('/api/dev/status').then(r => {
 }).catch(() => refresh());
 
 setInterval(refresh, 4000);
+
+async function purgeNoVideo() {
+  const btn = document.getElementById('purge-btn');
+  const out = document.getElementById('purge-result');
+  if (!confirm('Delete all transcripts that have no video file on disk? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  out.textContent = '';
+  try {
+    const res = await fetch('/api/purge-no-video', { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { out.textContent = 'Error: ' + data.error; }
+    else { out.textContent = `Done — ${data.deleted} episode${data.deleted !== 1 ? 's' : ''} removed.`; }
+    refresh();
+  } catch(e) {
+    out.textContent = 'Request failed.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Delete transcripts without video';
+}
 </script>
 </body>
 </html>
