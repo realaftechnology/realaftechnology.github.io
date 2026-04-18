@@ -3230,11 +3230,13 @@ async function savePendingVoiceNote() {
   if (!_pendingVoiceBlob) return;
   const blob = _pendingVoiceBlob;
   const ext  = _pendingVoiceExt;
-  _pendingVoiceBlob = null;
-  _pendingVoiceExt  = '';
 
-  document.getElementById('voice-save-row').style.display = 'none';
-  document.querySelector('.input-bar').style.display = 'flex';
+  // Keep save row visible while uploading — buttons disabled to show progress
+  const saveBtn    = document.getElementById('voice-save-btn');
+  const discardBtn = document.getElementById('voice-discard-btn');
+  saveBtn.textContent = 'Saving\u2026';
+  saveBtn.disabled    = true;
+  discardBtn.disabled = true;
 
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -3244,15 +3246,27 @@ async function savePendingVoiceNote() {
   fd.append('file', blob, `VOICENOTE_${ts}.${ext}`);
   fd.append('title', `VOICENOTE_${ts}`);
 
-  _voiceStatus('Saving\u2026');
   try {
-    const res  = await fetch('/api/upload-video', { method: 'POST', body: fd });
+    const res  = await fetch('/api/upload-video', { method: 'POST', credentials: 'same-origin', body: fd });
     const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
-    _voiceStatus('Saved!', 1500);
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+
+    // Success — clear state and update UI
+    _pendingVoiceBlob = null;
+    _pendingVoiceExt  = '';
+    document.getElementById('voice-save-row').style.display = 'none';
+    document.querySelector('.input-bar').style.display = 'flex';
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled    = false;
+    discardBtn.disabled = false;
+    _voiceStatus('Saved \u2713', 2500);
     loadVoiceNotes();
   } catch(e) {
-    _voiceStatus(`Error: ${e.message}`, 8000);
+    // Restore buttons and show a visible error — tiny status text is too easy to miss
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled    = false;
+    discardBtn.disabled = false;
+    alert('Voice note upload failed:\n\n' + e.message + '\n\nTap Save to retry or Discard to cancel.');
   }
 }
 
@@ -3390,8 +3404,17 @@ async function toggleVoiceRecording() {
     return;
   }
 
-  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-  _voiceRecorder = new MediaRecorder(stream, { mimeType });
+  // Pick a supported mimeType — iOS Safari may not accept explicit 'audio/mp4'
+  let recorderMime = '';
+  for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'video/mp4']) {
+    if (MediaRecorder.isTypeSupported(t)) { recorderMime = t; break; }
+  }
+  try {
+    _voiceRecorder = new MediaRecorder(stream, recorderMime ? { mimeType: recorderMime } : {});
+  } catch(_) {
+    _voiceRecorder = new MediaRecorder(stream); // browser picks format
+  }
+  const actualMime = _voiceRecorder.mimeType || recorderMime || 'audio/mp4';
   _voiceChunks = [];
 
   _voiceRecorder.ondataavailable = e => { if (e.data.size > 0) _voiceChunks.push(e.data); };
@@ -3401,8 +3424,8 @@ async function toggleVoiceRecording() {
     // Keep stream alive — reused on next recording so iOS doesn't re-ask permission
     _stopWaveform(false); // keep input-bar hidden — save/discard row takes over
 
-    const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
-    _pendingVoiceBlob = new Blob(_voiceChunks, { type: mimeType });
+    const ext = actualMime.includes('webm') ? 'webm' : 'mp4';
+    _pendingVoiceBlob = new Blob(_voiceChunks, { type: actualMime });
     _pendingVoiceExt  = ext;
     _voiceChunks = [];
 
