@@ -1336,14 +1336,13 @@ function renderEpisodeList(episodes) {
     return;
   }
   // Split into video (Drive imports) and regular (numbered) episodes
-  const videoEps   = episodes.filter(ep => ep.has_video)
-    .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }));
-  const regularEps = episodes.filter(ep => !ep.has_video)
-    .sort((a, b) => {
-      const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
-      const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
-      return nb - na;
-    });
+  const numDesc = (a, b) => {
+    const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
+    const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
+    return nb - na;
+  };
+  const videoEps   = episodes.filter(ep => ep.has_video).sort(numDesc);
+  const regularEps = episodes.filter(ep => !ep.has_video).sort(numDesc);
 
   const renderVideo = ep => {
     const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
