@@ -1571,10 +1571,126 @@ def delete_episode_endpoint(episode_id):
     return jsonify({"ok": True})
 
 
+_QUOTE_FILLER_STARTS = (
+    "and ", "so ", "but ", "because ", "that ", "which ", "also ", "now ",
+    "well ", "okay ", "right ", "like ", "then ", "though ", "although ",
+    "as ", "or ", "yet ", "nor ", "if ", "when ", "where ", "while ",
+)
+_QUOTE_IMPACT_PHRASES = (
+    "you need to", "you have to", "you must", "you should",
+    "stop ", "never ", "always ", "don't ", "do not ",
+    "i believe", "the truth is", "most people", "the reality is",
+    "the fact is", "i'm telling you", "the problem is",
+    "here's the thing", "is the difference", "is everything",
+    "the only way", "that's why", "what separates",
+    "discipline", "accountability", "mediocre", "elite",
+    "no one tells you", "nobody tells you", "the real reason",
+    "you're never going to", "if you want to", "the honest truth",
+    "i'll tell you", "let me tell you",
+)
+_QUOTE_FILLER_PHRASES = (
+    "you know,", "you know.", "kind of", "sort of", "like i said",
+    "as i said", " um ", " uh ", "basically,", "literally,",
+    "going to go ahead", "gonna go ahead",
+)
+_QUOTE_HOUSEKEEPING = (
+    "subscribe", "check out", ".com", "follow us", "leave a review",
+    "itunes", "spotify", "patreon", "youtube", "see you tonight",
+    "see you tomorrow", "tonight at 7", "cti live", "show the show",
+    "hoe show", "sign up", "tune in",
+)
+
+
+def _score_quote(text):
+    """Score a candidate quote excerpt. Higher = better tweet-worthy quote."""
+    t = text.strip()
+    if not t:
+        return -999
+    lower = t.lower()
+    score = 0
+
+    # Housekeeping → discard
+    for h in _QUOTE_HOUSEKEEPING:
+        if h in lower:
+            return -999
+
+    # Completeness: starts uppercase, ends with sentence-ending punctuation
+    if t[0].isupper():
+        score += 20
+    else:
+        score -= 35
+
+    if t[-1] in '.!?':
+        score += 20
+    else:
+        score -= 15
+
+    if t[-1] == '!':
+        score += 8   # exclamation adds energy
+
+    # Filler/conjunction start — mid-thought fragment
+    for f in _QUOTE_FILLER_STARTS:
+        if lower.startswith(f):
+            score -= 30
+            break
+
+    # Length sweet spot: 80–240 chars is ideal tweet territory
+    n = len(t)
+    if 100 <= n <= 200:
+        score += 25
+    elif 80 <= n <= 240:
+        score += 15
+    elif 60 <= n < 80:
+        score += 5
+    elif n > 280:
+        score -= 10
+    elif n < 50:
+        score -= 30
+
+    # Impact language
+    for phrase in _QUOTE_IMPACT_PHRASES:
+        if phrase in lower:
+            score += 12
+            break   # award once
+
+    # Filler phrases
+    for phrase in _QUOTE_FILLER_PHRASES:
+        if phrase in lower:
+            score -= 10
+
+    # Second-person address — Andy talks directly to the listener
+    if ' you ' in lower or lower.startswith('you ') or " your " in lower:
+        score += 8
+
+    # First-person conviction — "I know", "I've", "I did"
+    if lower.startswith("i ") or " i've " in lower or " i know " in lower:
+        score += 5
+
+    return score
+
+
+def _extract_quote_candidates(segment_text):
+    """Split a ~400-word segment into scoreable sentence-level excerpts."""
+    # Split on sentence boundaries where next sentence starts with uppercase
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', segment_text.strip())
+    candidates = []
+    for s in sentences:
+        s = s.strip()
+        if len(s) >= 50:
+            candidates.append(s)
+    # Also try adjacent pairs for two-sentence punchy combos
+    for i in range(len(sentences) - 1):
+        pair = sentences[i].strip() + ' ' + sentences[i + 1].strip()
+        if 60 <= len(pair) <= 320:
+            candidates.append(pair)
+    return candidates
+
+
 @app.route("/api/random-quote")
 @requires_auth
 def random_quote():
-    """Return a random transcript segment to display as a rotating quote."""
+    """Return a tweet-worthy quote extracted and scored from transcript segments."""
+    import random
     conn = get_db()
     if not conn:
         return jsonify({"quote": "", "episode": ""}), 200
@@ -1582,48 +1698,28 @@ def random_quote():
         rows = conn.execute(
             "SELECT s.text, e.title FROM segments s "
             "JOIN episodes e ON s.episode_id = e.id "
-            # Segments are ~400 words (~2000 chars); require at least one sentence
             "WHERE length(s.text) > 150 "
-            "AND s.text NOT LIKE '%show the show%' "
-            "AND s.text NOT LIKE '%hoe show%' "
-            "AND s.text NOT LIKE '%see you tonight%' "
-            "AND s.text NOT LIKE '%see you tomorrow%' "
-            "AND s.text NOT LIKE '%CTI live%' "
-            "AND s.text NOT LIKE '%tonight at 7%' "
-            "AND s.text NOT LIKE '%7 p.m%' "
-            "AND s.text NOT LIKE '%subscribe%' "
-            "AND s.text NOT LIKE '%like and share%' "
-            "AND s.text NOT LIKE '%share the show%' "
-            "AND s.text NOT LIKE '%leave a review%' "
-            "AND s.text NOT LIKE '%iTunes%' "
-            "AND s.text NOT LIKE '%Spotify%' "
-            "AND s.text NOT LIKE '%check out%' "
-            "AND s.text NOT LIKE '%.com%' "
-            "AND s.text NOT LIKE '%sign up%' "
-            "AND s.text NOT LIKE '%we appreciate%' "
-            "AND s.text NOT LIKE '%thank you for%' "
-            "AND s.text NOT LIKE '%thanks for%' "
-            "AND s.text NOT LIKE '%tune in%' "
-            "AND s.text NOT LIKE '%next week%' "
-            "ORDER BY RANDOM() LIMIT 20"
+            "ORDER BY RANDOM() LIMIT 60"
         ).fetchall()
         conn.close()
-        if rows:
-            import random
-            # Score by internal punctuation — more complete thoughts score higher
-            def _score(r):
-                t = r["text"]
-                return t.count('.') + t.count('!') + t.count('?')
-            weighted = sorted(rows, key=_score, reverse=True)
-            pick = random.choice(weighted[:max(1, len(weighted) // 2)])
-            # Trim to a punchy excerpt: first 3 sentences or 280 chars
-            text = pick["text"].strip()
-            sentences = re.split(r'(?<=[.!?])\s+', text)
-            excerpt = ' '.join(sentences[:3])
-            if len(excerpt) > 320:
-                excerpt = excerpt[:320].rsplit(' ', 1)[0] + '…'
-            return jsonify({"quote": excerpt, "episode": pick["title"]})
-        return jsonify({"quote": "", "episode": ""})
+        if not rows:
+            return jsonify({"quote": "", "episode": ""})
+
+        # Score every sentence-level candidate across all segments
+        all_candidates = []
+        for row in rows:
+            for excerpt in _extract_quote_candidates(row["text"]):
+                score = _score_quote(excerpt)
+                if score > 15:
+                    all_candidates.append((score, excerpt, row["title"]))
+
+        if not all_candidates:
+            return jsonify({"quote": "", "episode": ""})
+
+        all_candidates.sort(key=lambda x: x[0], reverse=True)
+        # Pick randomly from top 8 so rotation feels varied, not repetitive
+        _, quote, episode = random.choice(all_candidates[:8])
+        return jsonify({"quote": quote, "episode": episode})
     except Exception:
         return jsonify({"quote": "", "episode": ""})
 
