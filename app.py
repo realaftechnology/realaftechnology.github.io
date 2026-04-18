@@ -1269,34 +1269,58 @@ def _ingest_one(job, video_path, filename, msg_q=None):
 def _drive_download_one(job, gdown, file_id_or_url, tmp_dir, msg_q):
     """
     Download a single Drive file into tmp_dir.
-    Returns the local path on success, None on failure.
+    Returns (local_path, stop_all). Retries with exponential backoff on 429.
     """
-    # Disk-space guard BEFORE downloading
     free = _disk_free_bytes()
     if free < _MIN_FREE_BYTES:
         _job_log(job, "error",
                  f"STOPPING — only {_fmt_bytes(free)} free. "
                  f"Need at least {_fmt_bytes(_MIN_FREE_BYTES)} before downloading next file.",
                  msg_q)
-        return None, True   # (path, stop_all)
+        return None, True
 
     url = (
         f"https://drive.google.com/uc?id={file_id_or_url}"
         if not file_id_or_url.startswith("http")
         else file_id_or_url
     )
-    try:
-        out = gdown.download(url, tmp_dir + os.sep, quiet=True)
-    except Exception as e:
-        _job_log(job, "error",
-                 f"Download failed: {e} — make sure link is 'Anyone with the link'", msg_q)
-        return None, False
 
-    if not out or not os.path.isfile(out):
-        _job_log(job, "error", "Download returned no file — check share link is public", msg_q)
-        return None, False
+    _RATE_LIMIT_SIGNALS = ("429", "too many requests", "quota", "rate limit", "rate_limit")
+    max_retries = 4
+    base_delay  = 15  # seconds; doubles each attempt: 15, 30, 60, 120
 
-    return out, False
+    for attempt in range(max_retries):
+        try:
+            out = gdown.download(url, tmp_dir + os.sep, quiet=True)
+        except Exception as e:
+            err_lower = str(e).lower()
+            is_rate   = any(s in err_lower for s in _RATE_LIMIT_SIGNALS)
+            if is_rate and attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                _job_log(job, "warn",
+                         f"Drive rate-limited (429) — waiting {delay}s "
+                         f"(retry {attempt + 2}/{max_retries})…", msg_q)
+                time.sleep(delay)
+                continue
+            _job_log(job, "error",
+                     f"Download failed: {e} — make sure link is 'Anyone with the link'", msg_q)
+            return None, False
+
+        if out and os.path.isfile(out):
+            return out, False
+
+        # gdown returned None — Drive sometimes does this silently on 429
+        if attempt < max_retries - 1:
+            delay = base_delay * (2 ** attempt)
+            _job_log(job, "warn",
+                     f"Download returned no file (possible rate limit) — waiting {delay}s "
+                     f"(retry {attempt + 2}/{max_retries})…", msg_q)
+            time.sleep(delay)
+        else:
+            _job_log(job, "error",
+                     f"Download failed after {max_retries} attempts — check share link is public", msg_q)
+
+    return None, False
 
 
 def _drive_worker(job, urls, msg_q=None):
@@ -1350,6 +1374,9 @@ def _drive_worker(job, urls, msg_q=None):
                     safe    = secure_filename(f["name"])
                     tmp_dir = os.path.join(tmp_base, f"gd_f_{int(time.time())}_{idx}")
                     os.makedirs(tmp_dir, exist_ok=True)
+
+                    if idx > 0:
+                        time.sleep(5)  # throttle between Drive downloads to avoid 429s
 
                     _job_log(job, "log",
                              f"[{idx+1}/{len(new_files)}] Downloading {f['name']} "
