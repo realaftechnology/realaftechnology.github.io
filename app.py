@@ -259,26 +259,59 @@ def semantic_search(query, limit=50, episode_filter=None):
     return [format_result(r, score) for score, r in scored[:limit]]
 
 
+_FTS_STOPWORDS = {
+    "a","an","the","and","or","but","in","on","at","to","for","of","with",
+    "is","was","are","were","be","been","have","has","had","do","does","did",
+    "i","you","he","she","it","we","they","me","him","her","us","them",
+    "what","how","why","when","where","who","which","that","this","these",
+    "those","my","your","his","its","our","their","about","from","into",
+    "by","as","up","out","no","not","so","if","its",
+}
+
+def _fts_terms(query):
+    """Strip punctuation and stopwords, return individual search terms for FTS5."""
+    clean = re.sub(r"[^\w\s]", " ", query)
+    words = [w.lower() for w in clean.split() if len(w) > 2 and w.lower() not in _FTS_STOPWORDS]
+    return words
+
+
 def keyword_search(query, limit=50):
     conn = get_db()
     if not conn: return []
-    try:
-        rows = conn.execute("""
-            SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
-                   e.title AS episode_title, e.filename, e.video_path, fts.rank
-            FROM fts_segments fts
-            JOIN segments s ON s.rowid = fts.rowid
-            JOIN episodes e ON e.id = s.episode_id
-            WHERE fts_segments MATCH ?
-            ORDER BY fts.rank LIMIT ?
-        """, (query, limit)).fetchall()
-    except:
-        rows = conn.execute("""
-            SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
-                   e.title AS episode_title, e.filename, e.video_path, 0 AS rank
-            FROM segments s JOIN episodes e ON e.id = s.episode_id
-            WHERE s.text LIKE ? LIMIT ?
-        """, (f"%{query}%", limit)).fetchall()
+
+    terms = _fts_terms(query)
+
+    # ── Try FTS5 with cleaned terms (OR across all terms) ────────────────────
+    rows = []
+    if terms:
+        fts_query = " OR ".join(terms)
+        try:
+            rows = conn.execute("""
+                SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
+                       e.title AS episode_title, e.filename, e.video_path, fts.rank
+                FROM fts_segments fts
+                JOIN segments s ON s.rowid = fts.rowid
+                JOIN episodes e ON e.id = s.episode_id
+                WHERE fts_segments MATCH ?
+                ORDER BY fts.rank LIMIT ?
+            """, (fts_query, limit)).fetchall()
+        except Exception:
+            rows = []
+
+    # ── LIKE fallback: OR across meaningful individual words ─────────────────
+    if not rows and terms:
+        placeholders = " OR ".join(["s.text LIKE ?"] * len(terms))
+        params = [f"%{t}%" for t in terms] + [limit]
+        try:
+            rows = conn.execute(f"""
+                SELECT s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
+                       e.title AS episode_title, e.filename, e.video_path, 0 AS rank
+                FROM segments s JOIN episodes e ON e.id = s.episode_id
+                WHERE {placeholders} LIMIT ?
+            """, params).fetchall()
+        except Exception:
+            rows = []
+
     conn.close()
     return [format_result(r, 0) for r in rows]
 
@@ -1546,11 +1579,11 @@ def random_quote():
     if not conn:
         return jsonify({"quote": "", "episode": ""}), 200
     try:
-        row = conn.execute(
+        rows = conn.execute(
             "SELECT s.text, e.title FROM segments s "
             "JOIN episodes e ON s.episode_id = e.id "
-            "WHERE length(s.text) > 120 AND length(s.text) < 380 "
-            # Exclude show outros and housekeeping
+            # Segments are ~400 words (~2000 chars); require at least one sentence
+            "WHERE length(s.text) > 150 "
             "AND s.text NOT LIKE '%show the show%' "
             "AND s.text NOT LIKE '%hoe show%' "
             "AND s.text NOT LIKE '%see you tonight%' "
@@ -1575,17 +1608,21 @@ def random_quote():
             "ORDER BY RANDOM() LIMIT 20"
         ).fetchall()
         conn.close()
-        # Prefer segments with more sentence structure (periods mid-text)
-        if row:
+        if rows:
             import random
-            # Score: bonus for internal punctuation (more complete thought)
+            # Score by internal punctuation — more complete thoughts score higher
             def _score(r):
                 t = r["text"]
                 return t.count('.') + t.count('!') + t.count('?')
-            weighted = sorted(row, key=_score, reverse=True)
-            # Pick randomly from top half so we don't always show the longest
-            pick = random.choice(weighted[:max(1, len(weighted)//2)])
-            return jsonify({"quote": pick["text"].strip(), "episode": pick["title"]})
+            weighted = sorted(rows, key=_score, reverse=True)
+            pick = random.choice(weighted[:max(1, len(weighted) // 2)])
+            # Trim to a punchy excerpt: first 3 sentences or 280 chars
+            text = pick["text"].strip()
+            sentences = re.split(r'(?<=[.!?])\s+', text)
+            excerpt = ' '.join(sentences[:3])
+            if len(excerpt) > 320:
+                excerpt = excerpt[:320].rsplit(' ', 1)[0] + '…'
+            return jsonify({"quote": excerpt, "episode": pick["title"]})
         return jsonify({"quote": "", "episode": ""})
     except Exception:
         return jsonify({"quote": "", "episode": ""})
