@@ -1131,7 +1131,15 @@ def upload_video():
     def _transcribe_bg(ep_id, ep_title, vid_path):
         print(f"[upload] {ep_id}: background transcription started", flush=True)
         if not OPENAI_KEY:
-            print(f"[upload] {ep_id}: OPENAI_API_KEY not set — skipping transcription", flush=True)
+            print(f"[upload] {ep_id}: OPENAI_API_KEY not set — marking error", flush=True)
+            try:
+                db = get_db()
+                if db:
+                    db.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (ep_id,))
+                    db.commit()
+                    db.close()
+            except Exception:
+                pass
             return
         audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
         try:
