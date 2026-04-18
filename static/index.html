@@ -1114,9 +1114,107 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── SPLASH SCREEN ── */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  background: #0a0a0a;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transition: opacity 0.5s ease;
+}
+#splash-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.splash-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 76px;
+  line-height: 1;
+  letter-spacing: -1.5px;
+  animation: splash-glow 2.2s ease-in-out infinite;
+}
+.splash-logo span { color: var(--red); }
+@keyframes splash-glow {
+  0%, 100% { text-shadow: 0 0 40px rgba(255,69,58,0.2); }
+  50% { text-shadow: 0 0 70px rgba(255,69,58,0.55), 0 0 120px rgba(255,69,58,0.15); }
+}
+.splash-dots {
+  display: flex;
+  gap: 7px;
+  margin-top: 28px;
+}
+.splash-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: splash-dot-pulse 1.3s ease-in-out infinite;
+  opacity: 0.35;
+}
+.splash-dot:nth-child(2) { animation-delay: 0.22s; }
+.splash-dot:nth-child(3) { animation-delay: 0.44s; }
+@keyframes splash-dot-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+/* ── CARD ENTRANCE ANIMATION ── */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ai-card   { animation: card-enter 0.25s ease both; }
+.chat-item { animation: card-enter 0.22s ease both; }
+
+/* ── TRANSCRIPTS PANEL OPEN ── */
+.transcripts-panel.open { animation: panel-fade 0.2s ease both; }
+@keyframes panel-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── BUTTON POLISH ── */
+.suggestion-chip    { transition: background 0.15s, color 0.15s, transform 0.1s; }
+.suggestion-chip:active  { transform: scale(0.95); }
+.ep-item:active          { opacity: 0.7; }
+.view-ep-btn:active      { transform: scale(0.97); }
+.clip-chip-btn:active    { transform: scale(0.97); }
+.get-summary-btn:active  { transform: scale(0.99); }
+.view-transcripts-btn:active { opacity: 0.7; }
+.sidebar-btn, .upload-btn { transition: color 0.15s, background 0.15s, transform 0.1s; }
+.sidebar-btn:active, .upload-btn:active { transform: scale(0.9); }
+.input-submit { transition: opacity 0.15s, transform 0.12s; }
+.input-submit:hover:not(:disabled) { transform: scale(1.1); }
+.google-btn { transition: opacity 0.15s, transform 0.1s; }
+.google-btn:hover { transform: scale(1.015); opacity: 0.95; }
+.modal-btn { transition: opacity 0.15s, transform 0.1s; }
+.modal-btn:active { transform: scale(0.98); }
+.clip-action-btn { transition: opacity 0.15s, transform 0.1s; }
+.clip-action-btn:hover { opacity: 0.9; }
+.play-btn { transition: background 0.15s, transform 0.1s; }
+.play-btn:active { transform: scale(0.96); }
+.download-btn { transition: background 0.15s, transform 0.1s; }
+.download-btn:active { transform: scale(0.96); }
+.view-clip-btn { transition: opacity 0.15s, transform 0.12s; }
+.view-clip-btn:hover { opacity: 0.9; transform: scale(1.02); }
 </style>
 </head>
 <body>
+
+<!-- SPLASH -->
+<div id="splash-screen">
+  <div class="splash-logo" translate="no"><span>AF</span>BRAIN</div>
+  <div class="splash-dots">
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+  </div>
+</div>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -1276,7 +1374,7 @@ body {
       <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
     </div>
     <div class="sidebar-list" id="episode-list">
-      <div style="padding:20px;color:var(--label-tertiary);font-size:13px">Loading...</div>
+      <div class="loading-row" style="padding:20px"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span></div>
     </div>
   </div>
   <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
@@ -1368,6 +1466,8 @@ function toggleSidebar() {
 }
 
 async function loadEpisodeList() {
+  document.getElementById('episode-list').innerHTML =
+    '<div class="loading-row" style="padding:20px"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span></div>';
   try {
     const res = await fetch('/api/episodes');
     const data = await res.json();
@@ -2936,13 +3036,23 @@ document.body.addEventListener('touchmove', function(e) {
   }, { passive: true });
 })();
 
+function hideSplash() {
+  const splash = document.getElementById('splash-screen');
+  if (!splash) return;
+  splash.classList.add('hidden');
+  setTimeout(() => { splash.remove(); }, 600);
+}
+
 (async function() {
+  const minShow = new Promise(r => setTimeout(r, 600));
   try {
     const res = await fetch('/api/me');
+    await minShow;
     if (res.ok) {
       const user = await res.json();
       const login = document.getElementById('login-screen');
       const main  = document.getElementById('main-screen');
+      hideSplash();
       login.style.display = 'none';
       main.style.display = 'flex';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
@@ -2957,9 +3067,12 @@ document.body.addEventListener('touchmove', function(e) {
       initEmptyState();
       document.getElementById('search-input').focus();
     } else {
+      hideSplash();
       document.getElementById('login-screen').style.opacity = '1';
     }
   } catch(e) {
+    await minShow;
+    hideSplash();
     document.getElementById('login-screen').style.opacity = '1';
   }
 })();
