@@ -160,6 +160,56 @@ def requires_auth(f):
     return decorated
 
 
+# ── ROLE-BASED ACCESS ─────────────────────────────────────────────────────────
+# Roles:
+#   team  — default. All standard features. No voice notes, no dev dashboard.
+#   dev   — everything 'team' gets, plus the dev dashboard and the ability to
+#           manage user roles. Does NOT get voice notes (that's Andy-only).
+#   andy  — voice notes exclusive. All other standard features. No dashboard.
+
+VALID_ROLES = {"team", "dev", "andy"}
+
+
+def get_user_role(email):
+    """Return the role for a given email. Falls back to 'team' if unset."""
+    if not email:
+        return "team"
+    try:
+        conn = get_db()
+        if not conn:
+            return "team"
+        row = conn.execute(
+            "SELECT role FROM users WHERE email = ? COLLATE NOCASE", (email,)
+        ).fetchone()
+        conn.close()
+        if row and row["role"] and row["role"] in VALID_ROLES:
+            return row["role"]
+    except Exception:
+        pass
+    return "team"
+
+
+def current_role():
+    """Role of the currently logged-in user. 'team' if not logged in."""
+    user = session.get("user") or {}
+    return get_user_role(user.get("email"))
+
+
+def requires_role(*roles):
+    """Decorator: 403 unless the session user has one of the given roles."""
+    roles_set = set(roles)
+    def wrap(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not session.get("user"):
+                return jsonify({"error": "unauthorized"}), 401
+            if current_role() not in roles_set:
+                return jsonify({"error": "forbidden"}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return wrap
+
+
 @app.route("/auth/google")
 def google_login():
     if not _google_oauth:
@@ -211,11 +261,31 @@ def google_callback():
     except Exception as e:
         return f"OAuth error: {e}", 400
 
+    # Authlib usually decodes the id_token into token["userinfo"], but on some
+    # environments (different OpenSSL, different Authlib versions, iOS WKWebView)
+    # the field is missing — you get an empty user_info and the access-denied
+    # page shows a blank email. Fall back to explicitly parsing the id_token,
+    # then the /userinfo endpoint, before giving up.
     user_info = token.get("userinfo") or {}
+    if not user_info.get("email"):
+        try:
+            user_info = _google_oauth.parse_id_token(token, nonce=None) or user_info
+        except Exception as e:
+            print(f"[oauth] parse_id_token failed: {e}", flush=True)
+    if not user_info.get("email"):
+        try:
+            resp = _google_oauth.get("https://openidconnect.googleapis.com/v1/userinfo", token=token)
+            if resp is not None and resp.status_code == 200:
+                user_info = resp.json() or user_info
+        except Exception as e:
+            print(f"[oauth] userinfo endpoint failed: {e}", flush=True)
+
     email     = (user_info.get("email") or "").lower()
     google_id = user_info.get("sub", "")
     name      = user_info.get("name", "")
     picture   = user_info.get("picture", "")
+    if not email:
+        print(f"[oauth] no email after all fallbacks — token keys: {list(token.keys())}", flush=True)
 
     # Allowlist check — if neither var is set, all Google accounts are permitted
     allowed = False
@@ -259,7 +329,8 @@ def api_me():
     user = session.get("user")
     if not user:
         return jsonify({"error": "not authenticated"}), 401
-    return jsonify(user)
+    # Merge in the current role so the frontend can gate UI correctly.
+    return jsonify({**user, "role": get_user_role(user.get("email"))})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -305,6 +376,12 @@ def get_db():
         "ALTER TABLE episodes ADD COLUMN transcribe_error TEXT",
         # When the current transcribe job started — used for stuck-row recovery on startup.
         "ALTER TABLE episodes ADD COLUMN transcribe_started_at TEXT",
+        # User role for access control. NULL is treated as 'team' at read time.
+        # Valid values: 'team' (default), 'dev' (admin + dashboard), 'andy' (voice notes).
+        "ALTER TABLE users ADD COLUMN role TEXT",
+        # One-time seed: ensure mattgraham15 stays an admin so the dashboard
+        # is always reachable even on a fresh DB. Idempotent.
+        "UPDATE users SET role = 'dev' WHERE email = 'mattgraham15@gmail.com' AND (role IS NULL OR role = '')",
         # Short-lived OAuth state tokens (used instead of Flask session to support iOS WKWebView)
         """CREATE TABLE IF NOT EXISTS oauth_states (
             state      TEXT PRIMARY KEY,
@@ -1211,6 +1288,10 @@ def upload_video():
     if not file.filename:
         return jsonify({"error": "No file selected"}), 400
 
+    # Voice notes are an Andy-only feature. Block uploads from anyone else.
+    if file.filename.upper().startswith("VOICENOTE_") and current_role() != "andy":
+        return jsonify({"error": "Voice notes are not enabled for your account"}), 403
+
     vdir = videos_dir()
     os.makedirs(vdir, exist_ok=True)
     filename = secure_filename(file.filename) or f"upload_{int(time.time())}.bin"
@@ -1338,6 +1419,9 @@ def spawn_transcription(ep_id, title, video_path, is_voice_note):
 @app.route("/api/voice-notes")
 @requires_auth
 def voice_notes_list():
+    # Only Andy gets to see voice notes — otherwise return empty.
+    if current_role() != "andy":
+        return jsonify({"notes": []})
     conn = get_db()
     if not conn:
         return jsonify({"notes": []})
@@ -1366,14 +1450,69 @@ def voice_notes_list():
     ]})
 
 
+@app.route("/api/admin/users")
+@requires_role("dev")
+def admin_list_users():
+    """List all users with their assigned roles. Dev-only."""
+    conn = get_db()
+    if not conn:
+        return jsonify({"users": []})
+    rows = conn.execute(
+        "SELECT google_id, email, name, picture, first_login, last_login, role "
+        "FROM users ORDER BY last_login DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify({"users": [
+        {
+            "google_id":   r["google_id"],
+            "email":       r["email"],
+            "name":        r["name"],
+            "picture":     r["picture"],
+            "first_login": r["first_login"],
+            "last_login":  r["last_login"],
+            "role":        (r["role"] or "team") if r["role"] in VALID_ROLES else "team",
+        }
+        for r in rows
+    ]})
+
+
+@app.route("/api/admin/users/<google_id>/role", methods=["POST"])
+@requires_role("dev")
+def admin_set_user_role(google_id):
+    """Set a user's role. Dev-only. Body: {"role": "team|dev|andy"}."""
+    data = request.get_json() or {}
+    new_role = (data.get("role") or "").strip().lower()
+    if new_role not in VALID_ROLES:
+        return jsonify({"error": f"Invalid role. Must be one of: {sorted(VALID_ROLES)}"}), 400
+
+    # Defensive: don't allow the currently-logged-in dev to demote themselves —
+    # otherwise they'd instantly lose access to the dashboard on the next click.
+    me = session.get("user") or {}
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    target = conn.execute(
+        "SELECT email FROM users WHERE google_id = ?", (google_id,)
+    ).fetchone()
+    if not target:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if target["email"].lower() == me.get("email", "").lower() and new_role != "dev":
+        conn.close()
+        return jsonify({"error": "You can't remove your own dev role — ask another dev to do it"}), 400
+
+    conn.execute("UPDATE users SET role = ? WHERE google_id = ?", (new_role, google_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "google_id": google_id, "role": new_role})
+
+
 @app.route("/api/voice-note/<episode_id>/retry", methods=["POST"])
-@requires_auth
+@requires_role("andy")
 def retry_voice_note(episode_id):
     """Re-queue transcription for a failed voice note — reuses the existing
     audio file on disk, no re-upload needed. The user hits 'Retry' after
     an earlier attempt failed (e.g. transient Whisper 429)."""
-    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
-        return jsonify({"error": "forbidden"}), 403
     conn = get_db()
     if not conn:
         return jsonify({"error": "No database"}), 500
@@ -1404,10 +1543,8 @@ def retry_voice_note(episode_id):
 
 
 @app.route("/api/voice-note/<episode_id>/rename", methods=["POST"])
-@requires_auth
+@requires_role("andy")
 def rename_voice_note(episode_id):
-    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
-        return jsonify({"error": "forbidden"}), 403
     data = request.get_json() or {}
     new_title = (data.get("title") or "").strip()
     if not new_title:
@@ -1487,6 +1624,9 @@ def _ensure_playback_mp3(src_path):
 @app.route("/api/audio/<episode_id>")
 @requires_auth
 def serve_audio(episode_id):
+    # Voice note audio is private to Andy.
+    if episode_id.startswith("VOICENOTE_") and current_role() != "andy":
+        return jsonify({"error": "forbidden"}), 403
     conn = get_db()
     if not conn:
         return jsonify({"error": "No database"}), 500
@@ -2018,6 +2158,9 @@ def _rebuild_fts(conn):
 @app.route("/api/delete-episode/<episode_id>", methods=["DELETE"])
 @requires_auth
 def delete_episode_endpoint(episode_id):
+    # Voice notes can only be deleted by Andy.
+    if episode_id.startswith("VOICENOTE_") and current_role() != "andy":
+        return jsonify({"error": "forbidden"}), 403
     conn = get_db()
     if not conn:
         return jsonify({"error": "No database"}), 500
@@ -2415,12 +2558,16 @@ def index():
 
 @app.route("/dev")
 def dev_dashboard():
-    # No @requires_auth — the page renders its own login form when unauthenticated
+    # The HTML handles the unauthenticated case. Block authenticated non-dev
+    # users explicitly — the dashboard is dev-only.
+    user = session.get("user")
+    if user and get_user_role(user.get("email")) != "dev":
+        return ("Forbidden — this dashboard is restricted to developer accounts.", 403)
     return send_from_directory("static", "dev.html")
 
 
 @app.route("/api/dev/status")
-@requires_auth
+@requires_role("dev")
 def dev_status():
     """Return system stats + all tracked import jobs."""
     # DB stats

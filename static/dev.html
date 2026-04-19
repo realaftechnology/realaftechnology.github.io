@@ -85,6 +85,19 @@
   /* Section */
   .section { margin-bottom: 28px; }
   .section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+
+  /* Role toggle pills in the Users & Roles section */
+  .role-pills { display: inline-flex; gap: 4px; background: rgba(255,255,255,0.04); padding: 3px; border-radius: 8px; }
+  .role-pill {
+    border: none; background: transparent; color: var(--text3);
+    font: 500 12px/1 inherit; padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .role-pill:hover:not(.active) { color: #fff; background: rgba(255,255,255,0.05); }
+  .role-pill.active { background: #ff453a; color: #fff; }
+  .role-pill:disabled { opacity: 0.5; cursor: not-allowed; }
+  .user-avatar-sm { width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-right: 8px; object-fit: cover; }
+  .you-tag { font-size: 10px; color: #ff453a; background: rgba(255,69,58,0.12); padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; letter-spacing: 0.4px; }
   .badge { background: var(--bg3); color: var(--text2); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px; letter-spacing: 0; }
   .badge.running { background: rgba(255,159,10,0.2); color: var(--orange); }
 
@@ -283,6 +296,22 @@
           <th>When</th>
         </tr></thead>
         <tbody id="search-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Users & roles — dev-only. Toggle anyone between Team / Dev / Andy. -->
+  <div class="section">
+    <div class="section-title">Users &amp; Roles <span class="badge" id="users-badge"></span></div>
+    <div class="card-wrap">
+      <table class="ep-table">
+        <thead><tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Last login</th>
+          <th style="text-align:right">Role</th>
+        </tr></thead>
+        <tbody id="users-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -737,6 +766,82 @@ fetch('/api/dev/status').then(r => {
 }).catch(() => refresh());
 
 setInterval(refresh, 4000);
+
+// ── Users & Roles ───────────────────────────────────────────────────────────
+let _meEmail = '';
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(m => { if (m) _meEmail = (m.email || '').toLowerCase(); });
+
+function _fmtDate(s) {
+  if (!s) return '—';
+  try {
+    const d = new Date(s.replace(' ', 'T') + 'Z');
+    if (isNaN(d)) return s;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return s; }
+}
+
+async function loadUsers() {
+  try {
+    const res = await fetch('/api/admin/users');
+    if (!res.ok) return;
+    const data = await res.json();
+    const users = data.users || [];
+    const badge = document.getElementById('users-badge');
+    if (badge) badge.textContent = users.length ? String(users.length) : '';
+    const tbody = document.getElementById('users-tbody');
+    if (!tbody) return;
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No users yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => {
+      const isMe = (u.email || '').toLowerCase() === _meEmail;
+      const safeEmail = (u.email || '').replace(/</g, '&lt;');
+      const safeName  = (u.name  || '').replace(/</g, '&lt;');
+      const avatar    = u.picture
+        ? `<img class="user-avatar-sm" src="${u.picture.replace(/"/g,'&quot;')}" alt="" onerror="this.style.display='none'">`
+        : '';
+      const meTag = isMe ? '<span class="you-tag">YOU</span>' : '';
+      const pill = (role, label) => {
+        const active = u.role === role;
+        // A dev can't demote themselves — prevents locking yourself out.
+        const disabled = isMe && u.role === 'dev' && role !== 'dev';
+        return `<button class="role-pill${active ? ' active' : ''}"
+          ${disabled ? 'disabled' : ''}
+          onclick="setUserRole('${u.google_id}','${role}')">${label}</button>`;
+      };
+      return `<tr>
+        <td>${avatar}${safeName || '—'}${meTag}</td>
+        <td style="color:var(--text3);font-size:12px">${safeEmail}</td>
+        <td style="color:var(--text3);font-size:12px">${_fmtDate(u.last_login)}</td>
+        <td style="text-align:right">
+          <div class="role-pills">
+            ${pill('team','Team')}${pill('dev','Dev')}${pill('andy','Andy')}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) { /* ignore */ }
+}
+
+async function setUserRole(googleId, role) {
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(googleId)}/role`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ role })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Update failed');
+    loadUsers();
+  } catch (e) {
+    alert('Role update failed: ' + e.message);
+  }
+}
+
+// Initial load + slow refresh
+loadUsers();
+setInterval(loadUsers, 10000);
 
 async function purgeNoVideo() {
   const btn = document.getElementById('purge-btn');
