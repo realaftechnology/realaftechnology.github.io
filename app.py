@@ -1497,9 +1497,9 @@ def admin_set_user_role(google_id):
     if not target:
         conn.close()
         return jsonify({"error": "User not found"}), 404
-    if target["email"].lower() == me.get("email", "").lower() and new_role != "dev":
+    if target["email"].lower() == me.get("email", "").lower() and new_role == "team":
         conn.close()
-        return jsonify({"error": "You can't remove your own dev role — ask another dev to do it"}), 400
+        return jsonify({"error": "You can't demote yourself to team — ask another dev to do it"}), 400
 
     conn.execute("UPDATE users SET role = ? WHERE google_id = ?", (new_role, google_id))
     conn.commit()
