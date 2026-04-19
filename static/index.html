@@ -1239,36 +1239,42 @@ body {
   opacity: 0;
   pointer-events: none;
 }
-.splash-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 76px;
-  line-height: 1;
-  letter-spacing: -1.5px;
-  animation: splash-glow 2.2s ease-in-out infinite;
+/* AFBrain synapse loader — replaces the old text+dots splash. */
+.afbrain-loader {
+  --size: 360px;
+  --loop: 1.2s;
+  width: var(--size);
+  height: var(--size);
+  position: relative;
+  display: grid;
+  place-items: center;
 }
-.splash-logo span { color: var(--red); }
-@keyframes splash-glow {
-  0%, 100% { text-shadow: 0 0 40px rgba(255,69,58,0.2); }
-  50% { text-shadow: 0 0 70px rgba(255,69,58,0.55), 0 0 120px rgba(255,69,58,0.15); }
-}
-.splash-dots {
-  display: flex;
-  gap: 7px;
-  margin-top: 28px;
-}
-.splash-dot {
-  width: 6px;
-  height: 6px;
+.afbrain-loader .aura {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  background: var(--red);
-  animation: splash-dot-pulse 1.3s ease-in-out infinite;
-  opacity: 0.35;
+  background: radial-gradient(circle,
+    rgba(255, 40, 40, 0.55) 0%,
+    rgba(255, 20, 20, 0.28) 35%,
+    rgba(255, 0, 0, 0.0) 70%);
+  filter: blur(14px);
+  mix-blend-mode: screen;
+  animation: afbrain-aura-pulse var(--loop) ease-in-out infinite;
+  pointer-events: none;
 }
-.splash-dot:nth-child(2) { animation-delay: 0.22s; }
-.splash-dot:nth-child(3) { animation-delay: 0.44s; }
-@keyframes splash-dot-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.4); }
+@keyframes afbrain-aura-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.9); }
+  50%      { opacity: 1;    transform: scale(1.05); }
+}
+.afbrain-loader svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  animation: afbrain-throb var(--loop) ease-in-out infinite;
+}
+@keyframes afbrain-throb {
+  0%, 100% { transform: scale(1);    filter: brightness(1)    saturate(1.1); }
+  50%      { transform: scale(1.02); filter: brightness(1.25) saturate(1.3); }
 }
 
 /* ── CARD ENTRANCE ANIMATION ── */
@@ -1314,13 +1320,113 @@ body {
 </head>
 <body>
 
-<!-- SPLASH -->
+<!-- SPLASH — AFBrain synapse loader -->
 <div id="splash-screen">
-  <div class="splash-logo" translate="no"><span>AF</span>BRAIN</div>
-  <div class="splash-dots">
-    <div class="splash-dot"></div>
-    <div class="splash-dot"></div>
-    <div class="splash-dot"></div>
+  <div class="afbrain-loader">
+    <div class="aura"></div>
+    <svg viewBox="0 0 708 717" xmlns="http://www.w3.org/2000/svg" aria-label="AFBrain loading">
+      <defs>
+        <filter id="afbrain-glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="4" result="b1"/>
+          <feGaussianBlur stdDeviation="10" in="SourceGraphic" result="b2"/>
+          <feMerge>
+            <feMergeNode in="b2"/>
+            <feMergeNode in="b1"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <path id="afb-p1" d="M 140 110 C  70 200,  50 340, 100 440 C 150 540, 240 610, 310 620" fill="none"/>
+        <path id="afb-p2" d="M 568 110 C 638 200, 658 340, 608 440 C 558 540, 468 610, 398 620" fill="none"/>
+        <path id="afb-p3" d="M 230 120 C 200 200, 190 300, 220 390 C 250 480, 290 550, 320 610" fill="none"/>
+        <path id="afb-p4" d="M 478 120 C 508 200, 518 300, 488 390 C 458 480, 418 550, 388 610" fill="none"/>
+        <path id="afb-p5" d="M 120 200 C 180 260, 220 330, 240 400" fill="none"/>
+        <path id="afb-p6" d="M 588 200 C 528 260, 488 330, 468 400" fill="none"/>
+        <path id="afb-p7" d="M 180 520 C 260 560, 448 560, 528 520" fill="none"/>
+      </defs>
+
+      <!-- Base: the brain PNG -->
+      <image href="/static/loading-screen-logo.png"
+             x="0" y="0" width="708" height="717"
+             preserveAspectRatio="xMidYMid meet"
+             style="filter: drop-shadow(0 0 16px rgba(255,40,40,0.55));"/>
+
+      <!-- Faint synapse trails -->
+      <g opacity="0.22" stroke="#ff5555" stroke-width="1.8" fill="none" filter="url(#afbrain-glow)">
+        <use href="#afb-p1"/><use href="#afb-p2"/><use href="#afb-p3"/>
+        <use href="#afb-p4"/><use href="#afb-p5"/><use href="#afb-p6"/><use href="#afb-p7"/>
+      </g>
+
+      <!-- Firing sparks -->
+      <g filter="url(#afbrain-glow)">
+        <circle r="5" fill="#fff">
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin="0s"><mpath href="#afb-p1"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0s"/>
+          <animate attributeName="r" values="3;6;4;0" keyTimes="0;0.3;0.7;1" dur="1.2s" repeatCount="indefinite" begin="0s"/>
+        </circle>
+        <circle r="5" fill="#ffdada">
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin="0.4s"><mpath href="#afb-p2"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0.4s"/>
+          <animate attributeName="r" values="3;6;4;0" keyTimes="0;0.3;0.7;1" dur="1.2s" repeatCount="indefinite" begin="0.4s"/>
+        </circle>
+        <circle r="4" fill="#fff">
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin="0.2s"><mpath href="#afb-p3"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0.2s"/>
+        </circle>
+        <circle r="4" fill="#ffecec">
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin="0.6s"><mpath href="#afb-p4"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0.6s"/>
+        </circle>
+        <circle r="3.5" fill="#fff">
+          <animateMotion dur="1s" repeatCount="indefinite" begin="0.75s"><mpath href="#afb-p5"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1s" repeatCount="indefinite" begin="0.75s"/>
+        </circle>
+        <circle r="3.5" fill="#fff">
+          <animateMotion dur="1s" repeatCount="indefinite" begin="0.3s"><mpath href="#afb-p6"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1s" repeatCount="indefinite" begin="0.3s"/>
+        </circle>
+        <circle r="3.5" fill="#ffdada">
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin="0.5s"><mpath href="#afb-p7"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0.5s"/>
+        </circle>
+      </g>
+
+      <!-- Endpoint flashes at brain landmarks -->
+      <g filter="url(#afbrain-glow)">
+        <circle cx="354" cy="60" r="0" fill="#fff">
+          <animate attributeName="r" values="0;14;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.05s"/>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.05s"/>
+        </circle>
+        <circle cx="354" cy="650" r="0" fill="#ffdada">
+          <animate attributeName="r" values="0;16;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.6s"/>
+          <animate attributeName="opacity" values="0;0.9;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.6s"/>
+        </circle>
+        <circle cx="45"  cy="360" r="0" fill="#fff">
+          <animate attributeName="r" values="0;13;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.3s"/>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.3s"/>
+        </circle>
+        <circle cx="663" cy="360" r="0" fill="#fff">
+          <animate attributeName="r" values="0;13;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.8s"/>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.8s"/>
+        </circle>
+        <circle cx="280" cy="160" r="0" fill="#fff">
+          <animate attributeName="r" values="0;10;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.15s"/>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.15s"/>
+        </circle>
+        <circle cx="428" cy="160" r="0" fill="#fff">
+          <animate attributeName="r" values="0;10;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.55s"/>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.5" dur="1.2s" repeatCount="indefinite" begin="0.55s"/>
+        </circle>
+        <circle cx="354" cy="500" r="0" fill="#ff5050">
+          <animate attributeName="r" values="0;18;0" keyTimes="0;0.3;0.7" dur="1.2s" repeatCount="indefinite" begin="0.1s"/>
+          <animate attributeName="opacity" values="0;0.85;0" keyTimes="0;0.3;0.7" dur="1.2s" repeatCount="indefinite" begin="0.1s"/>
+        </circle>
+        <!-- Center heart pulse — signature beat -->
+        <circle cx="354" cy="340" r="0" fill="#ff4040">
+          <animate attributeName="r" values="0;30;0" keyTimes="0;0.4;0.9" dur="1.2s" repeatCount="indefinite" begin="0s"/>
+          <animate attributeName="opacity" values="0;0.7;0" keyTimes="0;0.4;0.9" dur="1.2s" repeatCount="indefinite" begin="0s"/>
+        </circle>
+      </g>
+    </svg>
   </div>
 </div>
 
