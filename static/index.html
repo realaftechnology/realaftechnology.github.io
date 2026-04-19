@@ -2562,6 +2562,12 @@ function closeVideoPanel() {
 async function openVideoEpisode(videoFilename, title, episodeId) {
   toggleSidebar();
 
+  // Empty-state affordances (rotating quote + suggestion chips) aren't
+  // needed once the user has landed on a specific episode. Hide them.
+  clearInterval(_quoteTimer);
+  const _sb1 = document.getElementById('suggestion-bar');
+  if (_sb1) _sb1.style.display = 'none';
+
   currentQuery = title;
   chatHistory = [];
   hasResults = true;
@@ -3393,6 +3399,13 @@ async function loadVoiceNotes() {
 async function openVoiceNote(encodedId, safeTitle) {
   const id = decodeURIComponent(encodedId);
   toggleSidebar();
+
+  // Same as openVideoEpisode — clear the empty-state quote + suggestion chips
+  // since the user has picked a specific voice note to work with.
+  clearInterval(_quoteTimer);
+  const _sb2 = document.getElementById('suggestion-bar');
+  if (_sb2) _sb2.style.display = 'none';
+
   lockedEpisode = id;
   chatHistory = [];
   currentVideoContext = null;
