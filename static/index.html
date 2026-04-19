@@ -384,55 +384,7 @@ body {
 .scroll-area::-webkit-scrollbar { width: 0; }
 
 /* ── EMPTY / QUOTE ── */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px 20px;
-  /* Press-and-hold target — suppress iOS text selection / magnifier on long press */
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
-  /* 'none' stops iOS from hijacking the hold to start a scroll. Empty state
-     has no scrollable content so we lose nothing. */
-  touch-action: none;
-  min-height: 60vh;   /* big, forgiving hold zone even when the quote is short */
-}
-.empty-state.holding {
-  /* Slight feedback while the hold threshold is pending */
-  transition: background 0.15s ease;
-}
-.hold-hint {
-  margin-top: 32px;
-  font-size: 12px;
-  color: var(--label-tertiary);
-  opacity: 0.55;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  pointer-events: none;
-}
-
-/* Perimeter glow shown while the user is holding to record a voice note.
-   Fixed-positioned overlay, non-interactive, pulses red. */
-#record-glow {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  z-index: 900;
-  box-shadow:
-    inset 0 0 90px 10px rgba(255, 40, 40, 0.55),
-    inset 0 0 30px 2px rgba(255, 80, 80, 0.85);
-  transition: opacity 0.25s ease;
-  border-radius: 0;
-}
-#record-glow.active {
-  opacity: 1;
-  animation: record-glow-pulse 1.3s ease-in-out infinite;
-}
-@keyframes record-glow-pulse {
-  0%, 100% { filter: brightness(0.85); }
-  50%      { filter: brightness(1.3); }
-}
+.empty-state { text-align: center; padding: 60px 20px 20px; }
 .quote-block {
   min-height: 120px;
   display: flex;
@@ -1680,15 +1632,10 @@ body {
           <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
           <div class="quote-ep" id="quote-ep"></div>
         </div>
-        <div class="hold-hint" id="hold-hint">Hold anywhere to record</div>
       </div>
     </div>
     <div class="scroll-bottom-pad"></div>
   </div>
-
-  <!-- Perimeter glow for press-and-hold voice recording. Non-interactive
-       overlay; .active adds the red pulse while recording. -->
-  <div id="record-glow"></div>
 
   <!-- Suggestion chips: horizontal scroll bar anchored above input -->
   <div id="suggestion-bar"></div>
@@ -3753,81 +3700,12 @@ async function toggleVoiceRecording() {
     _voiceChunks = [];
 
     document.getElementById('voice-save-row').style.display = 'flex';
-    _setRecordGlow(false);
   };
 
   _voiceRecorder.start();
   _voiceActive = true;
   _startWaveform(stream);
   _voiceStatus('Recording\u2026');
-  _setRecordGlow(true);
-}
-
-// ── HOLD-TO-RECORD ───────────────────────────────────────────────────────────
-// Andy presses and holds anywhere on the empty state to record a voice note.
-// Perimeter glow pulses red while holding. Release to stop — the usual
-// save/discard row takes over from there. Short taps (< 250ms) are ignored.
-
-let _holdTimer = null;     // pending hold → recording timer
-let _holdStartedRec = false; // true once threshold passed and recording started
-const HOLD_THRESHOLD_MS = 250;
-
-function _setRecordGlow(on) {
-  const glow = document.getElementById('record-glow');
-  if (!glow) return;
-  glow.classList.toggle('active', !!on);
-}
-
-async function _holdStartRecording() {
-  // Only go if we're not already recording from elsewhere.
-  if (_voiceActive || _pendingVoiceBlob) return;
-  _holdStartedRec = true;
-  await toggleVoiceRecording();
-}
-
-function _holdPointerDown(e) {
-  // Bail if we're already recording, there's a pending blob waiting for
-  // save/discard, or we're not on the empty-state view (results are showing).
-  if (_voiceActive || _pendingVoiceBlob) return;
-  const empty = document.getElementById('empty-state');
-  if (!empty) return;
-  // Let interactive children handle their own events.
-  const t = e.target;
-  if (t && t.closest && t.closest('button, a, input, textarea, .vn-action-btn')) return;
-
-  _holdStartedRec = false;
-  if (_holdTimer) clearTimeout(_holdTimer);
-  _holdTimer = setTimeout(() => {
-    _holdTimer = null;
-    _holdStartRecording();
-  }, HOLD_THRESHOLD_MS);
-  empty.classList.add('holding');
-}
-
-function _holdPointerUp() {
-  if (_holdTimer) { clearTimeout(_holdTimer); _holdTimer = null; }
-  const empty = document.getElementById('empty-state');
-  if (empty) empty.classList.remove('holding');
-  if (_holdStartedRec && _voiceActive) {
-    // Stop the recording — onstop handler will show save/discard row.
-    try { _voiceRecorder.stop(); } catch(_) {}
-  }
-  _holdStartedRec = false;
-}
-
-function _attachHoldToRecord() {
-  const area = document.getElementById('results-area');
-  if (!area) return;
-  // Pointer events cover mouse + touch + pen uniformly.
-  area.addEventListener('pointerdown', _holdPointerDown);
-  // pointerup can fire outside the original target if the user slides finger off.
-  // Use document-level listener to catch it anywhere.
-  document.addEventListener('pointerup',     _holdPointerUp);
-  document.addEventListener('pointercancel', _holdPointerUp);
-  // If the user opens the context menu via long-press, bail without recording.
-  area.addEventListener('contextmenu', e => {
-    if (_voiceActive || _holdStartedRec) e.preventDefault();
-  });
 }
 
 function hideSplash() {
@@ -3858,14 +3736,9 @@ function hideSplash() {
         btn.style.display = 'flex';
         btn.title = `Signed in as ${user.email}\nClick to sign out`;
       }
-      // Hold-to-record for authorized user. Replaces the old record button —
-      // Andy presses and holds anywhere on the empty state to record.
+      // Show voice record button in the input bar for the authorized user.
       if (user.email === 'mattgraham15@gmail.com') {
-        _attachHoldToRecord();
-      } else {
-        // Non-owner users don't get the hold UI or the hint.
-        const hint = document.getElementById('hold-hint');
-        if (hint) hint.style.display = 'none';
+        document.getElementById('voice-btn').style.display = 'flex';
       }
       initEmptyState();
       loadEpisodeList();
