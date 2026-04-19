@@ -213,6 +213,19 @@
     font-family: var(--mono); font-size: 12px; line-height: 1.6;
     color: var(--text2); display: none;
   }
+
+  /* Users & Roles — mobile card layout */
+  .users-mobile-cards { display: none; }
+  @media (max-width: 639px) {
+    .users-table-wrap { display: none; }
+    .users-mobile-cards { display: flex; flex-direction: column; gap: 10px; }
+  }
+  .user-card { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; }
+  .user-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .user-card-name { font-size: 14px; font-weight: 500; }
+  .user-card-meta { font-size: 12px; color: var(--text3); padding-left: 32px; margin-bottom: 12px; line-height: 1.6; }
+  .user-card .role-pills { display: flex; width: 100%; }
+  .user-card .role-pill { flex: 1; min-height: 36px; font-size: 13px; padding: 8px 4px; }
 </style>
 </head>
 <body>
@@ -303,7 +316,7 @@
   <!-- Users & roles — dev-only. Toggle anyone between Team / Dev / Andy. -->
   <div class="section">
     <div class="section-title">Users &amp; Roles <span class="badge" id="users-badge"></span></div>
-    <div class="card-wrap">
+    <div class="card-wrap users-table-wrap">
       <table class="ep-table">
         <thead><tr>
           <th>User</th>
@@ -314,6 +327,7 @@
         <tbody id="users-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
+    <div class="users-mobile-cards" id="users-cards"></div>
   </div>
 
   <!-- Drive Import -->
@@ -789,12 +803,14 @@ async function loadUsers() {
     const badge = document.getElementById('users-badge');
     if (badge) badge.textContent = users.length ? String(users.length) : '';
     const tbody = document.getElementById('users-tbody');
+    const cards = document.getElementById('users-cards');
     if (!tbody) return;
     if (!users.length) {
       tbody.innerHTML = '<tr><td colspan="4" class="empty">No users yet</td></tr>';
+      if (cards) cards.innerHTML = '';
       return;
     }
-    tbody.innerHTML = users.map(u => {
+    const rows = users.map(u => {
       const isMe = (u.email || '').toLowerCase() === _meEmail;
       const safeEmail = (u.email || '').replace(/</g, '&lt;');
       const safeName  = (u.name  || '').replace(/</g, '&lt;');
@@ -810,17 +826,28 @@ async function loadUsers() {
           ${disabled ? 'disabled' : ''}
           onclick="setUserRole('${u.google_id}','${role}')">${label}</button>`;
       };
-      return `<tr>
-        <td>${avatar}${safeName || '—'}${meTag}</td>
-        <td style="color:var(--text3);font-size:12px">${safeEmail}</td>
-        <td style="color:var(--text3);font-size:12px">${_fmtDate(u.last_login)}</td>
-        <td style="text-align:right">
+      return {
+        row: `<tr>
+          <td>${avatar}${safeName || '—'}${meTag}</td>
+          <td style="color:var(--text3);font-size:12px">${safeEmail}</td>
+          <td style="color:var(--text3);font-size:12px">${_fmtDate(u.last_login)}</td>
+          <td style="text-align:right">
+            <div class="role-pills">
+              ${pill('team','Team')}${pill('dev','Dev')}${pill('andy','Andy')}
+            </div>
+          </td>
+        </tr>`,
+        card: `<div class="user-card">
+          <div class="user-card-top">${avatar}<span class="user-card-name">${safeName || '—'}</span>${meTag}</div>
+          <div class="user-card-meta">${safeEmail}<br>Last login: ${_fmtDate(u.last_login)}</div>
           <div class="role-pills">
             ${pill('team','Team')}${pill('dev','Dev')}${pill('andy','Andy')}
           </div>
-        </td>
-      </tr>`;
-    }).join('');
+        </div>`
+      };
+    });
+    tbody.innerHTML = rows.map(r => r.row).join('');
+    if (cards) cards.innerHTML = rows.map(r => r.card).join('');
   } catch (e) { /* ignore */ }
 }
 
