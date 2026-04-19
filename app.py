@@ -1306,6 +1306,14 @@ def _transcribe_bg(ep_id, ep_title, vid_path, voice_note):
         db.commit()
         db.close()
         print(f"[transcribe] {ep_id}: transcription done", flush=True)
+
+        # For voice notes especially, pre-generate the mp3 playback copy so
+        # the first tap on play doesn't wait on ffmpeg. Fire-and-forget —
+        # if this fails, serve_audio will lazy-transcode on demand instead.
+        try:
+            _ensure_playback_mp3(vid_path)
+        except Exception as e:
+            print(f"[transcribe] {ep_id}: playback mp3 pre-gen skipped: {e}", flush=True)
     except Exception as exc:
         print(f"[transcribe] {ep_id}: transcription failed: {exc}", flush=True)
         traceback.print_exc()
@@ -1440,6 +1448,42 @@ def rename_voice_note(episode_id):
     return jsonify({"ok": True})
 
 
+def _playback_path_for(video_path):
+    """Companion mp3 path for a given source audio/video file."""
+    return video_path.rsplit(".", 1)[0] + "_playback.mp3"
+
+
+def _ensure_playback_mp3(src_path):
+    """Make sure an mp3 playback copy exists for src_path. Returns the mp3
+    path on success, or None if transcoding failed.
+
+    MediaRecorder in browsers produces either webm/opus (Chrome, Android)
+    or fragmented mp4 without a leading moov atom (iOS Safari). Neither
+    plays reliably in the HTMLAudioElement across browsers — iOS Safari
+    can't play webm at all, and its own fragmented mp4 output won't
+    play back either until the moov is relocated. An mp3 at ~128kbps
+    sidesteps all of this and is tiny for voice."""
+    dst = _playback_path_for(src_path)
+    if os.path.exists(dst) and os.path.getsize(dst) > 0:
+        return dst
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", src_path, "-vn", "-ac", "1",
+             "-b:a", "128k", "-f", "mp3", "-y", dst],
+            capture_output=True, timeout=90
+        )
+        if result.returncode != 0:
+            print(f"[playback] ffmpeg failed: {result.stderr.decode()[:200]}", flush=True)
+            return None
+        return dst
+    except FileNotFoundError:
+        print("[playback] ffmpeg not installed — can't transcode", flush=True)
+        return None
+    except Exception as e:
+        print(f"[playback] transcode error: {e}", flush=True)
+        return None
+
+
 @app.route("/api/audio/<episode_id>")
 @requires_auth
 def serve_audio(episode_id):
@@ -1450,14 +1494,22 @@ def serve_audio(episode_id):
     conn.close()
     if not ep or not ep["video_path"]:
         return jsonify({"error": "Not found"}), 404
-    audio_path = ep["video_path"]
-    if not os.path.exists(audio_path):
+    src_path = ep["video_path"]
+    if not os.path.exists(src_path):
         return jsonify({"error": "File not found on disk"}), 404
-    ext = os.path.splitext(audio_path)[1].lower()
+
+    # Prefer the mp3 playback copy for broad browser compat (esp. iOS Safari).
+    # Lazily transcode on first play for recordings that predate this change.
+    playback = _ensure_playback_mp3(src_path)
+    if playback and os.path.exists(playback):
+        return send_file(playback, mimetype="audio/mpeg", conditional=True)
+
+    # Fallback: original file with best-effort mime.
+    ext = os.path.splitext(src_path)[1].lower()
     mime_map = {".webm": "audio/webm", ".mp4": "audio/mp4", ".mp3": "audio/mpeg",
                 ".m4a": "audio/mp4", ".wav": "audio/wav", ".ogg": "audio/ogg"}
     mime = mime_map.get(ext, "audio/mpeg")
-    return send_file(audio_path, mimetype=mime, conditional=True)
+    return send_file(src_path, mimetype=mime, conditional=True)
 
 
 @app.route("/api/drive-sources", methods=["GET"])
@@ -1982,12 +2034,14 @@ def delete_episode_endpoint(episode_id):
     conn.commit()
     conn.close()
 
-    # Delete video file
-    if ep and ep["video_path"] and os.path.exists(ep["video_path"]):
-        try:
-            os.remove(ep["video_path"])
-        except Exception:
-            pass
+    # Delete video file + any mp3 playback copy we generated for it
+    if ep and ep["video_path"]:
+        for p in (ep["video_path"], _playback_path_for(ep["video_path"])):
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
 
     return jsonify({"ok": True})
 
