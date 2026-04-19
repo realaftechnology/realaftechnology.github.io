@@ -3317,11 +3317,17 @@ function renderVoiceNotes(notes) {
   }
   list.innerHTML = notes.map(n => {
     const displayTitle = n.title.startsWith('VOICENOTE_') ? _formatVNTitle(n.title) : n.title.replace(/</g, '&lt;');
-    let metaText, metaClass;
+    let metaText, metaClass, metaTitle = '';
     if (n.status === 'transcribing') {
       metaText = 'Transcribing\u2026'; metaClass = 'pending';
     } else if (n.status === 'error') {
-      metaText = 'Transcription failed'; metaClass = 'error';
+      // Surface the specific error message so the user knows what went wrong
+      const errMsg = (n.error || '').trim();
+      metaText = errMsg
+        ? 'Failed: ' + errMsg.replace(/</g, '&lt;').slice(0, 80) + (errMsg.length > 80 ? '\u2026' : '')
+        : 'Transcription failed';
+      metaClass = 'error';
+      metaTitle = errMsg; // full error as hover tooltip
     } else if (n.excerpt) {
       metaText = n.excerpt.replace(/</g, '&lt;'); metaClass = '';
     } else {
@@ -3330,9 +3336,10 @@ function renderVoiceNotes(notes) {
     const eid = encodeURIComponent(n.id);
     const safeTitle = n.title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const clickable = (n.status === 'done' || n.status === null);
+    const titleAttr = metaTitle ? ` title="${metaTitle.replace(/"/g, '&quot;')}"` : '';
     return `<div class="vn-item" ${clickable ? `onclick="openVoiceNote('${eid}','${safeTitle}')"` : ''}>
       <div class="vn-item-title">${displayTitle}</div>
-      <div class="vn-item-meta ${metaClass}">${metaText}</div>
+      <div class="vn-item-meta ${metaClass}"${titleAttr}>${metaText}</div>
       <div class="vn-item-actions">
         <button class="vn-action-btn" onclick="renameVoiceNote('${eid}','${safeTitle}');event.stopPropagation()">Rename</button>
         <button class="vn-action-btn del" onclick="deleteVoiceNote('${eid}','${displayTitle}');event.stopPropagation()">Delete</button>
@@ -3341,11 +3348,24 @@ function renderVoiceNotes(notes) {
   }).join('');
 }
 
+// Poll the voice-notes endpoint while any note is mid-transcription so the UI
+// transitions from 'Transcribing…' to 'done'/'error' without requiring reload.
+let _vnPollTimer = null;
+function _scheduleVoiceNotePoll(notes) {
+  if (_vnPollTimer) { clearTimeout(_vnPollTimer); _vnPollTimer = null; }
+  const stillWorking = (notes || []).some(n => n.status === 'transcribing');
+  if (stillWorking) {
+    _vnPollTimer = setTimeout(loadVoiceNotes, 3000);
+  }
+}
+
 async function loadVoiceNotes() {
   try {
     const res  = await fetch('/api/voice-notes');
     const data = await res.json();
-    renderVoiceNotes(data.notes || []);
+    const notes = data.notes || [];
+    renderVoiceNotes(notes);
+    _scheduleVoiceNotePoll(notes);
   } catch(e) {
     document.getElementById('vn-list').innerHTML =
       '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">Failed to load.</div>';

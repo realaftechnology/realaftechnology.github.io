@@ -301,6 +301,10 @@ def get_db():
             last_login  TEXT DEFAULT (datetime('now'))
         )""",
         "ALTER TABLE episodes ADD COLUMN transcribe_status TEXT",
+        # Error message when transcription fails — shown in UI so the user isn't left guessing.
+        "ALTER TABLE episodes ADD COLUMN transcribe_error TEXT",
+        # When the current transcribe job started — used for stuck-row recovery on startup.
+        "ALTER TABLE episodes ADD COLUMN transcribe_started_at TEXT",
         # Short-lived OAuth state tokens (used instead of Flask session to support iOS WKWebView)
         """CREATE TABLE IF NOT EXISTS oauth_states (
             state      TEXT PRIMARY KEY,
@@ -313,6 +317,46 @@ def get_db():
         except Exception:
             pass
     return conn
+
+
+def recover_stuck_transcriptions():
+    """On worker startup, mark rows stuck in 'transcribing' state older than 10 min
+    as 'error'. Worker restarts kill the daemon thread, otherwise the row stays
+    stuck forever and the sidebar shows a permanent 'transcribing…' state."""
+    try:
+        conn = get_db()
+        if not conn:
+            return
+        cutoff = datetime.now().timestamp() - 600  # 10 minutes
+        rows = conn.execute(
+            "SELECT id, transcribe_started_at FROM episodes "
+            "WHERE transcribe_status = 'transcribing'"
+        ).fetchall()
+        stuck = []
+        for r in rows:
+            ts = r["transcribe_started_at"]
+            if not ts:
+                stuck.append(r["id"])
+                continue
+            try:
+                started = datetime.fromisoformat(ts).timestamp()
+                if started < cutoff:
+                    stuck.append(r["id"])
+            except Exception:
+                stuck.append(r["id"])
+        for ep_id in stuck:
+            conn.execute(
+                "UPDATE episodes SET transcribe_status = 'error', "
+                "transcribe_error = 'Transcription interrupted — worker restarted. Re-record to try again.' "
+                "WHERE id = ?",
+                (ep_id,)
+            )
+        if stuck:
+            conn.commit()
+            print(f"[recover] marked {len(stuck)} stuck transcription(s) as error", flush=True)
+        conn.close()
+    except Exception as e:
+        print(f"[recover] failed: {e}", flush=True)
 
 
 def get_episode_count():
@@ -908,8 +952,12 @@ def extract_audio(video_path, audio_path):
         return False  # ffmpeg not installed — caller will send video directly
 
 
-def whisper_transcribe(audio_path):
-    """Transcribe a single audio file via OpenAI Whisper API. Must be ≤25MB."""
+def whisper_transcribe(audio_path, fast_retry=False):
+    """Transcribe a single audio file via OpenAI Whisper API. Must be ≤25MB.
+
+    fast_retry=True uses short backoff (good for voice notes where the user is
+    watching a sidebar and needs quick feedback). Default backoff is patient
+    (good for long podcast imports that can tolerate rate-limit waits)."""
     if not OPENAI_KEY:
         raise RuntimeError("OPENAI_API_KEY not set — cannot transcribe")
 
@@ -933,8 +981,12 @@ def whisper_transcribe(audio_path):
     body += part("response_format", "verbose_json")
     body += f"--{boundary}--\r\n".encode()
 
-    max_retries = 5  # attempts: delays 15, 30, 60, 120s on 429
-    base_delay  = 15
+    # Voice notes: fail fast so the user sees a clear error in seconds, not minutes.
+    # Podcast imports: more patient so occasional rate limits don't kill the job.
+    if fast_retry:
+        max_retries, base_delay, req_timeout = 3, 3, 60   # 3s, 6s, 12s  → ~21s max
+    else:
+        max_retries, base_delay, req_timeout = 5, 15, 300 # 15s, 30s, 60s, 120s on 429
     for attempt in range(max_retries):
         # Fresh Request each attempt so urllib doesn't reuse a stale connection
         req = urllib.request.Request(
@@ -943,18 +995,31 @@ def whisper_transcribe(audio_path):
             headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": f"multipart/form-data; boundary={boundary}"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
+            with urllib.request.urlopen(req, timeout=req_timeout) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
+            # Read error body for a useful message before we close it
+            try:
+                err_body = e.read().decode("utf-8", errors="replace")[:300]
+            except Exception:
+                err_body = ""
             if e.code == 429 and attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt)
                 print(f"[whisper] rate-limited (429) — waiting {delay}s (retry {attempt + 2}/{max_retries})",
                       flush=True)
-                e.close()  # release the error response before sleeping
+                e.close()
                 time.sleep(delay)
                 continue
-            raise RuntimeError(f"Whisper API error {e.code}: {e.reason}")
-    raise RuntimeError("Whisper API: max retries exceeded after rate limiting")
+            raise RuntimeError(f"Whisper API error {e.code}: {e.reason}. {err_body}")
+        except (urllib.error.URLError, TimeoutError) as e:
+            # Network-level failure — retry briefly (fast path) or let podcast path retry longer
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                print(f"[whisper] network error: {e} — waiting {delay}s", flush=True)
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"Whisper API network error: {e}")
+    raise RuntimeError("Whisper API: max retries exceeded")
 
 
 def whisper_transcribe_chunked(audio_path):
@@ -1156,44 +1221,81 @@ def upload_video():
     episode_id = filename.rsplit(".", 1)[0]
     title = request.form.get("title", "").strip() or episode_id
 
+    is_voice_note = episode_id.startswith("VOICENOTE_")
+    started_at = datetime.now().isoformat(timespec='seconds')
+
     conn = get_db()
     if conn:
         conn.execute(
-            "INSERT OR REPLACE INTO episodes (id, title, filename, video_path, uploaded_at, transcribe_status) "
-            "VALUES (?, ?, ?, ?, ?, 'transcribing')",
-            (episode_id, title, filename, video_path, datetime.now().strftime('%Y-%m-%d'))
+            "INSERT OR REPLACE INTO episodes "
+            "(id, title, filename, video_path, uploaded_at, transcribe_status, transcribe_error, transcribe_started_at) "
+            "VALUES (?, ?, ?, ?, ?, 'transcribing', NULL, ?)",
+            (episode_id, title, filename, video_path, datetime.now().strftime('%Y-%m-%d'), started_at)
         )
         conn.commit()
         conn.close()
-        print(f"[upload] {episode_id}: stub row created", flush=True)
+        print(f"[upload] {episode_id}: stub row created (voice_note={is_voice_note})", flush=True)
     else:
         print(f"[upload] {episode_id}: WARNING — get_db() returned None, no stub row", flush=True)
 
-    def _transcribe_bg(ep_id, ep_title, vid_path):
-        print(f"[upload] {ep_id}: background transcription started", flush=True)
-        if not OPENAI_KEY:
-            print(f"[upload] {ep_id}: OPENAI_API_KEY not set — marking error", flush=True)
-            try:
-                db = get_db()
-                if db:
-                    db.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (ep_id,))
-                    db.commit()
-                    db.close()
-            except Exception:
-                pass
-            return
+    def _set_error(ep_id, msg):
+        """Always-callable helper to mark a row as errored. Defensive — never raises."""
+        try:
+            db = get_db()
+            if db:
+                db.execute(
+                    "UPDATE episodes SET transcribe_status = 'error', transcribe_error = ? WHERE id = ?",
+                    (msg[:500], ep_id)
+                )
+                db.commit()
+                db.close()
+        except Exception as e:
+            print(f"[upload] {ep_id}: failed to mark error: {e}", flush=True)
+
+    def _transcribe_bg(ep_id, ep_title, vid_path, voice_note):
+        # Bulletproof wrapper — ANY exception, including from inside the inner
+        # try block, must result in the DB row being updated. No more stuck rows.
+        print(f"[upload] {ep_id}: background transcription started (voice_note={voice_note})", flush=True)
         audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
         try:
-            ffmpeg_ok = extract_audio(vid_path, audio_path)
-            if not ffmpeg_ok:
-                if os.path.getsize(vid_path) > 24 * 1024 * 1024:
-                    raise RuntimeError("ffmpeg required for files larger than 24MB")
-                result = whisper_transcribe(vid_path)
+            if not OPENAI_KEY:
+                _set_error(ep_id, "OPENAI_API_KEY not configured on server")
+                return
+
+            if not os.path.exists(vid_path):
+                _set_error(ep_id, f"Uploaded file not found at {vid_path}")
+                return
+
+            file_size = os.path.getsize(vid_path)
+            if file_size == 0:
+                _set_error(ep_id, "Uploaded file is empty")
+                return
+
+            # Voice notes: skip ffmpeg, send directly to Whisper. Smaller, faster,
+            # one fewer failure mode. Whisper handles webm/mp4/m4a natively.
+            if voice_note and file_size <= 24 * 1024 * 1024:
+                print(f"[upload] {ep_id}: voice note fast path — direct Whisper ({file_size} bytes)", flush=True)
+                result = whisper_transcribe(vid_path, fast_retry=True)
             else:
-                result = whisper_transcribe_chunked(audio_path)
+                # Podcast path: extract audio with ffmpeg, then chunk if large.
+                ffmpeg_ok = extract_audio(vid_path, audio_path)
+                if not ffmpeg_ok:
+                    if file_size > 24 * 1024 * 1024:
+                        _set_error(ep_id, "ffmpeg required for files larger than 24MB")
+                        return
+                    result = whisper_transcribe(vid_path, fast_retry=voice_note)
+                else:
+                    result = whisper_transcribe_chunked(audio_path)
+
             db = get_db()
+            if not db:
+                _set_error(ep_id, "Database unavailable after transcription")
+                return
             ingest_video_episode(db, ep_id, ep_title, vid_path, result)
-            db.execute("UPDATE episodes SET transcribe_status = 'done' WHERE id = ?", (ep_id,))
+            db.execute(
+                "UPDATE episodes SET transcribe_status = 'done', transcribe_error = NULL WHERE id = ?",
+                (ep_id,)
+            )
             _rebuild_fts(db)
             db.commit()
             db.close()
@@ -1201,14 +1303,7 @@ def upload_video():
         except Exception as exc:
             print(f"[upload] {ep_id}: transcription failed: {exc}", flush=True)
             traceback.print_exc()
-            try:
-                db = get_db()
-                if db:
-                    db.execute("UPDATE episodes SET transcribe_status = 'error' WHERE id = ?", (ep_id,))
-                    db.commit()
-                    db.close()
-            except Exception:
-                pass
+            _set_error(ep_id, str(exc) or type(exc).__name__)
         finally:
             if os.path.exists(audio_path):
                 try:
@@ -1216,7 +1311,11 @@ def upload_video():
                 except Exception:
                     pass
 
-    threading.Thread(target=_transcribe_bg, args=(episode_id, title, video_path), daemon=True).start()
+    threading.Thread(
+        target=_transcribe_bg,
+        args=(episode_id, title, video_path, is_voice_note),
+        daemon=True
+    ).start()
     return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 
@@ -1228,6 +1327,7 @@ def voice_notes_list():
         return jsonify({"notes": []})
     rows = conn.execute("""
         SELECT e.id, e.title, e.video_path, e.uploaded_at, e.transcribe_status,
+               e.transcribe_error,
                COUNT(s.id) as segment_count,
                (SELECT text FROM segments WHERE episode_id = e.id ORDER BY start_secs ASC LIMIT 1) as excerpt
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
@@ -1240,6 +1340,7 @@ def voice_notes_list():
             "id":            r["id"],
             "title":         r["title"],
             "status":        r["transcribe_status"] or "done",
+            "error":         r["transcribe_error"] or "",
             "segments":      r["segment_count"],
             "excerpt":       (r["excerpt"] or "").strip()[:120],
             "uploaded_at":   r["uploaded_at"],
@@ -1850,34 +1951,74 @@ _QUOTE_FILLER_STARTS = (
     "and ", "so ", "but ", "because ", "that ", "which ", "also ", "now ",
     "well ", "okay ", "right ", "like ", "then ", "though ", "although ",
     "as ", "or ", "yet ", "nor ", "if ", "when ", "where ", "while ",
+    "anyway ", "anyways ", "basically ", "actually ", "literally ",
+    "honestly ", "maybe ", "probably ", "perhaps ", "look ", "listen ",
+    "first ", "second ", "third ", "finally ", "plus ", "however ",
+    "meanwhile ", "furthermore ", "additionally ", "again ", "still ",
+    "see ", "hey ", "alright ", "really ", "just ", "just, ",
+    "remember ",
 )
 _QUOTE_IMPACT_PHRASES = (
+    # Direct imperative
     "you need to", "you have to", "you must", "you should",
     "stop ", "never ", "always ", "don't ", "do not ",
+    # Truth-telling openers
     "i believe", "the truth is", "most people", "the reality is",
     "the fact is", "i'm telling you", "the problem is",
     "here's the thing", "is the difference", "is everything",
     "the only way", "that's why", "what separates",
-    "discipline", "accountability", "mediocre", "elite",
     "no one tells you", "nobody tells you", "the real reason",
     "you're never going to", "if you want to", "the honest truth",
-    "i'll tell you", "let me tell you",
+    "i'll tell you", "let me tell you", "the secret is",
+    "the key is", "what matters", "the difference between",
+    "everyone else", "no one wants to", "nobody wants to",
+    # Andy's core themes
+    "discipline", "accountability", "mediocre", "elite",
+    "excuses", "excuse", "consistency", "mindset",
+    "hard work", "hard thing", "the grind", "show up",
+    "warrior", "champion", "winner", "loser",
+    "quit ", "quitting", "quit,", "quit.",
+    "succeed", "success", "fail", "failure",
+    "action", "comfort zone", "your word", "keep your word",
+    "the truth about", "you earn", "earn it",
+    "price you pay", "pay the price",
 )
 _QUOTE_FILLER_PHRASES = (
-    "you know,", "you know.", "kind of", "sort of", "like i said",
-    "as i said", " um ", " uh ", "basically,", "literally,",
-    "going to go ahead", "gonna go ahead",
+    "you know,", "you know.", "you know ", "kind of", "sort of",
+    "like i said", "as i said", " um ", " uh ", "basically,", "literally,",
+    "going to go ahead", "gonna go ahead", "i think", "i guess",
+    "kind of like", "you see", "pretty much", "kinda ", "sorta ",
+    "stuff like that", "things like that", "anything like that",
+    "whatever ", "somehow ", "or something", "like that,", "i mean,",
+    "all that stuff", "all that kind", "that kind of thing",
 )
 _QUOTE_HOUSEKEEPING = (
     "subscribe", "check out", ".com", "follow us", "leave a review",
     "itunes", "spotify", "patreon", "youtube", "see you tonight",
     "see you tomorrow", "tonight at 7", "cti live", "show the show",
-    "hoe show", "sign up", "tune in",
+    "hoe show", "sign up", "tune in", "email me", "dm me",
+    "link in bio", "click the link", "comment below",
+    "episode of", "this show", "guys, ", "bro,", "dude,",
+    "alright guys", "let's get into",
+)
+# Bad trailing conjunctions/prepositions — sentence technically "ends" but
+# the thought continues. Reject if quote ends on one of these before the punct.
+_QUOTE_BAD_ENDINGS = (
+    " and", " or", " but", " because", " so", " if", " when", " with",
+    " of", " to", " for", " in", " on", " at", " by", " as", " from",
+    " the", " a", " an", " is", " was", " be", " been", " that",
 )
 
 
 def _score_quote(text):
-    """Score a candidate quote excerpt. Higher = better tweet-worthy quote."""
+    """Score a candidate quote excerpt. Higher = better tweet-worthy quote.
+
+    Returns -999 to reject outright. To pass, a candidate must:
+      * be a complete sentence with proper start/end punctuation,
+      * not start with a filler/conjunction,
+      * not contain housekeeping or heavy filler,
+      * have at least one signal of SUBSTANCE (impact phrase, direct
+        address, first-person conviction, or strong energy)."""
     t = text.strip()
     if not t:
         return -999
@@ -1900,6 +2041,13 @@ def _score_quote(text):
         if h in lower:
             return -999
 
+    # Reject sentences ending on conjunctions/prepositions — thought continues
+    # past the period (transcript artifact). e.g. "...the thing about that."
+    body_before_punct = lower.rstrip('.!?').rstrip()
+    for ending in _QUOTE_BAD_ENDINGS:
+        if body_before_punct.endswith(ending):
+            return -999
+
     # Tweet-length: 60–260 chars
     n = len(t)
     if n < 60 or n > 260:
@@ -1908,6 +2056,11 @@ def _score_quote(text):
     # Filler body phrases — discard if heavy
     filler_hits = sum(1 for p in _QUOTE_FILLER_PHRASES if p in lower)
     if filler_hits >= 2:
+        return -999
+
+    # Reject if it's mostly questions — questions rarely tweet well unless rhetorical
+    question_count = t.count('?')
+    if question_count >= 2:
         return -999
 
     # ── Scoring ───────────────────────────────────────────────────────────────
@@ -1923,24 +2076,39 @@ def _score_quote(text):
 
     # Energy
     if t[-1] == '!':
-        score += 12
+        score += 14
 
     # Impact language (award each match, not just first)
+    impact_hits = 0
     for phrase in _QUOTE_IMPACT_PHRASES:
         if phrase in lower:
             score += 15
+            impact_hits += 1
 
-    # Single filler phrase — small penalty
+    # Single filler phrase — meaningful penalty (was 8, now 12)
     if filler_hits == 1:
-        score -= 8
+        score -= 12
+
+    # Question mark — small penalty, often less tweet-worthy
+    if question_count == 1 and t[-1] != '!':
+        score -= 6
 
     # Direct address to listener
-    if ' you ' in lower or lower.startswith('you ') or ' your ' in lower:
+    has_you = (' you ' in lower or lower.startswith('you ') or ' your ' in lower)
+    if has_you:
         score += 10
 
     # First-person conviction
-    if lower.startswith('i ') or " i've " in lower or " i know " in lower:
+    has_first_person = (lower.startswith('i ') or " i've " in lower
+                       or " i know " in lower or " i'm " in lower)
+    if has_first_person:
         score += 6
+
+    # ── SUBSTANCE GATE ────────────────────────────────────────────────────────
+    # Must have at least one of: impact phrase, direct address, exclamation,
+    # or first-person conviction. Otherwise, the quote is too generic to ship.
+    if impact_hits == 0 and not has_you and t[-1] != '!' and not has_first_person:
+        return -999
 
     return score
 
@@ -1985,15 +2153,19 @@ def random_quote():
         for row in rows:
             for excerpt in _extract_quote_candidates(row["text"]):
                 score = _score_quote(excerpt)
-                if score > 0:
+                # Substance gate already enforces >=20-ish; require >=30 to be sure.
+                if score >= 30:
                     all_candidates.append((score, excerpt, row["title"]))
 
         if not all_candidates:
             return jsonify({"quote": "", "episode": ""})
 
         all_candidates.sort(key=lambda x: x[0], reverse=True)
-        # Pick randomly from top 12 for variety while keeping quality high
-        _, quote, episode = random.choice(all_candidates[:12])
+        # Pick randomly from top N for variety while keeping quality high.
+        # Smaller N = stricter quality. With the substance gate the top 8 are
+        # consistently strong.
+        top = all_candidates[:8]
+        _, quote, episode = random.choice(top)
         return jsonify({"quote": quote, "episode": episode})
     except Exception:
         return jsonify({"quote": "", "episode": ""})
@@ -2225,6 +2397,12 @@ def dev_status():
         "jobs":                jobs_snapshot,
         "searches":            searches,
     })
+
+
+# ── STARTUP HOOKS ─────────────────────────────────────────────────────────────
+# Runs once per worker when the module is imported (gunicorn) or executed (dev).
+# Clears out any transcribe jobs that were killed mid-flight by a worker restart.
+recover_stuck_transcriptions()
 
 
 if __name__ == "__main__":
