@@ -173,7 +173,16 @@
   .del-btn:hover { color: var(--red); background: rgba(255,69,58,0.12); }
 
   .empty { text-align: center; padding: 36px; color: var(--text3); font-size: 13px; }
-  .card-wrap { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
+  .card-wrap {
+    background: var(--bg2); border-radius: var(--radius);
+    /* Horizontal scroll on narrow screens so no column gets clipped.
+       overflow-y must stay hidden to keep the rounded corners. */
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Keep tables readable when the card is narrower than their content. */
+  .card-wrap .ep-table    { min-width: 560px; }
+  .card-wrap .search-table { min-width: 520px; }
 
   /* Rename */
   .rename-btn {
@@ -212,6 +221,40 @@
     padding: 10px 12px; max-height: 160px; overflow-y: auto;
     font-family: var(--mono); font-size: 12px; line-height: 1.6;
     color: var(--text2); display: none;
+  }
+
+  /* ── Mobile tightening (≤640px) ───────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .header {
+      padding: 10px 14px; gap: 8px;
+      flex-wrap: wrap; row-gap: 8px;
+    }
+    .header-title { font-size: 14px; }
+    .header-sub   { font-size: 11px; }
+    .header-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .header-right > button,
+    .header-right > .back-btn {
+      font-size: 12px !important;
+      padding: 6px 10px !important;
+    }
+
+    .page { padding: 14px; }
+
+    /* Denser stat cards — fit two per row on phone. */
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+    .stat-card { padding: 10px 12px; }
+    .stat-val  { font-size: 20px; }
+
+    .section { margin-bottom: 20px; }
+
+    /* Drive Import: give the textarea a bit more room and a full-width button. */
+    .upload-card { padding: 12px 14px; }
+    .upload-card textarea { height: 88px; font-size: 13px; }
+    .import-btn { width: 100%; padding: 11px 16px; font-size: 14px; }
+    .upload-card > div[style*="display:flex"] { flex-wrap: wrap; }
+
+    /* Hint that the tables can be swiped horizontally. */
+    .card-wrap { scrollbar-width: thin; }
   }
 </style>
 </head>
