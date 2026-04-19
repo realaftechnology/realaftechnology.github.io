@@ -1451,7 +1451,7 @@ def voice_notes_list():
 
 
 @app.route("/api/admin/users")
-@requires_role("dev")
+@requires_role("dev", "andy")
 def admin_list_users():
     """List all users with their assigned roles. Dev-only."""
     conn = get_db()
@@ -1477,7 +1477,7 @@ def admin_list_users():
 
 
 @app.route("/api/admin/users/<google_id>/role", methods=["POST"])
-@requires_role("dev")
+@requires_role("dev", "andy")
 def admin_set_user_role(google_id):
     """Set a user's role. Dev-only. Body: {"role": "team|dev|andy"}."""
     data = request.get_json() or {}
@@ -1497,9 +1497,9 @@ def admin_set_user_role(google_id):
     if not target:
         conn.close()
         return jsonify({"error": "User not found"}), 404
-    if target["email"].lower() == me.get("email", "").lower() and new_role != "dev":
+    if target["email"].lower() == me.get("email", "").lower() and new_role not in ("dev", "andy"):
         conn.close()
-        return jsonify({"error": "You can't remove your own dev role — ask another dev to do it"}), 400
+        return jsonify({"error": "You can't remove your own admin role — ask another dev to do it"}), 400
 
     conn.execute("UPDATE users SET role = ? WHERE google_id = ?", (new_role, google_id))
     conn.commit()
@@ -2561,13 +2561,13 @@ def dev_dashboard():
     # The HTML handles the unauthenticated case. Block authenticated non-dev
     # users explicitly — the dashboard is dev-only.
     user = session.get("user")
-    if user and get_user_role(user.get("email")) != "dev":
+    if user and get_user_role(user.get("email")) not in ("dev", "andy"):
         return ("Forbidden — this dashboard is restricted to developer accounts.", 403)
     return send_from_directory("static", "dev.html")
 
 
 @app.route("/api/dev/status")
-@requires_role("dev")
+@requires_role("dev", "andy")
 def dev_status():
     """Return system stats + all tracked import jobs."""
     # DB stats
