@@ -847,8 +847,8 @@ async function loadUsers() {
       const meTag = isMe ? '<span class="you-tag">YOU</span>' : '';
       const pill = (role, label) => {
         const active = u.role === role;
-        // A dev can't demote themselves — prevents locking yourself out.
-        const disabled = isMe && u.role === 'dev' && role !== 'dev';
+        // Only block self-demotion to team; dev/andy lateral switch is allowed.
+        const disabled = isMe && role === 'team';
         return `<button class="role-pill${active ? ' active' : ''}"
           ${disabled ? 'disabled' : ''}
           onclick="setUserRole('${u.google_id}','${role}')">${label}</button>`;
