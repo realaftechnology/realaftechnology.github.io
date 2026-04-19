@@ -255,7 +255,20 @@ body {
   text-overflow: ellipsis;
 }
 .vn-item-meta.pending { color: var(--orange); font-style: italic; }
-.vn-item-meta.error   { color: var(--red); }
+/* When a voice note fails, let the error message wrap across a couple lines
+   so the actual reason (rate limit vs quota exhaustion) is visible on mobile
+   where there's no hover-tooltip. */
+.vn-item-meta.error   {
+  color: var(--red);
+  white-space: normal;
+  line-height: 1.35;
+  max-height: 3.3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
 .vn-item-actions { display: flex; gap: 12px; margin-top: 5px; }
 .vn-action-btn {
   background: none;
@@ -3322,12 +3335,13 @@ function renderVoiceNotes(notes) {
       metaText = 'Transcribing\u2026'; metaClass = 'pending';
     } else if (n.status === 'error') {
       // Surface the specific error message so the user knows what went wrong
+      // (rate limit vs quota exhaustion needs different action).
       const errMsg = (n.error || '').trim();
       metaText = errMsg
-        ? 'Failed: ' + errMsg.replace(/</g, '&lt;').slice(0, 80) + (errMsg.length > 80 ? '\u2026' : '')
+        ? 'Failed: ' + errMsg.replace(/</g, '&lt;')
         : 'Transcription failed';
       metaClass = 'error';
-      metaTitle = errMsg; // full error as hover tooltip
+      metaTitle = errMsg; // full error as hover tooltip on desktop
     } else if (n.excerpt) {
       metaText = n.excerpt.replace(/</g, '&lt;'); metaClass = '';
     } else {
@@ -3337,10 +3351,14 @@ function renderVoiceNotes(notes) {
     const safeTitle = n.title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const clickable = (n.status === 'done' || n.status === null);
     const titleAttr = metaTitle ? ` title="${metaTitle.replace(/"/g, '&quot;')}"` : '';
+    const retryBtn = (n.status === 'error')
+      ? `<button class="vn-action-btn" onclick="retryVoiceNote('${eid}');event.stopPropagation()">Retry</button>`
+      : '';
     return `<div class="vn-item" ${clickable ? `onclick="openVoiceNote('${eid}','${safeTitle}')"` : ''}>
       <div class="vn-item-title">${displayTitle}</div>
       <div class="vn-item-meta ${metaClass}"${titleAttr}>${metaText}</div>
       <div class="vn-item-actions">
+        ${retryBtn}
         <button class="vn-action-btn" onclick="renameVoiceNote('${eid}','${safeTitle}');event.stopPropagation()">Rename</button>
         <button class="vn-action-btn del" onclick="deleteVoiceNote('${eid}','${displayTitle}');event.stopPropagation()">Delete</button>
       </div>
@@ -3513,6 +3531,21 @@ function discardPendingVoiceNote() {
   document.getElementById('voice-save-row').style.display = 'none';
   document.querySelector('.input-bar').style.display = 'flex';
   _voiceStatus('Discarded', 1500);
+}
+
+async function retryVoiceNote(encodedId) {
+  const id = decodeURIComponent(encodedId);
+  try {
+    const res = await fetch(`/api/voice-note/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    loadVoiceNotes(); // will pick up the new 'transcribing' state and start polling
+  } catch(e) {
+    alert('Retry failed: ' + e.message);
+  }
 }
 
 async function renameVoiceNote(encodedId, currentTitle) {

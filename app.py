@@ -1238,85 +1238,93 @@ def upload_video():
     else:
         print(f"[upload] {episode_id}: WARNING — get_db() returned None, no stub row", flush=True)
 
-    def _set_error(ep_id, msg):
-        """Always-callable helper to mark a row as errored. Defensive — never raises."""
-        try:
-            db = get_db()
-            if db:
-                db.execute(
-                    "UPDATE episodes SET transcribe_status = 'error', transcribe_error = ? WHERE id = ?",
-                    (msg[:500], ep_id)
-                )
-                db.commit()
-                db.close()
-        except Exception as e:
-            print(f"[upload] {ep_id}: failed to mark error: {e}", flush=True)
+    spawn_transcription(episode_id, title, video_path, is_voice_note)
+    return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
-    def _transcribe_bg(ep_id, ep_title, vid_path, voice_note):
-        # Bulletproof wrapper — ANY exception, including from inside the inner
-        # try block, must result in the DB row being updated. No more stuck rows.
-        print(f"[upload] {ep_id}: background transcription started (voice_note={voice_note})", flush=True)
-        audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
-        try:
-            if not OPENAI_KEY:
-                _set_error(ep_id, "OPENAI_API_KEY not configured on server")
-                return
 
-            if not os.path.exists(vid_path):
-                _set_error(ep_id, f"Uploaded file not found at {vid_path}")
-                return
-
-            file_size = os.path.getsize(vid_path)
-            if file_size == 0:
-                _set_error(ep_id, "Uploaded file is empty")
-                return
-
-            # Voice notes: skip ffmpeg, send directly to Whisper. Smaller, faster,
-            # one fewer failure mode. Whisper handles webm/mp4/m4a natively.
-            if voice_note and file_size <= 24 * 1024 * 1024:
-                print(f"[upload] {ep_id}: voice note fast path — direct Whisper ({file_size} bytes)", flush=True)
-                result = whisper_transcribe(vid_path, fast_retry=True)
-            else:
-                # Podcast path: extract audio with ffmpeg, then chunk if large.
-                ffmpeg_ok = extract_audio(vid_path, audio_path)
-                if not ffmpeg_ok:
-                    if file_size > 24 * 1024 * 1024:
-                        _set_error(ep_id, "ffmpeg required for files larger than 24MB")
-                        return
-                    result = whisper_transcribe(vid_path, fast_retry=voice_note)
-                else:
-                    result = whisper_transcribe_chunked(audio_path)
-
-            db = get_db()
-            if not db:
-                _set_error(ep_id, "Database unavailable after transcription")
-                return
-            ingest_video_episode(db, ep_id, ep_title, vid_path, result)
+def _set_transcribe_error(ep_id, msg):
+    """Always-callable helper to mark a row as errored. Defensive — never raises."""
+    try:
+        db = get_db()
+        if db:
             db.execute(
-                "UPDATE episodes SET transcribe_status = 'done', transcribe_error = NULL WHERE id = ?",
-                (ep_id,)
+                "UPDATE episodes SET transcribe_status = 'error', transcribe_error = ? WHERE id = ?",
+                (msg[:500], ep_id)
             )
-            _rebuild_fts(db)
             db.commit()
             db.close()
-            print(f"[upload] {ep_id}: transcription done", flush=True)
-        except Exception as exc:
-            print(f"[upload] {ep_id}: transcription failed: {exc}", flush=True)
-            traceback.print_exc()
-            _set_error(ep_id, str(exc) or type(exc).__name__)
-        finally:
-            if os.path.exists(audio_path):
-                try:
-                    os.remove(audio_path)
-                except Exception:
-                    pass
+    except Exception as e:
+        print(f"[transcribe] {ep_id}: failed to mark error: {e}", flush=True)
 
+
+def _transcribe_bg(ep_id, ep_title, vid_path, voice_note):
+    """Bulletproof wrapper — ANY exception results in the DB row being updated
+    with a status of 'error' and a readable message. No more stuck 'transcribing'
+    rows. Called from a daemon thread by spawn_transcription()."""
+    print(f"[transcribe] {ep_id}: background transcription started (voice_note={voice_note})", flush=True)
+    audio_path = vid_path.rsplit(".", 1)[0] + "_audio.mp3"
+    try:
+        if not OPENAI_KEY:
+            _set_transcribe_error(ep_id, "OPENAI_API_KEY not configured on server")
+            return
+
+        if not os.path.exists(vid_path):
+            _set_transcribe_error(ep_id, f"Uploaded file not found at {vid_path}")
+            return
+
+        file_size = os.path.getsize(vid_path)
+        if file_size == 0:
+            _set_transcribe_error(ep_id, "Uploaded file is empty")
+            return
+
+        # Voice notes: skip ffmpeg, send directly to Whisper. Smaller, faster,
+        # one fewer failure mode. Whisper handles webm/mp4/m4a natively.
+        if voice_note and file_size <= 24 * 1024 * 1024:
+            print(f"[transcribe] {ep_id}: voice note fast path — direct Whisper ({file_size} bytes)", flush=True)
+            result = whisper_transcribe(vid_path, fast_retry=True)
+        else:
+            # Podcast path: extract audio with ffmpeg, then chunk if large.
+            ffmpeg_ok = extract_audio(vid_path, audio_path)
+            if not ffmpeg_ok:
+                if file_size > 24 * 1024 * 1024:
+                    _set_transcribe_error(ep_id, "ffmpeg required for files larger than 24MB")
+                    return
+                result = whisper_transcribe(vid_path, fast_retry=voice_note)
+            else:
+                result = whisper_transcribe_chunked(audio_path)
+
+        db = get_db()
+        if not db:
+            _set_transcribe_error(ep_id, "Database unavailable after transcription")
+            return
+        ingest_video_episode(db, ep_id, ep_title, vid_path, result)
+        db.execute(
+            "UPDATE episodes SET transcribe_status = 'done', transcribe_error = NULL WHERE id = ?",
+            (ep_id,)
+        )
+        _rebuild_fts(db)
+        db.commit()
+        db.close()
+        print(f"[transcribe] {ep_id}: transcription done", flush=True)
+    except Exception as exc:
+        print(f"[transcribe] {ep_id}: transcription failed: {exc}", flush=True)
+        traceback.print_exc()
+        _set_transcribe_error(ep_id, str(exc) or type(exc).__name__)
+    finally:
+        if os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except Exception:
+                pass
+
+
+def spawn_transcription(ep_id, title, video_path, is_voice_note):
+    """Fire off a background transcription thread for the given episode."""
     threading.Thread(
         target=_transcribe_bg,
-        args=(episode_id, title, video_path, is_voice_note),
+        args=(ep_id, title, video_path, is_voice_note),
         daemon=True
     ).start()
-    return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 
 @app.route("/api/voice-notes")
@@ -1348,6 +1356,43 @@ def voice_notes_list():
         }
         for r in rows
     ]})
+
+
+@app.route("/api/voice-note/<episode_id>/retry", methods=["POST"])
+@requires_auth
+def retry_voice_note(episode_id):
+    """Re-queue transcription for a failed voice note — reuses the existing
+    audio file on disk, no re-upload needed. The user hits 'Retry' after
+    an earlier attempt failed (e.g. transient Whisper 429)."""
+    if session.get("user", {}).get("email") != "mattgraham15@gmail.com":
+        return jsonify({"error": "forbidden"}), 403
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    ep = conn.execute(
+        "SELECT title, video_path FROM episodes WHERE id = ?", (episode_id,)
+    ).fetchone()
+    if not ep:
+        conn.close()
+        return jsonify({"error": "Voice note not found"}), 404
+    video_path = ep["video_path"]
+    title = ep["title"]
+    if not video_path or not os.path.exists(video_path):
+        conn.close()
+        return jsonify({"error": "Audio file no longer on disk — re-record"}), 410
+
+    # Reset status so the frontend shows 'Transcribing…' again and polling kicks in.
+    conn.execute(
+        "UPDATE episodes SET transcribe_status = 'transcribing', transcribe_error = NULL, "
+        "transcribe_started_at = ? WHERE id = ?",
+        (datetime.now().isoformat(timespec='seconds'), episode_id)
+    )
+    conn.commit()
+    conn.close()
+
+    is_voice_note = episode_id.startswith("VOICENOTE_")
+    spawn_transcription(episode_id, title, video_path, is_voice_note)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/voice-note/<episode_id>/rename", methods=["POST"])
