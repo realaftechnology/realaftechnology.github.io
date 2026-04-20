@@ -136,14 +136,20 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
 }
-/* View toggle: Chat / Data Center — visible to all account types */
+/* View toggle: Chat / Data Center — centered in header regardless of side controls */
 .view-toggle {
   display: inline-flex;
   background: var(--bg-secondary);
   border-radius: 8px;
   padding: 2px;
   flex-shrink: 0;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
 }
 .view-toggle a {
   color: var(--label-secondary);
@@ -380,6 +386,10 @@ body {
   user-select: none;
 }
 .app-logo:active { opacity: 0.7; }
+/* On narrow phones, hide the logo so the centered toggle has breathing room */
+@media (max-width: 500px) {
+  .app-logo { display: none; }
+}
 /* Settings menu */
 .user-menu-wrap { position: relative; flex-shrink: 0; }
 #settings-menu {
@@ -441,6 +451,11 @@ body.light-mode {
   --label-quaternary: rgba(60,60,67,0.16);
 }
 body.light-mode .app-header { background: rgba(255,255,255,0.85); }
+/* Additional light-mode overrides so every surface matches the theme */
+body.light-mode .sidebar { background: #ffffff; }
+body.light-mode .input-area { background: rgba(255,255,255,0.92); }
+body.light-mode .view-transcripts-btn:hover,
+body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 .new-chat-btn {
   background: none;
   border: none;

@@ -61,6 +61,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
 }
 .sidebar-btn {
   background: none; border: none;
@@ -82,6 +83,10 @@ body {
   user-select: none;
 }
 .app-logo:active { opacity: 0.7; }
+/* On narrow phones, hide the logo so the centered toggle has breathing room */
+@media (max-width: 500px) {
+  .app-logo { display: none; }
+}
 /* Settings menu */
 .user-menu-wrap { position: relative; flex-shrink: 0; }
 #settings-menu {
@@ -144,7 +149,7 @@ body.light-mode {
 }
 body.light-mode .app-header { background: rgba(255,255,255,0.85); }
 
-/* segmented Chat / Data Center toggle */
+/* segmented Chat / Data Center toggle — centered in header */
 .view-toggle {
   display: inline-flex;
   background: var(--bg-secondary);
@@ -152,6 +157,11 @@ body.light-mode .app-header { background: rgba(255,255,255,0.85); }
   padding: 2px;
   gap: 0;
   flex-shrink: 0;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
 }
 .view-toggle a {
   color: var(--label-secondary);
