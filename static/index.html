@@ -119,7 +119,7 @@ body {
   transition: opacity 0.2s ease;
 }
 
-/* ── HEADER — full bleed, inner content capped ── */
+/* ── HEADER — full bleed, AFBrain centered ── */
 .app-header {
   width: 100%;
   flex-shrink: 0;
@@ -128,6 +128,8 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 0.5px solid var(--separator);
+  position: relative;
+  z-index: 50;
 }
 .header-inner {
   max-width: 720px;
@@ -135,39 +137,29 @@ body {
   padding: 0 20px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  min-height: 34px;
   position: relative;
 }
-/* View toggle: Chat / Data Center — centered in header regardless of side controls */
-.view-toggle {
-  display: inline-flex;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 2px;
-  flex-shrink: 0;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-}
-.view-toggle a {
-  color: var(--label-secondary);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 6px;
+/* Wordmark */
+.app-title-header {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.5px;
   line-height: 1;
-  transition: background 0.15s, color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.view-toggle a.active {
-  background: var(--bg-tertiary);
   color: var(--label);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  text-align: center;
 }
-.view-toggle a:not(.active):active { color: var(--label); }
+.app-title-header span { color: var(--red); }
+/* Floating header controls — don't disturb the centered wordmark */
 .sidebar-btn {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--label-secondary);
@@ -175,11 +167,25 @@ body {
   cursor: pointer;
   padding: 4px;
   line-height: 1;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
+  -webkit-tap-highlight-color: transparent;
 }
 .sidebar-btn:hover { color: var(--label); }
+.sidebar-btn:active { opacity: 0.6; }
+.header-right {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* On mobile the avatar lives in the bottom tab bar, not the header */
+@media (max-width: 767px) {
+  .header-right .user-menu-wrap { display: none; }
+}
 
 /* ── SIDEBAR ── */
 .sidebar {
@@ -472,14 +478,179 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 .new-chat-btn:hover { color: var(--label); background: var(--bg-secondary); }
 .new-chat-btn:active { opacity: 0.6; }
 
-/* ── DESKTOP SIDEBAR ALWAYS OPEN ── */
-@media (min-width: 768px) {
-  .sidebar { left: 0 !important; box-shadow: none; }
-  .sidebar-close { display: none; }
-  #sidebar-backdrop { display: none !important; }
-  #main-screen { padding-left: 280px; }
-  .sidebar-btn { display: none; }
+/* ── MOBILE BOTTOM TAB BAR ── */
+/* Fixed to the bottom, above everything but the keyboard. Hidden on desktop
+   and when the software keyboard is open (body.keyboard-open). */
+:root { --tab-bar-height: 56px; }
+.bottom-tab-bar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 150;
+  height: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(0,0,0,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--separator);
 }
+body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
+.bottom-tab-bar-inner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  width: 100%;
+  height: var(--tab-bar-height);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--label-tertiary);
+  font-family: var(--sf);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
+  padding: 4px 0 6px;
+}
+.tab-item svg { display: block; }
+.tab-item:active { opacity: 0.55; }
+.tab-item.active { color: var(--red); }
+.tab-item .tab-avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s;
+}
+.tab-item.active .tab-avatar { border-color: var(--red); }
+@media (max-width: 767px) {
+  .bottom-tab-bar { display: block; }
+  /* Lift the input-area above the tab bar. Its inner already carries its own
+     safe-area padding, so only add the tab-bar-height margin here. */
+  .input-area { margin-bottom: var(--tab-bar-height); }
+}
+/* When the keyboard is open, hide the tab bar so it doesn't float over the keyboard */
+body.keyboard-open .bottom-tab-bar { display: none; }
+body.keyboard-open .input-area { margin-bottom: 0; }
+
+/* ── PROFILE SHEET (mobile) ── */
+.profile-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: var(--bg-primary);
+  transform: translateX(100%);
+  transition: transform 0.28s ease;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.profile-sheet.open { transform: translateX(0); }
+.profile-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 0.5px solid var(--separator);
+}
+.profile-sheet-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label);
+  margin: 0;
+}
+.profile-sheet-close {
+  background: none;
+  border: none;
+  color: var(--label-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+.profile-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 24px);
+}
+.profile-avatar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 24px;
+}
+.profile-avatar-row img {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--separator);
+}
+.profile-avatar-row .profile-email {
+  color: var(--label-secondary);
+  font-size: 13px;
+  word-break: break-all;
+  text-align: center;
+}
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 14px;
+  background: none;
+  border: none;
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 15px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.profile-row:hover { background: var(--bg-tertiary); }
+.profile-row .caret { color: var(--label-tertiary); font-size: 16px; }
+.profile-row.danger { color: var(--red); }
+.profile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 219;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+.profile-sheet-backdrop.visible { opacity: 1; pointer-events: auto; }
+/* Only show profile sheet slide-in on mobile; on desktop the settings menu dropdown still works */
+@media (min-width: 768px) {
+  .profile-sheet { display: none; }
+  .profile-sheet-backdrop { display: none; }
+}
+
 
 /* ── SCROLL AREA ── */
 .scroll-area {
@@ -1718,37 +1889,34 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 
   <div class="app-header">
     <div class="header-inner">
-      <button class="sidebar-btn" onclick="toggleSidebar()">
+      <button class="sidebar-btn" onclick="toggleSidebar()" aria-label="Open menu">
         <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
       </button>
-      <img src="/static/loading-screen-logo.png" alt="AFBrain" class="app-logo">
-      <nav class="view-toggle" aria-label="Switch view">
-        <a href="/" class="active" aria-current="page">Chat</a>
-        <a href="/data-center">Data Center</a>
-      </nav>
-      <div style="flex:1"></div>
-      <button class="new-chat-btn" onclick="resetApp()" title="New chat">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M3 10C3 6.134 6.134 3 10 3s7 3.134 7 7-3.134 7-7 7H3.5L3 17v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M10 7v6M7 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <div class="user-menu-wrap">
-        <button id="user-avatar-btn" class="user-avatar-btn" onclick="toggleSettingsMenu(event)" title="Settings">
-          <img id="user-avatar" src="" width="28" height="28" style="border-radius:50%;object-fit:cover;display:block">
+      <h1 class="app-title-header" translate="no"><span>AF</span>Brain</h1>
+      <div class="header-right">
+        <button class="new-chat-btn" onclick="resetApp()" title="New chat" aria-label="New chat">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M3 10C3 6.134 6.134 3 10 3s7 3.134 7 7-3.134 7-7 7H3.5L3 17v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M10 7v6M7 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
         </button>
-        <div id="settings-menu" role="menu">
-          <div class="settings-email" id="settings-email"></div>
-          <button class="settings-row" onclick="toggleTheme()">
-            <span>Light mode</span>
-            <span class="theme-switch" aria-hidden="true"></span>
+        <div class="user-menu-wrap">
+          <button id="user-avatar-btn" class="user-avatar-btn" onclick="toggleSettingsMenu(event)" title="Settings">
+            <img id="user-avatar" src="" width="28" height="28" style="border-radius:50%;object-fit:cover;display:block">
           </button>
-          <a href="/dev" class="settings-row" id="settings-dev" style="display:none">
-            <span>Developer Dashboard</span>
-            <span class="caret">›</span>
-          </a>
-          <div class="settings-sep"></div>
-          <button class="settings-row danger" onclick="handleLogout()">Log out</button>
+          <div id="settings-menu" role="menu">
+            <div class="settings-email" id="settings-email"></div>
+            <button class="settings-row" onclick="toggleTheme()">
+              <span>Light mode</span>
+              <span class="theme-switch" aria-hidden="true"></span>
+            </button>
+            <a href="/dev" class="settings-row" id="settings-dev" style="display:none">
+              <span>Developer Dashboard</span>
+              <span class="caret">›</span>
+            </a>
+            <div class="settings-sep"></div>
+            <button class="settings-row danger" onclick="handleLogout()">Log out</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1805,6 +1973,67 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
       </div>
     </div>
   </div>
+
+  <!-- ── MOBILE BOTTOM TAB BAR ── -->
+  <nav class="bottom-tab-bar" aria-label="Primary">
+    <div class="bottom-tab-bar-inner">
+      <button class="tab-item" id="tab-content" onclick="openSidebarFromTab()" aria-label="Content">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <rect x="3" y="5"  width="16" height="2" rx="1" fill="currentColor"/>
+          <rect x="3" y="10" width="16" height="2" rx="1" fill="currentColor"/>
+          <rect x="3" y="15" width="16" height="2" rx="1" fill="currentColor"/>
+        </svg>
+        <span>Content</span>
+      </button>
+      <a class="tab-item active" id="tab-chat" href="/" aria-label="Chat">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <path d="M3.5 10.5C3.5 6.91 6.64 4 10.5 4h1c3.86 0 7 2.91 7 6.5 0 3.59-3.14 6.5-7 6.5H8l-3.5 2.5.7-3.2A6.36 6.36 0 0 1 3.5 10.5Z"
+                stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>Chat</span>
+      </a>
+      <a class="tab-item" id="tab-data" href="/data-center" aria-label="Data Center">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <rect x="3"  y="12" width="3" height="7" rx="1" fill="currentColor"/>
+          <rect x="9.5" y="7"  width="3" height="12" rx="1" fill="currentColor"/>
+          <rect x="16" y="3"  width="3" height="16" rx="1" fill="currentColor"/>
+        </svg>
+        <span>Data</span>
+      </a>
+      <button class="tab-item" id="tab-profile" onclick="openProfileSheet()" aria-label="Settings and Profile">
+        <img id="tab-avatar" class="tab-avatar" src="" alt="">
+        <span>Profile</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── PROFILE SHEET (mobile) ── -->
+  <div class="profile-sheet-backdrop" id="profile-sheet-backdrop" onclick="closeProfileSheet()"></div>
+  <aside class="profile-sheet" id="profile-sheet" aria-hidden="true">
+    <div class="profile-sheet-head">
+      <h2>Profile</h2>
+      <button class="profile-sheet-close" onclick="closeProfileSheet()" aria-label="Close">Done</button>
+    </div>
+    <div class="profile-sheet-body">
+      <div class="profile-avatar-row">
+        <img id="profile-avatar-img" src="" alt="">
+        <div class="profile-email" id="profile-email"></div>
+      </div>
+      <div class="profile-actions">
+        <button class="profile-row" onclick="toggleTheme()">
+          <span>Light mode</span>
+          <span class="theme-switch" aria-hidden="true"></span>
+        </button>
+        <a href="/dev" class="profile-row" id="profile-dev" style="display:none">
+          <span>Developer Dashboard</span>
+          <span class="caret">›</span>
+        </a>
+      </div>
+      <div class="profile-actions">
+        <button class="profile-row danger" onclick="handleLogout()">Log out</button>
+      </div>
+    </div>
+  </aside>
 
 </div>
 
@@ -1873,6 +2102,55 @@ function toggleSidebar() {
     document.getElementById('sidebar-search-input').value = '';
   }
 }
+
+// Bottom tab bar: Content tab opens the sidebar (and dismisses the keyboard first
+// so the tab bar isn't racing the keyboard-open class).
+function openSidebarFromTab() {
+  const input = document.getElementById('search-input');
+  if (input) input.blur();
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar && !sidebar.classList.contains('open')) toggleSidebar();
+}
+
+// ── PROFILE SHEET ────────────────────────────────────────────────────────────
+function openProfileSheet() {
+  const input = document.getElementById('search-input');
+  if (input) input.blur();
+  const sheet = document.getElementById('profile-sheet');
+  const bd    = document.getElementById('profile-sheet-backdrop');
+  if (!sheet) return;
+  sheet.classList.add('open');
+  if (bd) bd.classList.add('visible');
+  sheet.setAttribute('aria-hidden', 'false');
+  setActiveTab('profile');
+}
+function closeProfileSheet() {
+  const sheet = document.getElementById('profile-sheet');
+  const bd    = document.getElementById('profile-sheet-backdrop');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  if (bd) bd.classList.remove('visible');
+  sheet.setAttribute('aria-hidden', 'true');
+  setActiveTab('chat');
+}
+function isProfileSheetOpen() {
+  const sheet = document.getElementById('profile-sheet');
+  return !!(sheet && sheet.classList.contains('open'));
+}
+
+// Highlight the active tab in the bottom bar. `which` in {'chat','data','profile'}.
+function setActiveTab(which) {
+  ['chat','data','profile'].forEach(k => {
+    const el = document.getElementById('tab-' + k);
+    if (el) el.classList.toggle('active', k === which);
+  });
+}
+// On load, set tab-chat vs tab-data based on the URL path.
+(function initActiveTab() {
+  const p = window.location.pathname;
+  if (p.startsWith('/data-center')) setActiveTab('data');
+  else setActiveTab('chat');
+})();
 
 async function loadEpisodeList() {
   document.getElementById('episode-list').innerHTML =
@@ -3458,16 +3736,64 @@ document.body.addEventListener('touchmove', function(e) {
 
     const sidebar = document.getElementById('sidebar');
     const isOpen  = sidebar.classList.contains('open');
+    const isMobile = window.innerWidth < 768;
 
-    // Right swipe from left edge — open sidebar (mobile only)
-    if (dx > 0 && _tx < 40 && !isOpen && window.innerWidth < 768) {
+    // Sidebar gestures take priority
+    if (dx > 0 && _tx < 40 && !isOpen && isMobile) {
       toggleSidebar();
+      return;
     }
-    // Left swipe — close sidebar (mobile only)
-    if (dx < 0 && isOpen && window.innerWidth < 768) {
+    if (dx < 0 && isOpen && isMobile) {
       toggleSidebar();
+      return;
     }
+
+    // Profile-sheet swipe-right → close back to Data Center
+    if (isProfileSheetOpen()) {
+      if (dx > 0 && isMobile) closeProfileSheet();
+      return;
+    }
+
+    // Page-level horizontal nav (mobile only, only when no modal/overlay is on)
+    if (!isMobile) return;
+    // Ignore swipes that start inside scrollable panels where horizontal
+    // movement belongs to that panel (suggestion bar, clip-strip, etc.)
+    const inHScroll = e.target.closest('#suggestion-bar, .clip-strip, .clip-film-wrap, video');
+    if (inHScroll) return;
+
+    // Chat view (/) — swipe left → Data Center
+    if (dx < 0 && window.location.pathname === '/') {
+      window.location.href = '/data-center';
+      return;
+    }
+    // (Data Center page has its own handler that mirrors this.)
   }, { passive: true });
+})();
+
+// ── KEYBOARD-OPEN DETECTION ─────────────────────────────────────────────────
+// Toggle body.keyboard-open so the bottom tab bar can hide while the software
+// keyboard is showing. Uses visualViewport if available, falls back to
+// focus/blur on text inputs.
+(function() {
+  const KB_DELTA = 120; // px drop in viewport height that indicates keyboard
+  function setKbOpen(open) {
+    document.body.classList.toggle('keyboard-open', !!open);
+  }
+  if (window.visualViewport) {
+    const recompute = () => {
+      const dh = window.innerHeight - window.visualViewport.height;
+      setKbOpen(dh > KB_DELTA);
+    };
+    window.visualViewport.addEventListener('resize', recompute);
+    recompute();
+  } else {
+    document.addEventListener('focusin', e => {
+      if (e.target.matches('input, textarea')) setKbOpen(true);
+    });
+    document.addEventListener('focusout', e => {
+      if (e.target.matches('input, textarea')) setKbOpen(false);
+    });
+  }
 })();
 
 // ── VOICE NOTES SIDEBAR ──────────────────────────────────────────────────────
@@ -3902,13 +4228,17 @@ function hideSplash() {
       login.style.display = 'none';
       main.style.display = 'flex';
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
-      // Show user avatar in header
+      // Show user avatar in header + bottom tab bar + profile sheet
       if (user.picture) {
         const btn = document.getElementById('user-avatar-btn');
         const img = document.getElementById('user-avatar');
         img.src = user.picture;
         btn.style.display = 'flex';
         btn.title = `Signed in as ${user.email}\nClick to sign out`;
+        const tabAvatar = document.getElementById('tab-avatar');
+        if (tabAvatar) tabAvatar.src = user.picture;
+        const pImg = document.getElementById('profile-avatar-img');
+        if (pImg) pImg.src = user.picture;
       }
       // Role-based UI. 'andy' gets the voice-note mic; 'dev' gets a link to
       // the developer dashboard in the header. 'team' (default) gets neither.
@@ -3923,14 +4253,26 @@ function hideSplash() {
       if (role === 'dev' || role === 'andy') {
         const devBtn = document.getElementById('settings-dev');
         if (devBtn) devBtn.style.display = 'flex';
+        const profDev = document.getElementById('profile-dev');
+        if (profDev) profDev.style.display = 'flex';
       }
-      // Populate settings menu header with the signed-in email
+      // Populate settings menu header with the signed-in email (desktop dropdown + mobile sheet)
       const emailEl = document.getElementById('settings-email');
       if (emailEl && user.email) emailEl.textContent = user.email;
+      const pEmail = document.getElementById('profile-email');
+      if (pEmail && user.email) pEmail.textContent = user.email;
       initEmptyState();
       loadEpisodeList();
       if (role === 'andy') loadVoiceNotes();
-      document.getElementById('search-input').focus();
+      // Auto-open the sidebar when the user arrived via the Content tab
+      // from /data-center (which navigates to "/#menu"). Strip the hash
+      // so the auto-open doesn't repeat on refresh.
+      if (window.location.hash === '#menu') {
+        history.replaceState(null, '', '/');
+        toggleSidebar();
+      } else {
+        document.getElementById('search-input').focus();
+      }
     } else {
       hideSplash();
       document.getElementById('login-screen').style.opacity = '1';
