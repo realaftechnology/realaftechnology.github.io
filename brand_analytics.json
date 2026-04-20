@@ -1,9 +1,9 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-04-20T16:59:18.224047+00:00",
+    "lastUpdated": "2026-04-20T17:01:03.250411+00:00",
     "period": "Last 28 days",
-    "source": "Live data from Windsor.ai"
+    "source": "Live data from Windsor.ai (values not currently returned by Windsor are left blank)"
   },
   "platforms": {
     "instagram": {
@@ -13,7 +13,7 @@
       "color": "#E1306C",
       "followers": {
         "current": 572981,
-        "prior": 550061
+        "prior": null
       },
       "reach": {
         "current": 2640459,
@@ -29,37 +29,37 @@
       },
       "posts": {
         "current": 12545,
-        "prior": 12495
+        "prior": null
       },
       "topPosts": [],
       "timeseries": [
         {
           "date": "2026-03-23",
-          "followers": 550061,
+          "followers": null,
           "reach": 62950,
           "engagement": 10067
         },
         {
           "date": "2026-03-30",
-          "followers": 555791,
+          "followers": null,
           "reach": 86811,
           "engagement": 15627
         },
         {
           "date": "2026-04-06",
-          "followers": 561521,
+          "followers": null,
           "reach": 99542,
           "engagement": 15176
         },
         {
           "date": "2026-04-13",
-          "followers": 567251,
+          "followers": null,
           "reach": 145477,
           "engagement": 22142
         },
         {
           "date": "2026-04-19",
-          "followers": 572981,
+          "followers": null,
           "reach": 116073,
           "engagement": 29118
         }
