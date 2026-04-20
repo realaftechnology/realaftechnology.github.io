@@ -642,10 +642,13 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 }
 
 /* ── MOBILE BOTTOM TAB BAR ── */
-/* Pinned to the physical screen bottom at all times. When the keyboard is
-   open the bar is translated down by --kb-height so the keyboard visually
-   overlays it — the bar itself never moves relative to the screen. */
-:root { --tab-bar-height: 56px; --kb-height: 0px; }
+/* Pinned to the physical screen bottom — plain position:fixed + bottom:0
+   and NO transform. A transform on a fixed element creates a new containing
+   block on iOS and shifts the anchor, which is what was causing the bar to
+   ride up with the keyboard and leave dead space underneath. With no
+   transform, iOS pins the bar to the layout viewport bottom; when the
+   software keyboard comes up it simply overlays the bar. */
+:root { --tab-bar-height: 56px; }
 .bottom-tab-bar {
   display: none;
   position: fixed;
@@ -657,8 +660,6 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
-  transform: translateY(var(--kb-height));
-  transition: transform 0.18s ease;
 }
 body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 .bottom-tab-bar-inner {
@@ -4027,9 +4028,13 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', _pinHeight, { passive: true });
   window.visualViewport.addEventListener('scroll', _pinHeight, { passive: true });
 }
-// Prevent body scroll — only scroll-area/sidebar/suggestion-bar should scroll
+// Prevent body-level scroll so only our intentional scroll containers move.
+// Any container you want the user to scroll vertically/horizontally needs to
+// be in this allow-list — otherwise touchmove is preempted.
 document.body.addEventListener('touchmove', function(e) {
-  if (!e.target.closest('.scroll-area, .sidebar-scroll, .sidebar-list, #suggestion-bar')) e.preventDefault();
+  if (!e.target.closest('.scroll-area, .sidebar-scroll, .sidebar-list, #suggestion-bar, .data-scroll, .profile-sheet-body')) {
+    e.preventDefault();
+  }
 }, { passive: false });
 
 // ── SWIPE GESTURES ────────────────────────────────────────────────────────────
@@ -4106,28 +4111,22 @@ document.body.addEventListener('touchmove', function(e) {
 // keyboard is showing. Uses visualViewport if available, falls back to
 // focus/blur on text inputs.
 (function() {
-  const KB_DELTA = 120; // px drop in viewport height that indicates keyboard
-  function setKbOpen(open, kbH) {
+  // Body class for keyboard state — the hotbar itself no longer moves, but
+  // other code (like the input-area margin-bottom reset) still needs to know.
+  const KB_DELTA = 120;
+  function setKbOpen(open) {
     document.body.classList.toggle('keyboard-open', !!open);
-    // Translate the hotbar down by the keyboard height so it stays anchored
-    // to the physical screen bottom instead of being lifted with the visual
-    // viewport. Makes the keyboard visually overlay the hotbar.
-    document.documentElement.style.setProperty('--kb-height', (open ? (kbH || 0) : 0) + 'px');
   }
   if (window.visualViewport) {
     const recompute = () => {
       const dh = window.innerHeight - window.visualViewport.height;
-      setKbOpen(dh > KB_DELTA, dh);
+      setKbOpen(dh > KB_DELTA);
     };
     window.visualViewport.addEventListener('resize', recompute);
     recompute();
   } else {
-    document.addEventListener('focusin', e => {
-      if (e.target.matches('input, textarea')) setKbOpen(true, 0);
-    });
-    document.addEventListener('focusout', e => {
-      if (e.target.matches('input, textarea')) setKbOpen(false, 0);
-    });
+    document.addEventListener('focusin',  e => { if (e.target.matches('input, textarea')) setKbOpen(true); });
+    document.addEventListener('focusout', e => { if (e.target.matches('input, textarea')) setKbOpen(false); });
   }
 })();
 
