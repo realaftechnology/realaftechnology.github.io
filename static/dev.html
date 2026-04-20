@@ -983,12 +983,25 @@ async function inviteUser() {
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Invite failed');
     emailInput.value = '';
-    status.style.color = 'var(--green)';
-    status.textContent = data.already_signed_in
+    // Build the summary: "[Invited/Updated] email as role · email status"
+    let summary = data.already_signed_in
       ? `Updated ${email} → ${role}`
       : `Invited ${email} as ${role}`;
+    if (data.already_signed_in) {
+      // Don't re-send an email to someone who's already active; just note it.
+      summary += ' — no email sent (user already active)';
+      status.style.color = 'var(--green)';
+    } else if (data.email_sent) {
+      summary += ' — email sent';
+      status.style.color = 'var(--green)';
+    } else {
+      summary += ' — email NOT sent: ' + (data.email_message || 'unknown error');
+      status.style.color = 'var(--orange, #ff9f0a)';
+    }
+    status.textContent = summary;
     loadUsers();
-    setTimeout(() => { status.textContent = ''; }, 3000);
+    // Leave the status visible longer so email failures are noticed.
+    setTimeout(() => { status.textContent = ''; }, data.email_sent ? 4000 : 8000);
   } catch (e) {
     status.style.color = 'var(--red)';
     status.textContent = e.message;

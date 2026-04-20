@@ -14,8 +14,12 @@ import threading
 import traceback
 import queue as queue_module
 import uuid
+import smtplib
 import urllib.request
 import urllib.error
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
 from collections import deque
 from datetime import datetime
 from flask import Flask, request, jsonify, session, send_from_directory, send_file, Response, stream_with_context, after_this_request, render_template_string, redirect, url_for
@@ -1583,6 +1587,126 @@ def admin_list_users():
     return jsonify({"users": out})
 
 
+# ── INVITATION EMAILS ──────────────────────────────────────────────────────
+# Sends a welcome/invite email over SMTP whenever an admin invites a new user.
+# Configured via env vars; if SMTP credentials aren't set we silently skip the
+# send so local/dev environments without mail config don't break the invite API.
+#
+# Required env vars on Railway (or wherever the app runs):
+#   SMTP_USER   — Gmail address that authenticates with Google (e.g. ops@afbrain.com)
+#   SMTP_PASS   — Gmail "App Password" (NOT the account password; generated at
+#                 https://myaccount.google.com/apppasswords — requires 2FA on).
+# Optional overrides (sensible defaults baked in):
+#   SMTP_HOST   — default smtp.gmail.com
+#   SMTP_PORT   — default 587 (STARTTLS)
+#   SMTP_FROM   — default: same as SMTP_USER
+#   SMTP_FROM_NAME — default: "AFBrain"
+#   APP_URL     — default: https://afbrainapp.up.railway.app (used in the CTA)
+def _smtp_config():
+    return {
+        "host":      os.environ.get("SMTP_HOST", "smtp.gmail.com"),
+        "port":      int(os.environ.get("SMTP_PORT", "587")),
+        "user":      os.environ.get("SMTP_USER", ""),
+        "password":  os.environ.get("SMTP_PASS", ""),
+        "from_addr": os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER", ""),
+        "from_name": os.environ.get("SMTP_FROM_NAME", "AFBrain"),
+        "app_url":   os.environ.get("APP_URL", "https://afbrainapp.up.railway.app"),
+    }
+
+
+def _render_invite_email(to_email, role, invited_by_name, app_url):
+    """Return (subject, text_body, html_body) for the invitation email."""
+    role_label = {"andy": "Andy", "dev": "Developer", "team": "Team"}.get(role, role.title())
+    subject = "You've been invited to AFBrain"
+    # Plain-text fallback for clients that can't render HTML
+    text = f"""Hi,
+
+{invited_by_name or 'An administrator'} has invited you to AFBrain — the Andy Frisella brand's AI-powered knowledge assistant.
+
+Your role: {role_label}
+
+To get started, sign in with this Google account ({to_email}):
+{app_url}
+
+If you weren't expecting this invite, you can safely ignore this email.
+
+— The AFBrain team
+"""
+    # HTML version — simple, inline-styled so it renders well across clients.
+    html = f"""<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:#ffffff;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#0a0a0a;padding:40px 20px;">
+      <tr><td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:520px;background:#111;border:1px solid rgba(84,84,88,0.5);border-radius:12px;overflow:hidden;">
+          <tr><td style="padding:32px 28px 24px;border-bottom:1px solid rgba(84,84,88,0.3);">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:0.5px;line-height:1;color:#ffffff;">
+              <span style="color:#ff453a;">AF</span>Brain
+            </div>
+          </td></tr>
+          <tr><td style="padding:28px;">
+            <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;color:#ffffff;line-height:1.3;">You've been invited to AFBrain</h1>
+            <p style="font-size:15px;line-height:1.55;color:rgba(235,235,245,0.8);margin:0 0 12px;">
+              {(invited_by_name or 'An administrator')} has invited you to AFBrain — the Andy Frisella brand's AI-powered knowledge assistant.
+            </p>
+            <p style="font-size:14px;line-height:1.55;color:rgba(235,235,245,0.6);margin:0 0 24px;">
+              Your role: <strong style="color:#ffffff;">{role_label}</strong>
+            </p>
+            <p style="margin:0 0 24px;">
+              <a href="{app_url}" style="display:inline-block;background:#ff453a;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;font-size:15px;">
+                Sign in to AFBrain
+              </a>
+            </p>
+            <p style="font-size:13px;line-height:1.55;color:rgba(235,235,245,0.5);margin:0 0 8px;">
+              Sign in with this Google account:
+              <strong style="color:rgba(235,235,245,0.85);">{to_email}</strong>
+            </p>
+            <p style="font-size:12px;line-height:1.5;color:rgba(235,235,245,0.4);margin:24px 0 0;">
+              If you weren't expecting this invite, you can safely ignore this email.
+            </p>
+          </td></tr>
+        </table>
+        <p style="font-size:11px;color:rgba(235,235,245,0.35);margin:16px 0 0;">— The AFBrain team</p>
+      </td></tr>
+    </table>
+  </body>
+</html>"""
+    return subject, text, html
+
+
+def send_invite_email(to_email, role, invited_by_name=None):
+    """Send an invitation email. Returns (ok, message).
+    ok=False indicates the send failed; the invite should still succeed at the
+    DB level — we just surface the email status to the admin UI."""
+    cfg = _smtp_config()
+    if not cfg["user"] or not cfg["password"]:
+        return False, "SMTP not configured (set SMTP_USER and SMTP_PASS)"
+
+    subject, text_body, html_body = _render_invite_email(
+        to_email=to_email, role=role,
+        invited_by_name=invited_by_name, app_url=cfg["app_url"]
+    )
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = formataddr((cfg["from_name"], cfg["from_addr"]))
+    msg["To"]      = to_email
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html",  "utf-8"))
+
+    try:
+        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(cfg["user"], cfg["password"])
+            server.sendmail(cfg["from_addr"], [to_email], msg.as_string())
+        return True, "sent"
+    except Exception as e:
+        # Log but don't raise — caller decides how to surface this.
+        print(f"[invite-email] failed to send to {to_email}: {e}", flush=True)
+        return False, str(e)
+
+
 @app.route("/api/admin/users/invite", methods=["POST"])
 @requires_role("dev", "andy")
 def admin_invite_user():
@@ -1618,8 +1742,21 @@ def admin_invite_user():
         conn.commit()
     finally:
         conn.close()
+
+    # Send the invitation email — but only for BRAND-NEW invites. If the user
+    # is already signed in (role update), don't spam them with another welcome.
+    invited_by_name = me.get("name") or me.get("email") or None
+    if existing:
+        email_sent, email_message = False, "user already active — no email sent"
+    else:
+        email_sent, email_message = send_invite_email(
+            to_email=email, role=role, invited_by_name=invited_by_name
+        )
+
     return jsonify({"ok": True, "email": email, "role": role,
-                    "already_signed_in": bool(existing)})
+                    "already_signed_in": bool(existing),
+                    "email_sent": email_sent,
+                    "email_message": email_message})
 
 
 @app.route("/api/admin/users/by-email/<path:email>", methods=["DELETE"])
