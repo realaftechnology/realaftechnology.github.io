@@ -2755,7 +2755,10 @@ def _brand_analytics_path():
 
 @app.route("/data-center")
 def data_center_page():
-    return send_from_directory("static", "data-center.html")
+    # The data-center view is now part of the single-page app shell.
+    # Serve index.html and let the client-side router show the data view
+    # based on location.pathname.
+    return send_from_directory("static", "index.html")
 
 
 @app.route("/api/brand-analytics")

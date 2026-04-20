@@ -13,6 +13,7 @@
 <title>AFBrain</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
@@ -229,6 +230,33 @@ body {
   padding: 10px 12px;
   border-bottom: 0.5px solid var(--separator);
   flex-shrink: 0;
+}
+/* View switcher inside sidebar (desktop primary, mobile secondary nav) */
+.sidebar-views {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--separator);
+}
+.sidebar-view-link {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: none;
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sidebar-view-link:hover { background: var(--bg-tertiary); }
+.sidebar-view-link:active { opacity: 0.7; }
+body[data-view="chat"] .sidebar-view-link[data-sv="chat"],
+body[data-view="data"] .sidebar-view-link[data-sv="data"] {
+  background: var(--red);
+  color: #fff;
 }
 .sidebar-search input {
   width: 100%;
@@ -478,10 +506,146 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 .new-chat-btn:hover { color: var(--label); background: var(--bg-secondary); }
 .new-chat-btn:active { opacity: 0.6; }
 
+/* ── DATA CENTER (imported from data-center.html for the SPA) ──────────── */
+/* Scoped under .view-data — declarations are identical to the originals. */
+.view-data { color: var(--label); font-size: 15px; line-height: 1.47; }
+.view-data .data-scroll {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.view-data .page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 32px);
+}
+.view-data .page-title {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; margin-bottom: 22px; flex-wrap: wrap;
+}
+.view-data .page-title h1 {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0;
+}
+.view-data .page-title .meta {
+  display: flex; gap: 10px; color: var(--label-secondary); font-size: 13px;
+}
+.view-data .page-title .pill {
+  background: var(--bg-secondary);
+  padding: 6px 12px; border-radius: 999px;
+}
+.view-data .refresh-btn {
+  background: var(--bg-secondary);
+  color: var(--label); border: none;
+  padding: 6px 14px; border-radius: 999px;
+  font-family: var(--sf); font-size: 13px; font-weight: 500;
+  cursor: pointer;
+}
+.view-data .refresh-btn:active { opacity: 0.6; }
+.view-data section { margin-bottom: 32px; }
+.view-data .section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--label-secondary);
+  margin: 0 0 12px;
+}
+.view-data .scorecard {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.view-data .kpi {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.view-data .kpi .label { color: var(--label-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.view-data .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; letter-spacing: -0.02em; }
+.view-data .kpi .delta { margin-top: 6px; font-size: 12px; }
+.view-data .delta.up { color: #32d74b; }
+.view-data .delta.down { color: var(--red); }
+.view-data .delta.flat { color: var(--label-tertiary); }
+.view-data .row { display: grid; gap: 10px; }
+.view-data .row-2 { grid-template-columns: 1fr 1fr; }
+.view-data .row-3 { grid-template-columns: 2fr 1fr; }
+@media (max-width: 860px) {
+  .view-data .row-2, .view-data .row-3 { grid-template-columns: 1fr; }
+}
+.view-data .panel {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.view-data .panel h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.view-data .chart-box { position: relative; height: 260px; }
+.view-data .platforms {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.view-data .platform-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.view-data .platform-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.view-data .platform-title { display: flex; align-items: center; gap: 10px; }
+.view-data .platform-dot { width: 8px; height: 8px; border-radius: 50%; }
+.view-data .platform-name { font-weight: 600; font-size: 14px; }
+.view-data .platform-handle { color: var(--label-secondary); font-size: 12px; }
+.view-data .platform-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 13px;
+}
+.view-data .platform-grid .k { color: var(--label-secondary); }
+.view-data .platform-grid .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.view-data .platform-grid .v .delta { display: inline; font-size: 11px; margin-left: 6px; font-weight: 500; }
+.view-data .accounts-detail {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--separator);
+}
+.view-data .accounts-detail summary {
+  cursor: pointer; color: var(--label-secondary); font-size: 12px;
+  list-style: none; user-select: none;
+}
+.view-data .accounts-detail summary::-webkit-details-marker { display: none; }
+.view-data .accounts-detail summary::before { content: "▸ "; font-size: 10px; }
+.view-data .accounts-detail[open] summary::before { content: "▾ "; }
+.view-data .account-row {
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  gap: 10px; padding: 8px 0; font-size: 12px;
+  border-bottom: 1px solid var(--separator);
+}
+.view-data .account-row:last-child { border-bottom: none; }
+.view-data .account-row .u { color: var(--label); font-weight: 500; }
+.view-data .account-row .m { color: var(--label-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+.view-data .account-row .m strong { color: var(--label); font-weight: 600; display: block; }
+.view-data .posts { display: flex; flex-direction: column; gap: 8px; }
+.view-data .post {
+  display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 12px; background: var(--bg-tertiary); border-radius: 10px;
+}
+.view-data .post .rank { color: var(--label-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.view-data .post .title { font-size: 14px; }
+.view-data .post .plat { color: var(--label-secondary); font-size: 12px; }
+.view-data .post .stats { text-align: right; font-size: 11px; color: var(--label-secondary); }
+.view-data .post .stats strong { color: var(--label); display: block; font-size: 13px; font-variant-numeric: tabular-nums; }
+.view-data .empty-hint {
+  color: var(--label-secondary); font-size: 13px; padding: 12px;
+  text-align: center;
+}
+.view-data .banner {
+  background: rgba(255, 159, 10, 0.1);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  color: var(--orange);
+  padding: 10px 14px; border-radius: 10px; font-size: 12px;
+  margin-bottom: 16px;
+}
+.view-data .data-empty {
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; min-height: 200px;
+  color: var(--label-tertiary); font-size: 14px;
+}
+
 /* ── MOBILE BOTTOM TAB BAR ── */
-/* Fixed to the bottom, above everything but the keyboard. Hidden on desktop
-   and when the software keyboard is open (body.keyboard-open). */
-:root { --tab-bar-height: 56px; }
+/* Pinned to the physical screen bottom at all times. When the keyboard is
+   open the bar is translated down by --kb-height so the keyboard visually
+   overlays it — the bar itself never moves relative to the screen. */
+:root { --tab-bar-height: 56px; --kb-height: 0px; }
 .bottom-tab-bar {
   display: none;
   position: fixed;
@@ -493,6 +657,8 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
+  transform: translateY(var(--kb-height));
+  transition: transform 0.18s ease;
 }
 body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 .bottom-tab-bar-inner {
@@ -654,6 +820,39 @@ body.keyboard-open .input-area { margin-bottom: 0; }
   .profile-sheet-backdrop { display: none; }
 }
 
+
+/* ── SPA VIEWS WRAPPER ──────────────────────────────────────────────────── */
+/* The chat and data-center views live side-by-side inside this container and
+   slide horizontally when the active tab changes. Header and hotbar sit
+   outside the views so they never remount during navigation. */
+.views-wrap {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+.view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+/* Default positions (dark-mode of data-view: it's waiting off-screen to the right) */
+.view-chat { transform: translateX(0); }
+.view-data { transform: translateX(100%); }
+/* When the body has data-view="data", chat slides left and data slides into place */
+body[data-view="data"] .view-chat { transform: translateX(-100%); }
+body[data-view="data"] .view-data { transform: translateX(0); }
+/* When we navigate programmatically without animation (initial page load),
+   disable transitions briefly so the views don't visibly slide in. */
+body.views-no-anim .view { transition: none !important; }
 
 /* ── SCROLL AREA ── */
 .scroll-area {
@@ -1872,6 +2071,13 @@ body.keyboard-open .input-area { margin-bottom: 0; }
       <span class="sidebar-head-title">Episodes</span>
       <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
     </div>
+    <!-- Desktop view switcher: hotbar is mobile-only so desktop users use this -->
+    <nav class="sidebar-views" aria-label="Views">
+      <button class="sidebar-view-link" data-sv="chat"
+              onclick="navigate('chat'); toggleSidebar();">Chat</button>
+      <button class="sidebar-view-link" data-sv="data"
+              onclick="navigate('data'); toggleSidebar();">Data Center</button>
+    </nav>
     <div class="sidebar-search">
       <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
     </div>
@@ -1925,56 +2131,130 @@ body.keyboard-open .input-area { margin-bottom: 0; }
     </div>
   </div>
 
-  <div class="scroll-area" id="scroll-area">
-    <div id="results-area">
-      <div class="empty-state" id="empty-state">
-        <div class="quote-block" id="quote-block">
-          <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
-          <div class="quote-ep" id="quote-ep"></div>
+  <!-- ── SPA VIEWS ── Chat and Data Center live here; the hotbar tab bar
+       and swipe gestures toggle between them with a horizontal slide. -->
+  <div class="views-wrap" id="views-wrap">
+
+    <!-- Chat view: existing scroll area, suggestion chips, input bar -->
+    <section class="view view-chat" data-view="chat">
+      <div class="scroll-area" id="scroll-area">
+        <div id="results-area">
+          <div class="empty-state" id="empty-state">
+            <div class="quote-block" id="quote-block">
+              <div class="quote-text" id="quote-text">&#8220;&#8221;</div>
+              <div class="quote-ep" id="quote-ep"></div>
+            </div>
+          </div>
+        </div>
+        <div class="scroll-bottom-pad"></div>
+      </div>
+
+      <!-- Suggestion chips: horizontal scroll bar anchored above input -->
+      <div id="suggestion-bar"></div>
+
+      <!-- Input bar is in-flow inside .view-chat flex column.
+           It naturally sits above the keyboard because _pinHeight shrinks
+           #main-screen to visualViewport.height when the keyboard opens. -->
+      <div class="input-area" id="input-area">
+        <div class="input-area-inner">
+          <div id="voice-status"></div>
+          <div id="locked-pill" style="display:none">
+            <div class="locked-ep-pill">
+              <span id="locked-label"></span>
+              <button onclick="clearLockedEpisode()">✕</button>
+            </div>
+          </div>
+          <div id="voice-waveform-row">
+            <canvas id="voice-waveform"></canvas>
+            <button class="input-submit" onclick="toggleVoiceRecording()" aria-label="Stop recording">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><rect x="0" y="0" width="12" height="12" rx="2"/></svg>
+            </button>
+          </div>
+          <div id="voice-save-row">
+            <button id="voice-save-btn" onclick="savePendingVoiceNote()">Save</button>
+            <button id="voice-discard-btn" onclick="discardPendingVoiceNote()">Discard</button>
+          </div>
+          <div class="input-bar">
+            <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
+            <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+            <button class="input-submit" id="voice-btn" style="display:none" onclick="toggleVoiceRecording()" aria-label="Record voice note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+                <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="scroll-bottom-pad"></div>
-  </div>
+    </section>
 
-  <!-- Suggestion chips: horizontal scroll bar anchored above input -->
-  <div id="suggestion-bar"></div>
+    <!-- Data Center view: rendered into #data-page on first activation -->
+    <section class="view view-data" data-view="data">
+      <div class="data-scroll" id="data-scroll">
+        <main class="page" id="data-page">
+          <div class="page-title">
+            <div>
+              <h1>Data Center</h1>
+              <div class="meta" style="margin-top:4px">
+                <span class="pill" id="period-pill">—</span>
+                <span class="pill" id="updated-pill">—</span>
+              </div>
+            </div>
+            <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">Refresh</button>
+          </div>
 
-  <!-- Input bar is in-flow inside #main-screen flex column.
-       It naturally sits above the keyboard because _pinHeight shrinks
-       #main-screen to visualViewport.height when the keyboard opens. -->
-  <div class="input-area" id="input-area">
-    <div class="input-area-inner">
-      <div id="voice-status"></div>
-      <div id="locked-pill" style="display:none">
-        <div class="locked-ep-pill">
-          <span id="locked-label"></span>
-          <button onclick="clearLockedEpisode()">✕</button>
-        </div>
+          <div id="banner" class="banner" style="display:none"></div>
+
+          <section>
+            <h2 class="section-label">Brand Impact — At a Glance</h2>
+            <div class="scorecard" id="scorecard"></div>
+          </section>
+
+          <section>
+            <h2 class="section-label">Trend Over Time</h2>
+            <div class="row row-2">
+              <div class="panel">
+                <h3>Followers</h3>
+                <div class="chart-box"><canvas id="chartFollowers"></canvas></div>
+              </div>
+              <div class="panel">
+                <h3>Weekly Reach</h3>
+                <div class="chart-box"><canvas id="chartReach"></canvas></div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="section-label">Platform Comparison</h2>
+            <div class="row row-3">
+              <div class="panel">
+                <h3>Audience &amp; Reach by Platform</h3>
+                <div class="chart-box"><canvas id="chartCompare"></canvas></div>
+              </div>
+              <div class="panel">
+                <h3>Engagement Share</h3>
+                <div class="chart-box"><canvas id="chartShare"></canvas></div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="section-label">Top Performing Content</h2>
+            <div class="panel">
+              <div class="posts" id="topPosts"></div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="section-label">Per-Platform Detail</h2>
+            <div class="platforms" id="platforms"></div>
+          </section>
+        </main>
       </div>
-      <div id="voice-waveform-row">
-        <canvas id="voice-waveform"></canvas>
-        <button class="input-submit" onclick="toggleVoiceRecording()" aria-label="Stop recording">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><rect x="0" y="0" width="12" height="12" rx="2"/></svg>
-        </button>
-      </div>
-      <div id="voice-save-row">
-        <button id="voice-save-btn" onclick="savePendingVoiceNote()">Save</button>
-        <button id="voice-discard-btn" onclick="discardPendingVoiceNote()">Discard</button>
-      </div>
-      <div class="input-bar">
-        <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
-        <button class="input-submit" id="voice-btn" style="display:none" onclick="toggleVoiceRecording()" aria-label="Record voice note">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
-            <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </div>
+    </section>
+
   </div>
 
 </div>
@@ -1993,21 +2273,21 @@ body.keyboard-open .input-area { margin-bottom: 0; }
         </svg>
         <span>Content</span>
       </button>
-      <a class="tab-item active" id="tab-chat" href="/" aria-label="Chat">
+      <button class="tab-item active" id="tab-chat" onclick="navigate('chat')" aria-label="Chat">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
           <path d="M3.5 10.5C3.5 6.91 6.64 4 10.5 4h1c3.86 0 7 2.91 7 6.5 0 3.59-3.14 6.5-7 6.5H8l-3.5 2.5.7-3.2A6.36 6.36 0 0 1 3.5 10.5Z"
                 stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/>
         </svg>
         <span>Chat</span>
-      </a>
-      <a class="tab-item" id="tab-data" href="/data-center" aria-label="Data Center">
+      </button>
+      <button class="tab-item" id="tab-data" onclick="navigate('data')" aria-label="Data Center">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
           <rect x="3"  y="12" width="3" height="7" rx="1" fill="currentColor"/>
           <rect x="9.5" y="7"  width="3" height="12" rx="1" fill="currentColor"/>
           <rect x="16" y="3"  width="3" height="16" rx="1" fill="currentColor"/>
         </svg>
         <span>Data</span>
-      </a>
+      </button>
       <button class="tab-item" id="tab-profile" onclick="openProfileSheet()" aria-label="Settings and Profile">
         <img id="tab-avatar" class="tab-avatar" src="" alt="">
         <span>Profile</span>
@@ -2114,9 +2394,44 @@ function toggleSidebar() {
 function openSidebarFromTab() {
   const input = document.getElementById('search-input');
   if (input) input.blur();
+  if (isProfileSheetOpen()) closeProfileSheet({ silent: true });
   const sidebar = document.getElementById('sidebar');
   if (sidebar && !sidebar.classList.contains('open')) toggleSidebar();
 }
+
+// ── SPA NAVIGATION ──────────────────────────────────────────────────────────
+// navigate('chat'|'data') swaps the active view with a CSS slide transition.
+// Uses pushState so URL stays meaningful and deep links keep working.
+const VIEW_PATHS = { chat: '/', data: '/data-center' };
+let _dataLoaded = false;
+function navigate(view, opts) {
+  opts = opts || {};
+  if (view !== 'chat' && view !== 'data') return;
+  const current = document.body.dataset.view || 'chat';
+  if (current === view && !opts.force) { setActiveTab(view); return; }
+  // Close profile sheet if it's open, since navigating should return to a real view
+  if (isProfileSheetOpen()) closeProfileSheet({ silent: true });
+  // Dismiss the keyboard so the input doesn't remain focused in the off-screen view
+  const input = document.getElementById('search-input');
+  if (input && document.activeElement === input) input.blur();
+  document.body.dataset.view = view;
+  setActiveTab(view);
+  if (!opts.skipPush) {
+    const path = VIEW_PATHS[view];
+    if (window.location.pathname !== path) {
+      history.pushState({ view }, '', path);
+    }
+  }
+  if (view === 'data' && !_dataLoaded) {
+    _dataLoaded = true;
+    initDataCenter().catch(err => console.error('[data-center] initial load failed:', err));
+  }
+}
+window.addEventListener('popstate', (e) => {
+  const path = window.location.pathname;
+  const view = path.startsWith('/data-center') ? 'data' : 'chat';
+  navigate(view, { skipPush: true });
+});
 
 // ── PROFILE SHEET ────────────────────────────────────────────────────────────
 function openProfileSheet() {
@@ -2130,14 +2445,15 @@ function openProfileSheet() {
   sheet.setAttribute('aria-hidden', 'false');
   setActiveTab('profile');
 }
-function closeProfileSheet() {
+function closeProfileSheet(opts) {
+  opts = opts || {};
   const sheet = document.getElementById('profile-sheet');
   const bd    = document.getElementById('profile-sheet-backdrop');
   if (!sheet) return;
   sheet.classList.remove('open');
   if (bd) bd.classList.remove('visible');
   sheet.setAttribute('aria-hidden', 'true');
-  setActiveTab('chat');
+  if (!opts.silent) setActiveTab(document.body.dataset.view || 'chat');
 }
 function isProfileSheetOpen() {
   const sheet = document.getElementById('profile-sheet');
@@ -2151,11 +2467,17 @@ function setActiveTab(which) {
     if (el) el.classList.toggle('active', k === which);
   });
 }
-// On load, set tab-chat vs tab-data based on the URL path.
-(function initActiveTab() {
-  const p = window.location.pathname;
-  if (p.startsWith('/data-center')) setActiveTab('data');
-  else setActiveTab('chat');
+// Initial view from URL — done without animation so the initial render is instant.
+(function initView() {
+  const path = window.location.pathname;
+  const view = path.startsWith('/data-center') ? 'data' : 'chat';
+  document.body.classList.add('views-no-anim');
+  document.body.dataset.view = view;
+  setActiveTab(view);
+  // Allow transitions after the next frame so subsequent nav animates.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('views-no-anim');
+  }));
 })();
 
 async function loadEpisodeList() {
@@ -3754,7 +4076,7 @@ document.body.addEventListener('touchmove', function(e) {
       return;
     }
 
-    // Profile-sheet swipe-right → close back to Data Center
+    // Profile-sheet swipe-right → close back to whichever view is underneath
     if (isProfileSheetOpen()) {
       if (dx > 0 && isMobile) closeProfileSheet();
       return;
@@ -3763,16 +4085,19 @@ document.body.addEventListener('touchmove', function(e) {
     // Page-level horizontal nav (mobile only, only when no modal/overlay is on)
     if (!isMobile) return;
     // Ignore swipes that start inside scrollable panels where horizontal
-    // movement belongs to that panel (suggestion bar, clip-strip, etc.)
-    const inHScroll = e.target.closest('#suggestion-bar, .clip-strip, .clip-film-wrap, video');
+    // movement belongs to that panel (charts, suggestion bar, etc.)
+    const inHScroll = e.target.closest('#suggestion-bar, .clip-strip, .clip-film-wrap, video, canvas, .chart-box, .platforms');
     if (inHScroll) return;
 
-    // Chat view (/) — swipe left → Data Center
-    if (dx < 0 && window.location.pathname === '/') {
-      window.location.href = '/data-center';
-      return;
+    const currentView = document.body.dataset.view || 'chat';
+    if (dx < 0) {
+      // Swipe left: chat → data → profile
+      if (currentView === 'chat') navigate('data');
+      else if (currentView === 'data') openProfileSheet();
+    } else if (dx > 0) {
+      // Swipe right: data → chat, profile → data (profile handled above)
+      if (currentView === 'data') navigate('chat');
     }
-    // (Data Center page has its own handler that mirrors this.)
   }, { passive: true });
 })();
 
@@ -3782,22 +4107,26 @@ document.body.addEventListener('touchmove', function(e) {
 // focus/blur on text inputs.
 (function() {
   const KB_DELTA = 120; // px drop in viewport height that indicates keyboard
-  function setKbOpen(open) {
+  function setKbOpen(open, kbH) {
     document.body.classList.toggle('keyboard-open', !!open);
+    // Translate the hotbar down by the keyboard height so it stays anchored
+    // to the physical screen bottom instead of being lifted with the visual
+    // viewport. Makes the keyboard visually overlay the hotbar.
+    document.documentElement.style.setProperty('--kb-height', (open ? (kbH || 0) : 0) + 'px');
   }
   if (window.visualViewport) {
     const recompute = () => {
       const dh = window.innerHeight - window.visualViewport.height;
-      setKbOpen(dh > KB_DELTA);
+      setKbOpen(dh > KB_DELTA, dh);
     };
     window.visualViewport.addEventListener('resize', recompute);
     recompute();
   } else {
     document.addEventListener('focusin', e => {
-      if (e.target.matches('input, textarea')) setKbOpen(true);
+      if (e.target.matches('input, textarea')) setKbOpen(true, 0);
     });
     document.addEventListener('focusout', e => {
-      if (e.target.matches('input, textarea')) setKbOpen(false);
+      if (e.target.matches('input, textarea')) setKbOpen(false, 0);
     });
   }
 })();
@@ -4289,6 +4618,219 @@ function hideSplash() {
     hideSplash();
     document.getElementById('login-screen').style.opacity = '1';
   }
+})();
+
+// ── DATA CENTER (merged from data-center.html for the SPA) ──────────────────
+// Renders KPIs, charts, platform cards, top posts. Called lazily on first
+// navigation to the Data view so we don't pay its cost on the chat screen.
+(function() {
+  const fmt = (n) => {
+    if (n == null || isNaN(n)) return "—";
+    if (Math.abs(n) >= 1_000_000) return (n/1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (Math.abs(n) >= 1_000) return (n/1_000).toFixed(1).replace(/\.0$/, "") + "k";
+    return n.toLocaleString();
+  };
+  const pct = (curr, prior) => (!prior ? null : ((curr - prior) / prior) * 100);
+  const deltaHTML = (curr, prior) => {
+    const p = pct(curr, prior);
+    if (p == null) return `<span class="delta flat">—</span>`;
+    if (Math.abs(p) < 0.1) return `<span class="delta flat">0%</span>`;
+    const cls = p > 0 ? "up" : "down";
+    const arrow = p > 0 ? "▲" : "▼";
+    return `<span class="delta ${cls}">${arrow} ${Math.abs(p).toFixed(1)}%</span>`;
+  };
+
+  let _charts = [];
+  function renderDataCenter(DATA) {
+    const platforms = DATA.platforms || {};
+    const keys = Object.keys(platforms);
+    document.getElementById("period-pill").textContent = DATA.meta?.period || "—";
+    document.getElementById("updated-pill").textContent = "Updated " + (DATA.meta?.lastUpdated
+      ? new Date(DATA.meta.lastUpdated).toLocaleString() : "—");
+
+    const anyConnected = keys.some(k => platforms[k].connected);
+    const banner = document.getElementById("banner");
+    if (!anyConnected) {
+      banner.style.display = "block";
+      banner.textContent = "Showing sample data. Connect sources (Windsor.ai) to populate live numbers.";
+    } else if (keys.some(k => !platforms[k].connected)) {
+      const sample = keys.filter(k => !platforms[k].connected).map(k => platforms[k].name).join(", ");
+      banner.style.display = "block";
+      banner.textContent = "Live: " + keys.filter(k => platforms[k].connected).map(k => platforms[k].name).join(", ")
+                          + ". Still sample data: " + sample + ".";
+    } else {
+      banner.style.display = "none";
+    }
+
+    // Totals
+    const T = { followers:0, priorFollowers:0, reach:0, priorReach:0,
+                engagement:0, priorEngagement:0, impressions:0, priorImpressions:0,
+                posts:0, priorPosts:0 };
+    for (const k of keys) {
+      const p = platforms[k];
+      T.followers += p.followers?.current || 0;     T.priorFollowers += p.followers?.prior || 0;
+      T.reach += p.reach?.current || 0;             T.priorReach += p.reach?.prior || 0;
+      T.engagement += p.engagement?.current || 0;   T.priorEngagement += p.engagement?.prior || 0;
+      T.impressions += p.impressions?.current || 0; T.priorImpressions += p.impressions?.prior || 0;
+      T.posts += p.posts?.current || 0;             T.priorPosts += p.posts?.prior || 0;
+    }
+    const er  = T.reach ? (T.engagement / T.reach) * 100 : 0;
+    const pEr = T.priorReach ? (T.priorEngagement / T.priorReach) * 100 : 0;
+    const kpis = [
+      { label:"Total Followers", value:fmt(T.followers),   delta:deltaHTML(T.followers, T.priorFollowers) },
+      { label:"Total Reach",     value:fmt(T.reach),       delta:deltaHTML(T.reach, T.priorReach) },
+      { label:"Impressions",     value:fmt(T.impressions), delta:deltaHTML(T.impressions, T.priorImpressions) },
+      { label:"Engagements",     value:fmt(T.engagement),  delta:deltaHTML(T.engagement, T.priorEngagement) },
+      { label:"Engagement Rate", value:er.toFixed(2)+"%",  delta:deltaHTML(er, pEr) },
+      { label:"Posts Published", value:fmt(T.posts),       delta:deltaHTML(T.posts, T.priorPosts) },
+    ];
+    document.getElementById("scorecard").innerHTML = kpis.map(k => `
+      <div class="kpi">
+        <div class="label">${k.label}</div>
+        <div class="value">${k.value}</div>
+        <div>${k.delta}</div>
+      </div>`).join("");
+
+    // Platform cards
+    document.getElementById("platforms").innerHTML = keys.map(k => {
+      const p = platforms[k];
+      const acc = (p.accounts && p.accounts.length) ? `
+        <details class="accounts-detail">
+          <summary>${p.accounts.length} account${p.accounts.length === 1 ? "" : "s"} — breakdown</summary>
+          ${p.accounts.slice().sort((a,b) => (b.followers||0)-(a.followers||0)).map(a => `
+            <div class="account-row">
+              <div class="u">@${a.username}</div>
+              <div class="m"><strong>${fmt(a.followers)}</strong>followers</div>
+              <div class="m"><strong>${fmt(a.reach?.current||0)}</strong>reach</div>
+              <div class="m"><strong>${fmt(a.engagement?.current||0)}</strong>engage</div>
+            </div>`).join("")}
+        </details>` : "";
+      return `
+        <div class="platform-card">
+          <div class="platform-head">
+            <div class="platform-title">
+              <span class="platform-dot" style="background:${p.color}"></span>
+              <div>
+                <div class="platform-name">${p.name}</div>
+                <div class="platform-handle">${p.handle}</div>
+              </div>
+            </div>
+            <span class="platform-handle">${p.connected ? "● live" : "○ sample"}</span>
+          </div>
+          <div class="platform-grid">
+            <div class="k">Followers</div>
+            <div class="v">${fmt(p.followers.current)} ${deltaHTML(p.followers.current, p.followers.prior)}</div>
+            <div class="k">Reach</div>
+            <div class="v">${fmt(p.reach.current)} ${deltaHTML(p.reach.current, p.reach.prior)}</div>
+            <div class="k">Engagement</div>
+            <div class="v">${fmt(p.engagement.current)} ${deltaHTML(p.engagement.current, p.engagement.prior)}</div>
+            <div class="k">Posts</div>
+            <div class="v">${fmt(p.posts.current)} ${deltaHTML(p.posts.current, p.posts.prior)}</div>
+          </div>
+          ${acc}
+        </div>`;
+    }).join("");
+
+    // Top posts
+    const allPosts = [];
+    for (const k of keys) for (const post of (platforms[k].topPosts || []))
+      allPosts.push({ ...post, platform: platforms[k].name, color: platforms[k].color });
+    allPosts.sort((a,b) => (b.engagement||0)-(a.engagement||0));
+    const topPostsEl = document.getElementById("topPosts");
+    topPostsEl.innerHTML = allPosts.slice(0, 10).map((p, i) => `
+      <div class="post">
+        <div class="rank">${String(i+1).padStart(2, "0")}</div>
+        <div>
+          <div class="title">${p.title}</div>
+          <div class="plat"><span style="color:${p.color}">●</span> ${p.platform}</div>
+        </div>
+        <div class="stats">
+          <strong>${fmt(p.engagement)}</strong>
+          ${fmt(p.reach)} reach
+        </div>
+      </div>`).join("") || `<div class="empty-hint">Top post data will appear once a media-level pull is wired in.</div>`;
+
+    // Charts
+    _charts.forEach(c => c.destroy()); _charts = [];
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.color = "rgba(235,235,245,0.6)";
+    Chart.defaults.borderColor = "rgba(84,84,88,0.5)";
+    Chart.defaults.font.family = "-apple-system, 'Helvetica Neue', sans-serif";
+
+    const dateSet = new Set();
+    for (const k of keys) for (const pt of (platforms[k].timeseries || [])) dateSet.add(pt.date);
+    const dates = [...dateSet].sort();
+    const seriesFor = (k, field) => dates.map(d => {
+      const pt = (platforms[k].timeseries || []).find(p => p.date === d);
+      return pt ? pt[field] : null;
+    });
+
+    _charts.push(new Chart(document.getElementById("chartFollowers"), {
+      type: "line",
+      data: { labels: dates, datasets: keys.map(k => ({
+        label: platforms[k].name, data: seriesFor(k, "followers"),
+        borderColor: platforms[k].color, backgroundColor: platforms[k].color + "22",
+        tension: 0.35, pointRadius: 2, borderWidth: 2,
+      })) },
+      options: { maintainAspectRatio: false, responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+        scales: { y: { grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+    }));
+    _charts.push(new Chart(document.getElementById("chartReach"), {
+      type: "line",
+      data: { labels: dates, datasets: keys.map(k => ({
+        label: platforms[k].name, data: seriesFor(k, "reach"),
+        borderColor: platforms[k].color, backgroundColor: platforms[k].color + "22",
+        tension: 0.35, pointRadius: 2, borderWidth: 2, fill: false,
+      })) },
+      options: { maintainAspectRatio: false, responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+    }));
+    _charts.push(new Chart(document.getElementById("chartCompare"), {
+      type: "bar",
+      data: { labels: keys.map(k => platforms[k].name), datasets: [
+        { label:"Followers",  data:keys.map(k => platforms[k].followers.current),  backgroundColor:"#ff453a" },
+        { label:"Reach",      data:keys.map(k => platforms[k].reach.current),      backgroundColor:"#ff9f0a" },
+        { label:"Engagement", data:keys.map(k => platforms[k].engagement.current), backgroundColor:"#32d74b" },
+      ] },
+      options: { maintainAspectRatio: false, responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+        scales: { y: { type: "logarithmic", grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+    }));
+    _charts.push(new Chart(document.getElementById("chartShare"), {
+      type: "doughnut",
+      data: { labels: keys.map(k => platforms[k].name), datasets: [{
+        data: keys.map(k => platforms[k].engagement.current),
+        backgroundColor: keys.map(k => platforms[k].color), borderWidth: 0,
+      }] },
+      options: { maintainAspectRatio: false, responsive: true, cutout: "62%",
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } } }
+    }));
+  }
+  async function loadDataCenterData() {
+    const r = await fetch("/api/brand-analytics", { credentials: "include" });
+    if (!r.ok) throw new Error("fetch failed: " + r.status);
+    return r.json();
+  }
+  window.refreshData = async function refreshData() {
+    const btn = document.getElementById("refresh-btn");
+    if (!btn) return;
+    btn.textContent = "Refreshing…"; btn.disabled = true;
+    try { renderDataCenter(await loadDataCenterData()); }
+    catch (e) { console.error(e); alert("Refresh failed: " + e.message); }
+    finally { btn.textContent = "Refresh"; btn.disabled = false; }
+  };
+  window.initDataCenter = async function initDataCenter() {
+    try { renderDataCenter(await loadDataCenterData()); }
+    catch (e) {
+      const banner = document.getElementById("banner");
+      if (banner) {
+        banner.style.display = "block";
+        banner.textContent = "Could not load brand analytics: " + e.message;
+      }
+    }
+  };
 })();
 </script>
 </body>
