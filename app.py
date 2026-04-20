@@ -54,6 +54,77 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 ALLOWED_EMAILS = {e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()}
 ALLOWED_DOMAIN = os.environ.get("ALLOWED_DOMAIN", "").strip().lower()
 
+# Basic RFC-5322-ish check — good enough to reject obvious garbage before we
+# put it in the DB. Full validation happens at OAuth time via Google.
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def _db_has_any_allowed_emails(conn):
+    """True if the allowed_emails table has at least one row. Used by the
+    access check below: if neither env vars nor DB list anything, we fall
+    back to the original 'allow any Google account' behavior so first-run
+    deployments aren't bricked."""
+    try:
+        row = conn.execute("SELECT 1 FROM allowed_emails LIMIT 1").fetchone()
+        return row is not None
+    except Exception:
+        return False
+
+
+def is_email_allowed(email):
+    """Return True if `email` is permitted to sign in. Consults, in order:
+      1. ALLOWED_EMAILS env var  (Railway-managed)
+      2. ALLOWED_DOMAIN env var  (Railway-managed)
+      3. allowed_emails DB table (dashboard-managed)
+    If all three are empty, allow any Google account (first-run default).
+    """
+    email = (email or "").lower()
+    if not email:
+        return False
+    if ALLOWED_EMAILS and email in ALLOWED_EMAILS:
+        return True
+    if ALLOWED_DOMAIN and email.endswith("@" + ALLOWED_DOMAIN):
+        return True
+    conn = get_db()
+    db_has_entries = False
+    if conn:
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM allowed_emails WHERE email = ? COLLATE NOCASE",
+                (email,),
+            ).fetchone()
+            if row:
+                conn.close()
+                return True
+            db_has_entries = _db_has_any_allowed_emails(conn)
+        finally:
+            conn.close()
+    # Legacy fallback: if nothing is configured anywhere, permit all signups.
+    if not ALLOWED_EMAILS and not ALLOWED_DOMAIN and not db_has_entries:
+        return True
+    return False
+
+
+def _preset_role_for(email):
+    """Look up the role assigned at invite time, if any. Used only on first
+    signup — we don't stomp the role on subsequent logins."""
+    email = (email or "").lower()
+    if not email:
+        return None
+    conn = get_db()
+    if not conn:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT role FROM allowed_emails WHERE email = ? COLLATE NOCASE",
+            (email,),
+        ).fetchone()
+        if row and row["role"] in VALID_ROLES:
+            return row["role"]
+    finally:
+        conn.close()
+    return None
+
 oauth = OAuth(app)
 _google_oauth = None
 if GOOGLE_CLIENT_ID:
@@ -287,16 +358,8 @@ def google_callback():
     if not email:
         print(f"[oauth] no email after all fallbacks — token keys: {list(token.keys())}", flush=True)
 
-    # Allowlist check — if neither var is set, all Google accounts are permitted
-    allowed = False
-    if ALLOWED_EMAILS and email in ALLOWED_EMAILS:
-        allowed = True
-    elif ALLOWED_DOMAIN and email.endswith("@" + ALLOWED_DOMAIN):
-        allowed = True
-    elif not ALLOWED_EMAILS and not ALLOWED_DOMAIN:
-        allowed = True
-
-    if not allowed:
+    # Allowlist check — env vars + DB-managed invite list. See is_email_allowed.
+    if not is_email_allowed(email):
         return render_template_string("""<!doctype html>
 <html><head><title>Access Denied</title></head>
 <body style="background:#000;color:#fff;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center">
@@ -307,15 +370,18 @@ def google_callback():
 </div>
 </body></html>""", email=email), 403
 
-    # Upsert user record
+    # Upsert user record. On first signup, inherit the role preset at invite
+    # time (allowed_emails.role); on subsequent logins, don't stomp the role —
+    # admins may have adjusted it via the dashboard.
+    preset_role = _preset_role_for(email)
     conn = get_db()
     if conn:
         conn.execute("""
-            INSERT INTO users (google_id, email, name, picture, first_login, last_login)
-            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+            INSERT INTO users (google_id, email, name, picture, first_login, last_login, role)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), ?)
             ON CONFLICT(google_id) DO UPDATE SET
                 name=excluded.name, picture=excluded.picture, last_login=datetime('now')
-        """, (google_id, email, name, picture))
+        """, (google_id, email, name, picture, preset_role))
         conn.commit()
         conn.close()
 
@@ -382,6 +448,20 @@ def get_db():
         # One-time seed: ensure mattgraham15 stays an admin so the dashboard
         # is always reachable even on a fresh DB. Idempotent.
         "UPDATE users SET role = 'dev' WHERE email = 'mattgraham15@gmail.com' AND (role IS NULL OR role = '')",
+        # Invite list — the dashboard-manageable allowlist. Each row is an email
+        # that is permitted to sign in, plus the role they'll inherit on first
+        # login. Lives alongside the ALLOWED_EMAILS / ALLOWED_DOMAIN env vars:
+        # any of the three paths grants access.
+        """CREATE TABLE IF NOT EXISTS allowed_emails (
+            email    TEXT PRIMARY KEY COLLATE NOCASE,
+            role     TEXT DEFAULT 'team',
+            added_by TEXT,
+            added_at TEXT DEFAULT (datetime('now'))
+        )""",
+        # Seed: keep the primary admin and active test accounts on the allowlist
+        # regardless of env config, so we can never accidentally lock ourselves out.
+        "INSERT OR IGNORE INTO allowed_emails (email, role, added_by) VALUES ('mattgraham15@gmail.com', 'dev', 'seed')",
+        "INSERT OR IGNORE INTO allowed_emails (email, role, added_by) VALUES ('chris@clickup.com',     'dev', 'seed')",
         # Short-lived OAuth state tokens (used instead of Flask session to support iOS WKWebView)
         """CREATE TABLE IF NOT EXISTS oauth_states (
             state      TEXT PRIMARY KEY,
@@ -1453,16 +1533,26 @@ def voice_notes_list():
 @app.route("/api/admin/users")
 @requires_role("dev", "andy")
 def admin_list_users():
-    """List all users with their assigned roles. Dev-only."""
+    """List all users managed by the dashboard. Returns a union of:
+      - signed-in users (have a google_id + users row)
+      - pending invites (in allowed_emails but have not yet signed in)
+    Pending rows have google_id=None and pending=True so the UI can render
+    them with a muted style. Dev-only."""
     conn = get_db()
     if not conn:
         return jsonify({"users": []})
-    rows = conn.execute(
+    signed_in = conn.execute(
         "SELECT google_id, email, name, picture, first_login, last_login, role "
         "FROM users ORDER BY last_login DESC"
     ).fetchall()
+    # emails (lowercased) that already have a user row — used to dedupe the invite list
+    have_signed_in = {(r["email"] or "").lower() for r in signed_in}
+    invites = conn.execute(
+        "SELECT email, role, added_at FROM allowed_emails ORDER BY added_at DESC"
+    ).fetchall()
     conn.close()
-    return jsonify({"users": [
+
+    out = [
         {
             "google_id":   r["google_id"],
             "email":       r["email"],
@@ -1471,9 +1561,95 @@ def admin_list_users():
             "first_login": r["first_login"],
             "last_login":  r["last_login"],
             "role":        (r["role"] or "team") if r["role"] in VALID_ROLES else "team",
+            "pending":     False,
         }
-        for r in rows
-    ]})
+        for r in signed_in
+    ]
+    for r in invites:
+        em = (r["email"] or "").lower()
+        if em in have_signed_in:
+            continue  # already in the signed-in list; don't duplicate
+        out.append({
+            "google_id":   None,
+            "email":       r["email"],
+            "name":        None,
+            "picture":     None,
+            "first_login": None,
+            "last_login":  None,
+            "role":        r["role"] if r["role"] in VALID_ROLES else "team",
+            "pending":     True,
+            "added_at":    r["added_at"],
+        })
+    return jsonify({"users": out})
+
+
+@app.route("/api/admin/users/invite", methods=["POST"])
+@requires_role("dev", "andy")
+def admin_invite_user():
+    """Add an email to the dashboard-managed allowlist with a preset role.
+    Body: {"email": "...", "role": "team|dev|andy"}. If the user has already
+    signed in, we update their role in-place instead of issuing a new invite."""
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    role  = (data.get("role")  or "team").strip().lower()
+    if not _EMAIL_RE.match(email):
+        return jsonify({"error": "Invalid email address"}), 400
+    if role not in VALID_ROLES:
+        return jsonify({"error": f"Invalid role. Must be one of: {sorted(VALID_ROLES)}"}), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    try:
+        # If they've already signed in, we want the invite to "upgrade" their
+        # current role rather than silently no-op.
+        existing = conn.execute(
+            "SELECT google_id FROM users WHERE email = ? COLLATE NOCASE", (email,)
+        ).fetchone()
+        if existing:
+            conn.execute("UPDATE users SET role = ? WHERE google_id = ?",
+                         (role, existing["google_id"]))
+        me = session.get("user") or {}
+        conn.execute(
+            "INSERT INTO allowed_emails (email, role, added_by) VALUES (?, ?, ?) "
+            "ON CONFLICT(email) DO UPDATE SET role=excluded.role",
+            (email, role, me.get("email", ""))
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "email": email, "role": role,
+                    "already_signed_in": bool(existing)})
+
+
+@app.route("/api/admin/users/by-email/<path:email>", methods=["DELETE"])
+@requires_role("dev", "andy")
+def admin_remove_user(email):
+    """Remove a user from both the allowlist and (if present) the users table.
+    This prevents them from re-authenticating and strips their role. Existing
+    Flask sessions survive until their cookie expires — plan accordingly."""
+    email = (email or "").strip().lower()
+    if not _EMAIL_RE.match(email):
+        return jsonify({"error": "Invalid email address"}), 400
+
+    me = session.get("user") or {}
+    if email == (me.get("email") or "").lower():
+        return jsonify({"error": "You can't remove yourself — ask another dev to do it"}), 400
+
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "No database"}), 500
+    try:
+        deleted_user    = conn.execute("DELETE FROM users          WHERE email = ? COLLATE NOCASE", (email,)).rowcount
+        deleted_invite  = conn.execute("DELETE FROM allowed_emails WHERE email = ? COLLATE NOCASE", (email,)).rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    if not deleted_user and not deleted_invite:
+        return jsonify({"error": "No such user or invite"}), 404
+    return jsonify({"ok": True, "email": email,
+                    "removed_user": bool(deleted_user),
+                    "removed_invite": bool(deleted_invite)})
 
 
 @app.route("/api/admin/users/<google_id>/role", methods=["POST"])

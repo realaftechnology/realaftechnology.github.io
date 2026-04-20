@@ -97,7 +97,47 @@
   .role-pill.active { background: #ff453a; color: #fff; }
   .role-pill:disabled { opacity: 0.5; cursor: not-allowed; }
   .user-avatar-sm { width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-right: 8px; object-fit: cover; }
+  .user-avatar-placeholder {
+    display: inline-block; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--bg3); vertical-align: middle; margin-right: 8px;
+  }
   .you-tag { font-size: 10px; color: #ff453a; background: rgba(255,69,58,0.12); padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; letter-spacing: 0.4px; }
+  .pending-tag {
+    font-size: 10px; color: var(--text3); background: rgba(255,255,255,0.06);
+    padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600;
+    letter-spacing: 0.4px; text-transform: uppercase;
+  }
+  .pending-row td { opacity: 0.7; }
+
+  /* Invite row (email + role select + Invite button) */
+  .invite-row {
+    display: flex; gap: 8px; align-items: center;
+    background: var(--bg2); border-radius: var(--radius);
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .invite-input, .invite-select {
+    background: var(--bg3); border: 1px solid var(--sep); border-radius: 6px;
+    color: var(--text); font-family: var(--sf); font-size: 13px;
+    padding: 8px 10px; outline: none;
+  }
+  .invite-input { flex: 1; min-width: 0; }
+  .invite-input:focus, .invite-select:focus { border-color: var(--red); }
+  .invite-select { cursor: pointer; }
+  .invite-btn {
+    background: var(--red); color: #fff; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit; flex-shrink: 0;
+  }
+  .invite-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* Remove button on each user row */
+  .user-remove {
+    background: none; border: none; color: var(--text3); font-size: 14px;
+    cursor: pointer; padding: 4px 8px; border-radius: 5px; line-height: 1;
+    transition: color 0.12s, background 0.12s;
+  }
+  .user-remove:hover:not(:disabled) { color: var(--red); background: rgba(255,69,58,0.12); }
+  .user-remove:disabled { opacity: 0.25; cursor: not-allowed; }
   .badge { background: var(--bg3); color: var(--text2); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px; letter-spacing: 0; }
   .badge.running { background: rgba(255,159,10,0.2); color: var(--orange); }
 
@@ -181,7 +221,7 @@
     -webkit-overflow-scrolling: touch;
   }
   /* Keep tables readable when the card is narrower than their content. */
-  .card-wrap .ep-table    { min-width: 560px; }
+  .card-wrap .ep-table    { min-width: 620px; }
   .card-wrap .search-table { min-width: 520px; }
 
   /* Rename */
@@ -255,6 +295,13 @@
 
     /* Hint that the tables can be swiped horizontally. */
     .card-wrap { scrollbar-width: thin; }
+
+    /* Invite row wraps: email gets its own line, role + button share the next. */
+    .invite-row { flex-wrap: wrap; gap: 6px; padding: 10px; }
+    .invite-input { flex: 1 0 100%; }
+    .invite-select { flex: 1; }
+    .invite-btn { flex: 1; }
+    #invite-status { flex-basis: 100%; }
   }
 </style>
 </head>
@@ -343,9 +390,21 @@
     </div>
   </div>
 
-  <!-- Users & roles — dev-only. Toggle anyone between Team / Dev / Andy. -->
+  <!-- Users & roles — dev-only. Invite, role-toggle, and remove. -->
   <div class="section">
     <div class="section-title">Users &amp; Roles <span class="badge" id="users-badge"></span></div>
+    <div class="invite-row">
+      <input type="email" id="invite-email" class="invite-input"
+             placeholder="email@example.com" autocomplete="off"
+             onkeydown="if(event.key==='Enter')inviteUser()">
+      <select id="invite-role" class="invite-select">
+        <option value="team">Team</option>
+        <option value="dev">Dev</option>
+        <option value="andy">Andy</option>
+      </select>
+      <button class="invite-btn" id="invite-btn" onclick="inviteUser()">Invite</button>
+      <span id="invite-status" style="font-size:12px;color:var(--text3)"></span>
+    </div>
     <div class="card-wrap">
       <table class="ep-table">
         <thead><tr>
@@ -353,8 +412,9 @@
           <th>Email</th>
           <th>Last login</th>
           <th style="text-align:right">Role</th>
+          <th></th>
         </tr></thead>
-        <tbody id="users-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        <tbody id="users-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -823,6 +883,8 @@ function _fmtDate(s) {
   } catch { return s; }
 }
 
+function _esc(s) { return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 async function loadUsers() {
   try {
     const res = await fetch('/api/admin/users');
@@ -834,33 +896,48 @@ async function loadUsers() {
     const tbody = document.getElementById('users-tbody');
     if (!tbody) return;
     if (!users.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty">No users yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No users yet</td></tr>';
       return;
     }
     tbody.innerHTML = users.map(u => {
       const isMe = (u.email || '').toLowerCase() === _meEmail;
-      const safeEmail = (u.email || '').replace(/</g, '&lt;');
-      const safeName  = (u.name  || '').replace(/</g, '&lt;');
+      const pending = !!u.pending;
+      const safeEmail = _esc(u.email || '');
+      const safeName  = _esc(u.name  || '');
       const avatar    = u.picture
-        ? `<img class="user-avatar-sm" src="${u.picture.replace(/"/g,'&quot;')}" alt="" onerror="this.style.display='none'">`
-        : '';
-      const meTag = isMe ? '<span class="you-tag">YOU</span>' : '';
+        ? `<img class="user-avatar-sm" src="${_esc(u.picture)}" alt="" onerror="this.style.display='none'">`
+        : '<span class="user-avatar-placeholder"></span>';
+      const meTag      = isMe ? '<span class="you-tag">YOU</span>' : '';
+      const pendingTag = pending ? '<span class="pending-tag">Invited</span>' : '';
+      // Role pills only work for signed-in users (need a google_id).
+      // For pending invites we show the preset role as a muted pill group.
       const pill = (role, label) => {
         const active = u.role === role;
-        // Only block self-demotion to team; dev/andy lateral switch is allowed.
-        const disabled = isMe && role === 'team';
+        const disabled = pending || (isMe && role === 'team');
+        const onclick = pending
+          ? ''  // no-op; to change a pending role, re-invite
+          : `onclick="setUserRole('${_esc(u.google_id)}','${role}')"`;
         return `<button class="role-pill${active ? ' active' : ''}"
-          ${disabled ? 'disabled' : ''}
-          onclick="setUserRole('${u.google_id}','${role}')">${label}</button>`;
+          ${disabled ? 'disabled' : ''} ${onclick}>${label}</button>`;
       };
-      return `<tr>
-        <td>${avatar}${safeName || '—'}${meTag}</td>
+      const lastLoginCell = pending
+        ? '<span style="color:var(--text3);font-size:11px">—</span>'
+        : _fmtDate(u.last_login);
+      const removeDisabled = isMe;
+      const removeTitle = isMe ? 'You can\'t remove yourself' : 'Remove user';
+      return `<tr class="${pending ? 'pending-row' : ''}">
+        <td>${avatar}${safeName || (pending ? '<span style="color:var(--text3)">—</span>' : '—')}${meTag}${pendingTag}</td>
         <td style="color:var(--text3);font-size:12px">${safeEmail}</td>
-        <td style="color:var(--text3);font-size:12px">${_fmtDate(u.last_login)}</td>
+        <td style="color:var(--text3);font-size:12px">${lastLoginCell}</td>
         <td style="text-align:right">
           <div class="role-pills">
             ${pill('team','Team')}${pill('dev','Dev')}${pill('andy','Andy')}
           </div>
+        </td>
+        <td style="text-align:right;width:32px">
+          <button class="user-remove" title="${removeTitle}"
+            ${removeDisabled ? 'disabled' : ''}
+            onclick="removeUser('${_esc(u.email)}')">&times;</button>
         </td>
       </tr>`;
     }).join('');
@@ -879,6 +956,59 @@ async function setUserRole(googleId, role) {
     loadUsers();
   } catch (e) {
     alert('Role update failed: ' + e.message);
+  }
+}
+
+async function inviteUser() {
+  const emailInput = document.getElementById('invite-email');
+  const roleInput  = document.getElementById('invite-role');
+  const btn        = document.getElementById('invite-btn');
+  const status     = document.getElementById('invite-status');
+  const email = (emailInput.value || '').trim().toLowerCase();
+  const role  = roleInput.value || 'team';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    status.textContent = 'Enter a valid email.';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  btn.disabled = true;
+  status.style.color = 'var(--text3)';
+  status.textContent = 'Inviting…';
+  try {
+    const res = await fetch('/api/admin/users/invite', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, role })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Invite failed');
+    emailInput.value = '';
+    status.style.color = 'var(--green)';
+    status.textContent = data.already_signed_in
+      ? `Updated ${email} → ${role}`
+      : `Invited ${email} as ${role}`;
+    loadUsers();
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  } catch (e) {
+    status.style.color = 'var(--red)';
+    status.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeUser(email) {
+  if (!email) return;
+  if (!confirm(`Remove ${email} from AFBrain?\n\nThey won't be able to sign back in, and their role will be cleared. Any active session they have will stay valid until the cookie expires.`)) return;
+  try {
+    const res = await fetch(`/api/admin/users/by-email/${encodeURIComponent(email)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Remove failed');
+    loadUsers();
+  } catch (e) {
+    alert('Remove failed: ' + e.message);
   }
 }
 
