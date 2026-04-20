@@ -2732,6 +2732,48 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+# ── DATA CENTER (brand analytics) ─────────────────────────────────────────
+# Accessible to every authenticated account type (team / dev / andy).
+# The HTML does its own /api/me gate so we don't need @requires_auth here.
+
+
+def _brand_analytics_path():
+    """Locate data.json. Order: BRAND_ANALYTICS_PATH env var, then the data-center
+    pipeline folder (dev), then a copy inside the app (prod)."""
+    env = os.environ.get("BRAND_ANALYTICS_PATH")
+    if env and os.path.exists(env):
+        return env
+    here = os.path.dirname(os.path.abspath(__file__))
+    external = os.path.abspath(os.path.join(here, "..", "data-center", "data", "data.json"))
+    if os.path.exists(external):
+        return external
+    internal = os.path.join(here, "brand_analytics.json")
+    if os.path.exists(internal):
+        return internal
+    return None
+
+
+@app.route("/data-center")
+def data_center_page():
+    return send_from_directory("static", "data-center.html")
+
+
+@app.route("/api/brand-analytics")
+@requires_auth
+def brand_analytics():
+    path = _brand_analytics_path()
+    if not path:
+        return jsonify({"error": "no brand analytics data available",
+                        "platforms": {},
+                        "meta": {"lastUpdated": None, "period": "—",
+                                 "source": "data file not found — run the refresh pipeline"}}), 200
+    try:
+        with open(path) as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": f"failed to read brand analytics: {e}"}), 500
+
+
 @app.route("/dev")
 def dev_dashboard():
     # The HTML handles the unauthenticated case. Block authenticated non-dev

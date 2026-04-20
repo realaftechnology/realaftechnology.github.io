@@ -1,0 +1,575 @@
+{
+  "meta": {
+    "brand": "AFBrain",
+    "lastUpdated": "2026-04-20T15:44:49.230336+00:00",
+    "period": "Last 28 days",
+    "source": "Instagram: Windsor.ai (live). Other platforms: sample data."
+  },
+  "platforms": {
+    "instagram": {
+      "name": "Instagram",
+      "handle": "6 accounts",
+      "connected": true,
+      "color": "#E1306C",
+      "followers": {
+        "current": 572981,
+        "prior": 550061
+      },
+      "reach": {
+        "current": 2640459,
+        "prior": 3580455
+      },
+      "impressions": {
+        "current": 3964814,
+        "prior": 5064467
+      },
+      "engagement": {
+        "current": 446844,
+        "prior": 598627
+      },
+      "posts": {
+        "current": 12545,
+        "prior": 12495
+      },
+      "topPosts": [],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 550061,
+          "reach": 62950,
+          "engagement": 10067
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 555791,
+          "reach": 86811,
+          "engagement": 15627
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 561521,
+          "reach": 99542,
+          "engagement": 15176
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 567251,
+          "reach": 145477,
+          "engagement": 22142
+        },
+        {
+          "date": "2026-04-19",
+          "followers": 572981,
+          "reach": 116073,
+          "engagement": 29118
+        }
+      ],
+      "accounts": [
+        {
+          "id": "17841462297134104",
+          "username": "realafshow",
+          "name": "Real AF Clips",
+          "followers": 379142,
+          "mediaCount": 1074,
+          "reach": {
+            "current": 1603516,
+            "prior": 2843675
+          },
+          "engagement": {
+            "current": 263796,
+            "prior": 474002
+          },
+          "impressions": {
+            "current": 2446900,
+            "prior": 4001696
+          }
+        },
+        {
+          "id": "17841460176292177",
+          "username": "motivatedbyfreedom1776",
+          "name": "Motivated By Freedom",
+          "followers": 109551,
+          "mediaCount": 2838,
+          "reach": {
+            "current": 281768,
+            "prior": 417293
+          },
+          "engagement": {
+            "current": 74834,
+            "prior": 82560
+          },
+          "impressions": {
+            "current": 411899,
+            "prior": 587670
+          }
+        },
+        {
+          "id": "17841460302945899",
+          "username": "realandyfrisellafan",
+          "name": "Andy Frisella Fan",
+          "followers": 60184,
+          "mediaCount": 3792,
+          "reach": {
+            "current": 678192,
+            "prior": 223737
+          },
+          "engagement": {
+            "current": 95517,
+            "prior": 23897
+          },
+          "impressions": {
+            "current": 977611,
+            "prior": 307086
+          }
+        },
+        {
+          "id": "17841468020255374",
+          "username": "newamericanage",
+          "name": "New American Age",
+          "followers": 19557,
+          "mediaCount": 3416,
+          "reach": {
+            "current": 62579,
+            "prior": 78115
+          },
+          "engagement": {
+            "current": 10527,
+            "prior": 14211
+          },
+          "impressions": {
+            "current": 108546,
+            "prior": 144044
+          }
+        },
+        {
+          "id": "17841469443528222",
+          "username": "mfceomentality",
+          "name": "MFCEO Mentality",
+          "followers": 4541,
+          "mediaCount": 1405,
+          "reach": {
+            "current": 14403,
+            "prior": 17635
+          },
+          "engagement": {
+            "current": 2170,
+            "prior": 3957
+          },
+          "impressions": {
+            "current": 19857,
+            "prior": 23971
+          }
+        },
+        {
+          "id": "17841477407943556",
+          "username": "realafanswers",
+          "name": "RealAF Answers",
+          "followers": 6,
+          "mediaCount": 20,
+          "reach": {
+            "current": 1,
+            "prior": 0
+          },
+          "engagement": {
+            "current": 0,
+            "prior": 0
+          },
+          "impressions": {
+            "current": 1,
+            "prior": 0
+          }
+        }
+      ]
+    },
+    "tiktok": {
+      "name": "TikTok",
+      "handle": "@afbrain",
+      "connected": false,
+      "color": "#00F2EA",
+      "followers": {
+        "current": 73500,
+        "prior": 61200
+      },
+      "reach": {
+        "current": 1240000,
+        "prior": 890000
+      },
+      "impressions": {
+        "current": 2100000,
+        "prior": 1520000
+      },
+      "engagement": {
+        "current": 94000,
+        "prior": 71000
+      },
+      "posts": {
+        "current": 31,
+        "prior": 28
+      },
+      "topPosts": [
+        {
+          "title": "How we train the brain model",
+          "reach": 512000,
+          "engagement": 41000,
+          "url": "#"
+        },
+        {
+          "title": "Day in the life founder",
+          "reach": 284000,
+          "engagement": 19500,
+          "url": "#"
+        },
+        {
+          "title": "3 things I wish I knew",
+          "reach": 167000,
+          "engagement": 12300,
+          "url": "#"
+        }
+      ],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 61200,
+          "reach": 58000,
+          "engagement": 4100
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 64300,
+          "reach": 71000,
+          "engagement": 5300
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 67800,
+          "reach": 83000,
+          "engagement": 6400
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 70900,
+          "reach": 96000,
+          "engagement": 7600
+        },
+        {
+          "date": "2026-04-20",
+          "followers": 73500,
+          "reach": 108000,
+          "engagement": 8900
+        }
+      ]
+    },
+    "twitter": {
+      "name": "Twitter / X",
+      "handle": "@afbrain",
+      "connected": false,
+      "color": "#1DA1F2",
+      "followers": {
+        "current": 12400,
+        "prior": 11800
+      },
+      "reach": {
+        "current": 184000,
+        "prior": 167000
+      },
+      "impressions": {
+        "current": 312000,
+        "prior": 289000
+      },
+      "engagement": {
+        "current": 8200,
+        "prior": 7100
+      },
+      "posts": {
+        "current": 58,
+        "prior": 51
+      },
+      "topPosts": [
+        {
+          "title": "Thread: our architecture",
+          "reach": 42000,
+          "engagement": 1980,
+          "url": "#"
+        },
+        {
+          "title": "Hiring announcement",
+          "reach": 28500,
+          "engagement": 1340,
+          "url": "#"
+        },
+        {
+          "title": "Weekly build update",
+          "reach": 18200,
+          "engagement": 910,
+          "url": "#"
+        }
+      ],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 11800,
+          "reach": 7200,
+          "engagement": 340
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 11950,
+          "reach": 7800,
+          "engagement": 390
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 12100,
+          "reach": 8100,
+          "engagement": 420
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 12260,
+          "reach": 8400,
+          "engagement": 450
+        },
+        {
+          "date": "2026-04-20",
+          "followers": 12400,
+          "reach": 8700,
+          "engagement": 480
+        }
+      ]
+    },
+    "youtube": {
+      "name": "YouTube",
+      "handle": "@afbrain",
+      "connected": false,
+      "color": "#FF0000",
+      "followers": {
+        "current": 9800,
+        "prior": 8600
+      },
+      "reach": {
+        "current": 142000,
+        "prior": 118000
+      },
+      "impressions": {
+        "current": 198000,
+        "prior": 164000
+      },
+      "engagement": {
+        "current": 6700,
+        "prior": 5100
+      },
+      "posts": {
+        "current": 4,
+        "prior": 3
+      },
+      "topPosts": [
+        {
+          "title": "AFBrain explained in 10 min",
+          "reach": 68000,
+          "engagement": 3200,
+          "url": "#"
+        },
+        {
+          "title": "Product walkthrough",
+          "reach": 41000,
+          "engagement": 1980,
+          "url": "#"
+        },
+        {
+          "title": "Founder interview",
+          "reach": 18500,
+          "engagement": 910,
+          "url": "#"
+        }
+      ],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 8600,
+          "reach": 4200,
+          "engagement": 180
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 8900,
+          "reach": 5100,
+          "engagement": 220
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 9200,
+          "reach": 5900,
+          "engagement": 260
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 9500,
+          "reach": 6700,
+          "engagement": 310
+        },
+        {
+          "date": "2026-04-20",
+          "followers": 9800,
+          "reach": 7400,
+          "engagement": 360
+        }
+      ]
+    },
+    "facebook": {
+      "name": "Facebook",
+      "handle": "afbrain",
+      "connected": false,
+      "color": "#1877F2",
+      "followers": {
+        "current": 18900,
+        "prior": 18600
+      },
+      "reach": {
+        "current": 98000,
+        "prior": 102000
+      },
+      "impressions": {
+        "current": 147000,
+        "prior": 151000
+      },
+      "engagement": {
+        "current": 4100,
+        "prior": 4300
+      },
+      "posts": {
+        "current": 14,
+        "prior": 16
+      },
+      "topPosts": [
+        {
+          "title": "Product launch post",
+          "reach": 32000,
+          "engagement": 1240,
+          "url": "#"
+        },
+        {
+          "title": "Community highlight",
+          "reach": 18500,
+          "engagement": 690,
+          "url": "#"
+        },
+        {
+          "title": "Event recap",
+          "reach": 9800,
+          "engagement": 340,
+          "url": "#"
+        }
+      ],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 18600,
+          "reach": 5400,
+          "engagement": 240
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 18680,
+          "reach": 5200,
+          "engagement": 220
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 18760,
+          "reach": 5100,
+          "engagement": 210
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 18830,
+          "reach": 5000,
+          "engagement": 200
+        },
+        {
+          "date": "2026-04-20",
+          "followers": 18900,
+          "reach": 4900,
+          "engagement": 190
+        }
+      ]
+    },
+    "linkedin": {
+      "name": "LinkedIn",
+      "handle": "company/afbrain",
+      "connected": false,
+      "color": "#0A66C2",
+      "followers": {
+        "current": 6800,
+        "prior": 5900
+      },
+      "reach": {
+        "current": 72000,
+        "prior": 58000
+      },
+      "impressions": {
+        "current": 118000,
+        "prior": 94000
+      },
+      "engagement": {
+        "current": 3900,
+        "prior": 2800
+      },
+      "posts": {
+        "current": 11,
+        "prior": 9
+      },
+      "topPosts": [
+        {
+          "title": "Series A announcement",
+          "reach": 31000,
+          "engagement": 1680,
+          "url": "#"
+        },
+        {
+          "title": "Hiring: ML engineers",
+          "reach": 18400,
+          "engagement": 810,
+          "url": "#"
+        },
+        {
+          "title": "Industry report takeaways",
+          "reach": 9200,
+          "engagement": 420,
+          "url": "#"
+        }
+      ],
+      "timeseries": [
+        {
+          "date": "2026-03-23",
+          "followers": 5900,
+          "reach": 3100,
+          "engagement": 150
+        },
+        {
+          "date": "2026-03-30",
+          "followers": 6100,
+          "reach": 3600,
+          "engagement": 180
+        },
+        {
+          "date": "2026-04-06",
+          "followers": 6350,
+          "reach": 4100,
+          "engagement": 220
+        },
+        {
+          "date": "2026-04-13",
+          "followers": 6580,
+          "reach": 4600,
+          "engagement": 260
+        },
+        {
+          "date": "2026-04-20",
+          "followers": 6800,
+          "reach": 5200,
+          "engagement": 310
+        }
+      ]
+    }
+  }
+}

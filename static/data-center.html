@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AFBrain">
+<meta name="google" content="notranslate">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="icon" href="/static/apple-touch-icon.png">
+<title>AFBrain — Data Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+
+:root {
+  --bg-primary: #000000;
+  --bg-secondary: #1c1c1e;
+  --bg-tertiary: #2c2c2e;
+  --separator: rgba(84,84,88,0.65);
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --green: #32d74b;
+  --label: #ffffff;
+  --label-secondary: rgba(235,235,245,0.6);
+  --label-tertiary: rgba(235,235,245,0.3);
+  --label-quaternary: rgba(235,235,245,0.16);
+  --fill: rgba(120,120,128,0.36);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --sf: -apple-system, 'Helvetica Neue', sans-serif;
+}
+
+html { height: 100%; }
+body {
+  background: var(--bg-primary);
+  color: var(--label);
+  font-family: var(--sf);
+  font-size: 15px;
+  line-height: 1.47;
+  min-height: 100%;
+}
+
+/* ── HEADER (mirrors index.html app-header) ── */
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  width: 100%;
+  padding: calc(env(safe-area-inset-top) + 14px) 0 14px;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--separator);
+}
+.header-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-btn {
+  background: none; border: none;
+  color: var(--label-secondary);
+  font-size: 20px; cursor: pointer; padding: 4px;
+  flex-shrink: 0; display: flex; align-items: center;
+}
+.app-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 0.5px; line-height: 1;
+}
+.app-title span { color: var(--red); }
+
+/* segmented Chat / Data Center toggle */
+.view-toggle {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+  flex-shrink: 0;
+}
+.view-toggle a {
+  color: var(--label-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.view-toggle a.active {
+  background: var(--bg-tertiary);
+  color: var(--label);
+}
+.view-toggle a:not(.active):active { color: var(--label); }
+
+.header-spacer { flex: 1; }
+.user-avatar-btn {
+  background: none; border: none; cursor: pointer; padding: 0;
+  border-radius: 50%; overflow: hidden;
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+.user-avatar-btn img { width: 28px; height: 28px; object-fit: cover; display: block; }
+
+/* ── PAGE ── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+.page-title {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; margin-bottom: 22px; flex-wrap: wrap;
+}
+.page-title h1 {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0;
+}
+.page-title .meta {
+  display: flex; gap: 10px; color: var(--label-secondary); font-size: 13px;
+}
+.page-title .pill {
+  background: var(--bg-secondary);
+  padding: 6px 12px; border-radius: 999px;
+}
+.refresh-btn {
+  background: var(--bg-secondary);
+  color: var(--label); border: none;
+  padding: 6px 14px; border-radius: 999px;
+  font-family: var(--sf); font-size: 13px; font-weight: 500;
+  cursor: pointer;
+}
+.refresh-btn:active { opacity: 0.6; }
+
+section { margin-bottom: 32px; }
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--label-secondary);
+  margin: 0 0 12px;
+}
+
+/* KPI scorecard */
+.scorecard {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.kpi {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.kpi .label { color: var(--label-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; letter-spacing: -0.02em; }
+.kpi .delta { margin-top: 6px; font-size: 12px; }
+.delta.up { color: var(--green); }
+.delta.down { color: var(--red); }
+.delta.flat { color: var(--label-tertiary); }
+
+/* Panels & charts */
+.row { display: grid; gap: 10px; }
+.row-2 { grid-template-columns: 1fr 1fr; }
+.row-3 { grid-template-columns: 2fr 1fr; }
+@media (max-width: 860px) { .row-2, .row-3 { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.panel h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.chart-box { position: relative; height: 260px; }
+
+/* platform cards */
+.platforms {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.platform-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.platform-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.platform-title { display: flex; align-items: center; gap: 10px; }
+.platform-dot { width: 8px; height: 8px; border-radius: 50%; }
+.platform-name { font-weight: 600; font-size: 14px; }
+.platform-handle { color: var(--label-secondary); font-size: 12px; }
+.platform-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 13px;
+}
+.platform-grid .k { color: var(--label-secondary); }
+.platform-grid .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.platform-grid .v .delta { display: inline; font-size: 11px; margin-left: 6px; font-weight: 500; }
+.accounts-detail {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--separator);
+}
+.accounts-detail summary {
+  cursor: pointer; color: var(--label-secondary); font-size: 12px;
+  list-style: none; user-select: none;
+}
+.accounts-detail summary::-webkit-details-marker { display: none; }
+.accounts-detail summary::before { content: "▸ "; font-size: 10px; }
+.accounts-detail[open] summary::before { content: "▾ "; }
+.account-row {
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  gap: 10px; padding: 8px 0; font-size: 12px;
+  border-bottom: 1px solid var(--separator);
+}
+.account-row:last-child { border-bottom: none; }
+.account-row .u { color: var(--label); font-weight: 500; }
+.account-row .m { color: var(--label-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+.account-row .m strong { color: var(--label); font-weight: 600; display: block; }
+
+/* top posts */
+.posts { display: flex; flex-direction: column; gap: 8px; }
+.post {
+  display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 12px; background: var(--bg-tertiary); border-radius: 10px;
+}
+.post .rank { color: var(--label-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.post .title { font-size: 14px; }
+.post .plat { color: var(--label-secondary); font-size: 12px; }
+.post .stats { text-align: right; font-size: 11px; color: var(--label-secondary); }
+.post .stats strong { color: var(--label); display: block; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.empty-hint {
+  color: var(--label-secondary); font-size: 13px; padding: 12px;
+  text-align: center;
+}
+.banner {
+  background: rgba(255, 159, 10, 0.1);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  color: var(--orange);
+  padding: 10px 14px; border-radius: 10px; font-size: 12px;
+  margin-bottom: 16px;
+}
+
+/* login screen (same as index.html) */
+#login-screen {
+  display: none; align-items: center; justify-content: center;
+  height: 100vh; padding: 0 24px;
+}
+.login-box { width: 100%; max-width: 340px; text-align: center; }
+.login-logo {
+  font-family: 'Bebas Neue', sans-serif; font-size: 64px;
+  line-height: 1; letter-spacing: -1px; margin-bottom: 40px;
+}
+.login-logo span { color: var(--red); }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; height: 50px; background: #fff; border: none;
+  border-radius: var(--radius); color: #1f1f1f;
+  font-family: var(--sf); font-size: 17px; font-weight: 500;
+  cursor: pointer; text-decoration: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Login (same gate as index.html) -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo" translate="no"><span>AF</span>BRAIN</div>
+    <a class="google-btn" href="/auth/google">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </a>
+  </div>
+</div>
+
+<div id="main-screen" style="display:none">
+
+  <div class="app-header">
+    <div class="header-inner">
+      <button class="sidebar-btn" onclick="location.href='/'" title="Back to chat">
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+          <rect width="18" height="2" rx="1" fill="currentColor"/>
+          <rect y="6" width="18" height="2" rx="1" fill="currentColor"/>
+          <rect y="12" width="18" height="2" rx="1" fill="currentColor"/>
+        </svg>
+      </button>
+      <div class="app-title" translate="no"><span>AF</span>BRAIN</div>
+      <nav class="view-toggle" aria-label="Switch view">
+        <a href="/">Chat</a>
+        <a href="/data-center" class="active" aria-current="page">Data Center</a>
+      </nav>
+      <div class="header-spacer"></div>
+      <button id="user-avatar-btn" class="user-avatar-btn" onclick="handleLogout()" title="Sign out">
+        <img id="user-avatar" src="" width="28" height="28" alt="">
+      </button>
+    </div>
+  </div>
+
+  <main class="page">
+
+    <div class="page-title">
+      <div>
+        <h1>Data Center</h1>
+        <div class="meta" style="margin-top:4px">
+          <span class="pill" id="period-pill">—</span>
+          <span class="pill" id="updated-pill">—</span>
+        </div>
+      </div>
+      <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">Refresh</button>
+    </div>
+
+    <div id="banner" class="banner" style="display:none"></div>
+
+    <section>
+      <h2 class="section-label">Brand Impact — At a Glance</h2>
+      <div class="scorecard" id="scorecard"></div>
+    </section>
+
+    <section>
+      <h2 class="section-label">Trend Over Time</h2>
+      <div class="row row-2">
+        <div class="panel">
+          <h3>Followers</h3>
+          <div class="chart-box"><canvas id="chartFollowers"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Weekly Reach</h3>
+          <div class="chart-box"><canvas id="chartReach"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-label">Platform Comparison</h2>
+      <div class="row row-3">
+        <div class="panel">
+          <h3>Audience &amp; Reach by Platform</h3>
+          <div class="chart-box"><canvas id="chartCompare"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Engagement Share</h3>
+          <div class="chart-box"><canvas id="chartShare"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-label">Top Performing Content</h2>
+      <div class="panel">
+        <div class="posts" id="topPosts"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-label">Per-Platform Detail</h2>
+      <div class="platforms" id="platforms"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ── AUTH GATE (mirrors index.html behavior) ───────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch("/api/me");
+    if (!r.ok) throw new Error("unauth");
+    const me = await r.json();
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("main-screen").style.display  = "block";
+    const avatar = document.getElementById("user-avatar");
+    if (me.picture) avatar.src = me.picture;
+    document.getElementById("user-avatar-btn").style.display = "flex";
+    return me;
+  } catch (e) {
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("main-screen").style.display  = "none";
+    return null;
+  }
+}
+async function handleLogout() {
+  try { await fetch("/api/logout", { method: "POST" }); } catch (e) {}
+  location.href = "/";
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+const fmt = (n) => {
+  if (n == null || isNaN(n)) return "—";
+  if (Math.abs(n) >= 1_000_000) return (n/1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (Math.abs(n) >= 1_000) return (n/1_000).toFixed(1).replace(/\.0$/, "") + "k";
+  return n.toLocaleString();
+};
+const pct = (curr, prior) => (!prior ? null : ((curr - prior) / prior) * 100);
+const deltaHTML = (curr, prior) => {
+  const p = pct(curr, prior);
+  if (p == null) return `<span class="delta flat">—</span>`;
+  if (Math.abs(p) < 0.1) return `<span class="delta flat">0%</span>`;
+  const cls = p > 0 ? "up" : "down";
+  const arrow = p > 0 ? "▲" : "▼";
+  return `<span class="delta ${cls}">${arrow} ${Math.abs(p).toFixed(1)}%</span>`;
+};
+
+let charts = [];
+function render(DATA) {
+  const platforms = DATA.platforms || {};
+  const keys = Object.keys(platforms);
+  document.getElementById("period-pill").textContent = DATA.meta?.period || "—";
+  document.getElementById("updated-pill").textContent = "Updated " + (DATA.meta?.lastUpdated
+    ? new Date(DATA.meta.lastUpdated).toLocaleString() : "—");
+
+  const anyConnected = keys.some(k => platforms[k].connected);
+  const banner = document.getElementById("banner");
+  if (!anyConnected) {
+    banner.style.display = "block";
+    banner.textContent = "Showing sample data. Connect sources (Windsor.ai) to populate live numbers.";
+  } else if (keys.some(k => !platforms[k].connected)) {
+    const sample = keys.filter(k => !platforms[k].connected).map(k => platforms[k].name).join(", ");
+    banner.style.display = "block";
+    banner.textContent = "Live: " + keys.filter(k => platforms[k].connected).map(k => platforms[k].name).join(", ")
+                        + ". Still sample data: " + sample + ".";
+  } else {
+    banner.style.display = "none";
+  }
+
+  // Totals
+  const T = { followers:0, priorFollowers:0, reach:0, priorReach:0,
+              engagement:0, priorEngagement:0, impressions:0, priorImpressions:0,
+              posts:0, priorPosts:0 };
+  for (const k of keys) {
+    const p = platforms[k];
+    T.followers += p.followers?.current || 0;   T.priorFollowers += p.followers?.prior || 0;
+    T.reach += p.reach?.current || 0;           T.priorReach += p.reach?.prior || 0;
+    T.engagement += p.engagement?.current || 0; T.priorEngagement += p.engagement?.prior || 0;
+    T.impressions += p.impressions?.current || 0; T.priorImpressions += p.impressions?.prior || 0;
+    T.posts += p.posts?.current || 0;           T.priorPosts += p.posts?.prior || 0;
+  }
+  const er  = T.reach ? (T.engagement / T.reach) * 100 : 0;
+  const pEr = T.priorReach ? (T.priorEngagement / T.priorReach) * 100 : 0;
+  const kpis = [
+    { label:"Total Followers", value:fmt(T.followers),   delta:deltaHTML(T.followers, T.priorFollowers) },
+    { label:"Total Reach",     value:fmt(T.reach),       delta:deltaHTML(T.reach, T.priorReach) },
+    { label:"Impressions",     value:fmt(T.impressions), delta:deltaHTML(T.impressions, T.priorImpressions) },
+    { label:"Engagements",     value:fmt(T.engagement),  delta:deltaHTML(T.engagement, T.priorEngagement) },
+    { label:"Engagement Rate", value:er.toFixed(2)+"%",  delta:deltaHTML(er, pEr) },
+    { label:"Posts Published", value:fmt(T.posts),       delta:deltaHTML(T.posts, T.priorPosts) },
+  ];
+  document.getElementById("scorecard").innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      <div>${k.delta}</div>
+    </div>`).join("");
+
+  // Platform cards
+  document.getElementById("platforms").innerHTML = keys.map(k => {
+    const p = platforms[k];
+    const acc = (p.accounts && p.accounts.length) ? `
+      <details class="accounts-detail">
+        <summary>${p.accounts.length} account${p.accounts.length === 1 ? "" : "s"} — breakdown</summary>
+        ${p.accounts.slice().sort((a,b) => (b.followers||0)-(a.followers||0)).map(a => `
+          <div class="account-row">
+            <div class="u">@${a.username}</div>
+            <div class="m"><strong>${fmt(a.followers)}</strong>followers</div>
+            <div class="m"><strong>${fmt(a.reach?.current||0)}</strong>reach</div>
+            <div class="m"><strong>${fmt(a.engagement?.current||0)}</strong>engage</div>
+          </div>`).join("")}
+      </details>` : "";
+    return `
+      <div class="platform-card">
+        <div class="platform-head">
+          <div class="platform-title">
+            <span class="platform-dot" style="background:${p.color}"></span>
+            <div>
+              <div class="platform-name">${p.name}</div>
+              <div class="platform-handle">${p.handle}</div>
+            </div>
+          </div>
+          <span class="platform-handle">${p.connected ? "● live" : "○ sample"}</span>
+        </div>
+        <div class="platform-grid">
+          <div class="k">Followers</div>
+          <div class="v">${fmt(p.followers.current)} ${deltaHTML(p.followers.current, p.followers.prior)}</div>
+          <div class="k">Reach</div>
+          <div class="v">${fmt(p.reach.current)} ${deltaHTML(p.reach.current, p.reach.prior)}</div>
+          <div class="k">Engagement</div>
+          <div class="v">${fmt(p.engagement.current)} ${deltaHTML(p.engagement.current, p.engagement.prior)}</div>
+          <div class="k">Posts</div>
+          <div class="v">${fmt(p.posts.current)} ${deltaHTML(p.posts.current, p.posts.prior)}</div>
+        </div>
+        ${acc}
+      </div>`;
+  }).join("");
+
+  // Top posts
+  const allPosts = [];
+  for (const k of keys) for (const post of (platforms[k].topPosts || []))
+    allPosts.push({ ...post, platform: platforms[k].name, color: platforms[k].color });
+  allPosts.sort((a,b) => (b.engagement||0)-(a.engagement||0));
+  const topPostsEl = document.getElementById("topPosts");
+  topPostsEl.innerHTML = allPosts.slice(0, 10).map((p, i) => `
+    <div class="post">
+      <div class="rank">${String(i+1).padStart(2, "0")}</div>
+      <div>
+        <div class="title">${p.title}</div>
+        <div class="plat"><span style="color:${p.color}">●</span> ${p.platform}</div>
+      </div>
+      <div class="stats">
+        <strong>${fmt(p.engagement)}</strong>
+        ${fmt(p.reach)} reach
+      </div>
+    </div>`).join("") || `<div class="empty-hint">Top post data will appear once a media-level pull is wired in.</div>`;
+
+  // Charts
+  charts.forEach(c => c.destroy()); charts = [];
+  Chart.defaults.color = "rgba(235,235,245,0.6)";
+  Chart.defaults.borderColor = "rgba(84,84,88,0.5)";
+  Chart.defaults.font.family = "-apple-system, 'Helvetica Neue', sans-serif";
+
+  const dateSet = new Set();
+  for (const k of keys) for (const pt of (platforms[k].timeseries || [])) dateSet.add(pt.date);
+  const dates = [...dateSet].sort();
+  const seriesFor = (k, field) => dates.map(d => {
+    const pt = (platforms[k].timeseries || []).find(p => p.date === d);
+    return pt ? pt[field] : null;
+  });
+
+  charts.push(new Chart(document.getElementById("chartFollowers"), {
+    type: "line",
+    data: { labels: dates, datasets: keys.map(k => ({
+      label: platforms[k].name, data: seriesFor(k, "followers"),
+      borderColor: platforms[k].color, backgroundColor: platforms[k].color + "22",
+      tension: 0.35, pointRadius: 2, borderWidth: 2,
+    })) },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+      scales: { y: { grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+  }));
+
+  charts.push(new Chart(document.getElementById("chartReach"), {
+    type: "line",
+    data: { labels: dates, datasets: keys.map(k => ({
+      label: platforms[k].name, data: seriesFor(k, "reach"),
+      borderColor: platforms[k].color, backgroundColor: platforms[k].color + "22",
+      tension: 0.35, pointRadius: 2, borderWidth: 2, fill: false,
+    })) },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+  }));
+
+  charts.push(new Chart(document.getElementById("chartCompare"), {
+    type: "bar",
+    data: { labels: keys.map(k => platforms[k].name), datasets: [
+      { label:"Followers",  data:keys.map(k => platforms[k].followers.current),  backgroundColor:"#ff453a" },
+      { label:"Reach",      data:keys.map(k => platforms[k].reach.current),      backgroundColor:"#ff9f0a" },
+      { label:"Engagement", data:keys.map(k => platforms[k].engagement.current), backgroundColor:"#32d74b" },
+    ] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } },
+      scales: { y: { type: "logarithmic", grid: { color: "rgba(84,84,88,0.3)" } }, x: { grid: { display: false } } } }
+  }));
+
+  charts.push(new Chart(document.getElementById("chartShare"), {
+    type: "doughnut",
+    data: { labels: keys.map(k => platforms[k].name), datasets: [{
+      data: keys.map(k => platforms[k].engagement.current),
+      backgroundColor: keys.map(k => platforms[k].color), borderWidth: 0,
+    }] },
+    options: { maintainAspectRatio: false, responsive: true, cutout: "62%",
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 } } } } }
+  }));
+}
+
+async function loadData() {
+  const r = await fetch("/api/brand-analytics", { credentials: "include" });
+  if (!r.ok) throw new Error("fetch failed: " + r.status);
+  return r.json();
+}
+async function refreshData() {
+  const btn = document.getElementById("refresh-btn");
+  btn.textContent = "Refreshing…"; btn.disabled = true;
+  try { render(await loadData()); }
+  catch (e) { console.error(e); alert("Refresh failed: " + e.message); }
+  finally { btn.textContent = "Refresh"; btn.disabled = false; }
+}
+
+(async () => {
+  const me = await checkAuth();
+  if (!me) return;
+  try { render(await loadData()); }
+  catch (e) {
+    document.getElementById("banner").style.display = "block";
+    document.getElementById("banner").textContent = "Could not load brand analytics: " + e.message;
+  }
+})();
+</script>
+</body>
+</html>
