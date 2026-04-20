@@ -239,11 +239,13 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 .tab-item.active .tab-avatar { border-color: var(--red); }
 @media (max-width: 767px) {
-  .bottom-tab-bar { display: block; }
+  body.is-authed .bottom-tab-bar { display: block; }
   /* Push page content above the bar */
-  .page { padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 32px); }
+  body.is-authed .page { padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 32px); }
 }
-body.keyboard-open .bottom-tab-bar { display: none; }
+/* The tab bar stays visible when the keyboard is open; iOS pins it under
+   the keyboard. Data Center has no input so this rarely applies here, but we
+   keep the behavior identical to index.html. */
 
 /* ── PROFILE SHEET (mobile) ── */
 .profile-sheet {
@@ -580,9 +582,13 @@ section { margin-bottom: 32px; }
       <div class="platforms" id="platforms"></div>
     </section>
   </main>
+</div>
 
-  <!-- ── MOBILE BOTTOM TAB BAR ── -->
-  <nav class="bottom-tab-bar" aria-label="Primary">
+<!-- The bottom tab bar + profile sheet are direct children of <body> so their
+     position:fixed anchoring is independent of #main-screen. This keeps the
+     hotbar anchored identically to the Chat page. -->
+<!-- ── MOBILE BOTTOM TAB BAR ── -->
+<nav class="bottom-tab-bar" aria-label="Primary">
     <div class="bottom-tab-bar-inner">
       <button class="tab-item" id="tab-content" onclick="openDataCenterMenu()" aria-label="Content">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -641,7 +647,6 @@ section { margin-bottom: 32px; }
       </div>
     </div>
   </aside>
-</div>
 
 <script>
 // ── AUTH GATE (mirrors index.html behavior) ───────────────────────────────
@@ -652,6 +657,7 @@ async function checkAuth() {
     const me = await r.json();
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("main-screen").style.display  = "block";
+    document.body.classList.add("is-authed");
     const avatar = document.getElementById("user-avatar");
     if (me.picture) avatar.src = me.picture;
     const btn = document.getElementById("user-avatar-btn");

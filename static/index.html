@@ -537,13 +537,16 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 .tab-item.active .tab-avatar { border-color: var(--red); }
 @media (max-width: 767px) {
-  .bottom-tab-bar { display: block; }
+  body.is-authed .bottom-tab-bar { display: block; }
   /* Lift the input-area above the tab bar. Its inner already carries its own
      safe-area padding, so only add the tab-bar-height margin here. */
-  .input-area { margin-bottom: var(--tab-bar-height); }
+  body.is-authed .input-area { margin-bottom: var(--tab-bar-height); }
 }
-/* When the keyboard is open, hide the tab bar so it doesn't float over the keyboard */
-body.keyboard-open .bottom-tab-bar { display: none; }
+/* When the software keyboard is open, the keyboard sits on top of the tab bar
+   (iOS pins position:fixed to the layout viewport, so the tab bar stays at
+   the screen bottom behind the keyboard). _pinHeight already rides the search
+   bar up above the keyboard. We just drop the tab-bar margin so the search
+   bar sits flush at the top of the keyboard instead of floating 56px above it. */
 body.keyboard-open .input-area { margin-bottom: 0; }
 
 /* ── PROFILE SHEET (mobile) ── */
@@ -1974,8 +1977,13 @@ body.keyboard-open .input-area { margin-bottom: 0; }
     </div>
   </div>
 
-  <!-- ── MOBILE BOTTOM TAB BAR ── -->
-  <nav class="bottom-tab-bar" aria-label="Primary">
+</div>
+
+<!-- The bottom tab bar + profile sheet are direct children of <body> so their
+     position:fixed anchoring is independent of #main-screen (which gets
+     resized by _pinHeight to track the visualViewport height). -->
+<!-- ── MOBILE BOTTOM TAB BAR ── -->
+<nav class="bottom-tab-bar" aria-label="Primary">
     <div class="bottom-tab-bar-inner">
       <button class="tab-item" id="tab-content" onclick="openSidebarFromTab()" aria-label="Content">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -2034,8 +2042,6 @@ body.keyboard-open .input-area { margin-bottom: 0; }
       </div>
     </div>
   </aside>
-
-</div>
 
 <script>
 let currentResults = [];
@@ -4227,6 +4233,7 @@ function hideSplash() {
       hideSplash();
       login.style.display = 'none';
       main.style.display = 'flex';
+      document.body.classList.add('is-authed');
       requestAnimationFrame(() => requestAnimationFrame(() => { main.style.opacity = '1'; }));
       // Show user avatar in header + bottom tab bar + profile sheet
       if (user.picture) {
