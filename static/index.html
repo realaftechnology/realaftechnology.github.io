@@ -894,20 +894,19 @@ body.views-no-anim .view { transition: none !important; }
 /* ── SUGGESTION BAR (above input, horizontal scroll) ── */
 #suggestion-bar {
   width: 100%;
+  max-width: 720px;     /* align with .scroll-area + .input-area-inner column */
+  margin: 0 auto;
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 8px 20px;    /* matches scroll-area + input-area-inner side padding */
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
   flex-shrink: 0;
 }
 #suggestion-bar::-webkit-scrollbar { display: none; }
-@media (min-width: 768px) {
-  #suggestion-bar { padding-left: 20px; }
-}
 .suggestion-chip {
   background: var(--bg-secondary);
   border: 0.5px solid var(--separator);
