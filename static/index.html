@@ -3156,7 +3156,7 @@ function getBrainstormPrompt() {
 
   let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. ${budgetContext} Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.`;
   if (window._savedIdeasContext) {
-    prompt += `\n\n${window._savedIdeasContext}\n\nUse these as inspiration to suggest related but fresh ideas — don't repeat them, but build on the themes and formats that worked. Avoid suggesting ideas similar to any listed under "Ideas to avoid" — the user explicitly didn't find them useful.`;
+    prompt += `\n\n(Soft taste signal only — do NOT repeat or remix these. Generate something completely different that a person with this taste profile would also enjoy:\n${window._savedIdeasContext})`;
   }
   return prompt;
 }

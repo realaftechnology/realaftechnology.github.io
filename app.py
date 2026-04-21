@@ -3178,17 +3178,20 @@ def ideas_context():
         lines = []
         for i, r in enumerate(saved_rows, 1):
             title = r['title'] or 'Untitled'
-            snippet = (r['body'] or '')[:100].replace('\n', ' ')
-            lines.append(f'{i}. {title}: {snippet}')
-        parts.append('Previously saved good ideas:\n' + '\n'.join(lines))
+            lines.append(f'{i}. {title}')
+        parts.append(
+            'The user has previously saved ideas they liked. Use these ONLY to understand their taste and content style'
+            ' — do NOT repeat or directly riff on these ideas. Generate something fresh and different that would appeal'
+            ' to someone with these sensibilities:\n\nSaved idea signals:\n' + '\n'.join(lines) +
+            '\n\nThe new idea must be genuinely different from any of the above.'
+        )
 
     if disliked_rows:
         lines = []
         for i, r in enumerate(disliked_rows, 1):
             title = r['title'] or 'Untitled'
-            snippet = (r['body'] or '')[:100].replace('\n', ' ')
-            lines.append(f'{i}. {title}: {snippet}')
-        parts.append('Ideas to avoid (user didn\'t like these directions):\n' + '\n'.join(lines))
+            lines.append(f'{i}. {title}')
+        parts.append('Ideas to avoid (user explicitly didn\'t find these useful — do not suggest similar directions):\n' + '\n'.join(lines))
 
     return jsonify({'context': '\n\n'.join(parts)})
 
