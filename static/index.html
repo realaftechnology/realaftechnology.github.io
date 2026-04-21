@@ -676,7 +676,7 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
   display: none;
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  z-index: 150;
+  z-index: 230;
   height: var(--tab-bar-height);
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
@@ -993,6 +993,57 @@ body.keyboard-open .input-area { margin-bottom: 0; }
   .profile-sheet-backdrop { display: none; }
 }
 
+/* ── SAVED IDEAS SCREEN ── */
+.saved-ideas-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 225;
+  background: var(--bg-primary);
+  transform: translateX(100%);
+  transition: transform 0.28s ease;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.saved-ideas-screen.open { transform: translateX(0); }
+.saved-ideas-screen-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px 10px;
+  border-bottom: 0.5px solid var(--separator);
+  gap: 8px;
+}
+.saved-ideas-screen-back {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 6px 0;
+  font-family: var(--sf);
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.saved-ideas-screen-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label);
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+.saved-ideas-screen-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px calc(var(--tab-bar-height) + 24px);
+}
+.saved-ideas-count-badge {
+  color: var(--label-tertiary);
+  font-size: 15px;
+}
+@media (min-width: 768px) {
+  .saved-ideas-screen { display: none; }
+}
 
 /* ── SPA VIEWS WRAPPER ──────────────────────────────────────────────────── */
 /* The chat and data-center views live side-by-side inside this container and
@@ -2527,6 +2578,10 @@ body.views-no-anim #input-area { transition: none; }
           <span>Light mode</span>
           <span class="theme-switch" aria-hidden="true"></span>
         </button>
+        <button class="profile-row" onclick="openSavedIdeasScreen()">
+          <span>Saved Ideas</span>
+          <span class="saved-ideas-count-badge" id="saved-ideas-count-badge">›</span>
+        </button>
         <a href="/dev" class="profile-row" id="profile-dev" style="display:none">
           <span>Developer Dashboard</span>
           <span class="caret">›</span>
@@ -2535,10 +2590,18 @@ body.views-no-anim #input-area { transition: none; }
       <div class="profile-actions">
         <button class="profile-row danger" onclick="handleLogout()">Log out</button>
       </div>
-      <div class="saved-ideas-section" id="saved-ideas-section">
-        <h3>Saved Ideas</h3>
-        <div id="saved-ideas-list"><div class="saved-ideas-empty">Loading...</div></div>
-      </div>
+    </div>
+  </aside>
+
+  <!-- ── SAVED IDEAS SCREEN ── -->
+  <aside class="saved-ideas-screen" id="saved-ideas-screen" aria-hidden="true">
+    <div class="saved-ideas-screen-head">
+      <button class="saved-ideas-screen-back" onclick="closeSavedIdeasScreen()">‹ Back</button>
+      <h2>Saved Ideas</h2>
+      <div style="width:60px"></div>
+    </div>
+    <div class="saved-ideas-screen-body">
+      <div id="saved-ideas-list"><div class="saved-ideas-empty">Loading...</div></div>
     </div>
   </aside>
 
@@ -2699,6 +2762,20 @@ function isProfileSheetOpen() {
   return !!(sheet && sheet.classList.contains('open'));
 }
 
+function openSavedIdeasScreen() {
+  const screen = document.getElementById('saved-ideas-screen');
+  if (!screen) return;
+  screen.classList.add('open');
+  screen.setAttribute('aria-hidden', 'false');
+  loadSavedIdeas();
+}
+function closeSavedIdeasScreen() {
+  const screen = document.getElementById('saved-ideas-screen');
+  if (!screen) return;
+  screen.classList.remove('open');
+  screen.setAttribute('aria-hidden', 'true');
+}
+
 // ── SAVED IDEAS ──────────────────────────────────────────────────────────────
 
 async function loadSavedIdeasContext() {
@@ -2718,6 +2795,8 @@ async function loadSavedIdeas() {
     if (!res.ok) { list.innerHTML = '<div class="saved-ideas-empty">Failed to load.</div>'; return; }
     const data = await res.json();
     const ideas = data.ideas || [];
+    const badge = document.getElementById('saved-ideas-count-badge');
+    if (badge) badge.textContent = ideas.length > 0 ? `${ideas.length} ›` : '›';
     if (!ideas.length) {
       list.innerHTML = '<div class="saved-ideas-empty">No saved ideas yet. Click Save on any BrainStorm response to save it.</div>';
       return;
@@ -2749,6 +2828,9 @@ async function deleteSavedIdea(id) {
     if (list && !list.querySelector('.saved-idea-card')) {
       list.innerHTML = '<div class="saved-ideas-empty">No saved ideas yet. Click Save on any BrainStorm response to save it.</div>';
     }
+    const remaining = list ? list.querySelectorAll('.saved-idea-card').length : 0;
+    const badge = document.getElementById('saved-ideas-count-badge');
+    if (badge) badge.textContent = remaining > 0 ? `${remaining} ›` : '›';
     loadSavedIdeasContext();
   } catch { /* ignore */ }
 }
@@ -5052,6 +5134,17 @@ function hideSplash() {
       loadSavedIdeasContext();
       if (role === 'andy') {
         document.getElementById('voice-btn').style.display = 'flex';
+        // Replace the center BrainStorm button with a Voice Note button for Andy
+        const bsBtn = document.querySelector('.tab-brainstorm');
+        if (bsBtn) {
+          bsBtn.removeAttribute('onclick');
+          bsBtn.addEventListener('click', toggleVoiceRecording);
+          bsBtn.setAttribute('aria-label', 'Voice Note');
+          const icon = document.getElementById('brainstorm-icon');
+          if (icon) icon.innerHTML = '<text x="14" y="21" text-anchor="middle" font-size="24" fill="white" font-family="-apple-system,\'Helvetica Neue\',sans-serif">♠</text>';
+          const label = bsBtn.querySelector('span:last-child');
+          if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
+        }
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
         const vnSec = document.getElementById('vn-section');
