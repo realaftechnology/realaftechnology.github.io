@@ -810,24 +810,13 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 @media (min-width: 768px) {
   .input-bs-btn { display: flex; }
-  /* Center the 44px button on the pill's left edge: its radius (22) matches
-     the pill's left-cap radius, so when we shift it -22px, the right half
-     of the button is concentric with the pill's left cap — the two curves
-     share an outline and there's no visible gap between the button and the
-     pill at any vertical position. */
-  .input-bar { padding-left: 0; }
-  .input-bs-btn { margin-left: -22px; }
 }
 .input-bs-btn:active .input-bs-circle {
   transform: scale(0.91);
 }
 .input-bs-circle {
-  /* 44px matches the pill's height so the button's radius (22) equals the
-     pill's left-cap radius — when we center this button on the pill's left
-     edge, the two curves match and there's no wedge-shaped dark gap at the
-     top/bottom corners like there was with the smaller 32px version. */
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: #e5181f;
   display: flex;
@@ -840,6 +829,15 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   0%, 100% { box-shadow: 0 0 4px 0 rgba(220, 20, 20, 0.35); }
   50%      { box-shadow: 0 0 8px 1px rgba(220, 20, 20, 0.55); }
 }
+/* Flex row that puts the BrainStorm button OUTSIDE and to the LEFT of the
+   input pill, with both vertically centered. On mobile the button is hidden
+   (the tab-bar BrainStorm takes over) so the row just wraps the pill. */
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.input-row .input-bar { flex: 1; min-width: 0; }
 #brainstorm-circle-desktop.brainstorm-spinning svg {
   animation: brainstorm-spin 1s linear infinite;
   transform-origin: center center;
@@ -2487,24 +2485,26 @@ body.views-no-anim #input-area { transition: none; }
             <button id="voice-save-btn" onclick="savePendingVoiceNote()">Save</button>
             <button id="voice-discard-btn" onclick="discardPendingVoiceNote()">Discard</button>
           </div>
-          <div class="input-bar">
+          <div class="input-row">
             <button class="input-bs-btn" onclick="doBrainStorm()" aria-label="BrainStorm">
               <div class="input-bs-circle" id="brainstorm-circle-desktop">
-                <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="22" height="22" style="display:block;margin:0;transform-origin:center center;">
+                <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="18" height="18" style="display:block;margin:0;transform-origin:center center;">
                   <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
                 </svg>
               </div>
             </button>
-            <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
-            <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
-            <button class="input-submit" id="voice-btn" style="display:none" onclick="toggleVoiceRecording()" aria-label="Record voice note">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
-                <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </button>
+            <div class="input-bar">
+              <textarea id="search-input" placeholder="Ask anything..." rows="1"></textarea>
+              <button class="input-submit" id="main-submit" onclick="handleSubmit()">&#8593;</button>
+              <button class="input-submit" id="voice-btn" style="display:none" onclick="toggleVoiceRecording()" aria-label="Record voice note">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+                  <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
