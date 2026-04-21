@@ -2616,10 +2616,6 @@ let allEpisodes = [];
 let currentVideoContext = null; // {filename} set when AI response can reference a known video
 window._savedIdeasContext = '';
 
-function _synapseLoader(label) {
-  const id = 's' + Math.random().toString(36).slice(2, 7);
-  return `<div class="loading-row"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 708 708" width="48" height="48" overflow="visible" style="flex-shrink:0;margin-right:8px" aria-hidden="true"><defs><filter id="${id}g" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="30" in="SourceGraphic" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><path id="${id}a" d="M 140 110 C 70 200, 50 340, 100 440 C 150 540, 240 610, 310 620" fill="none"/><path id="${id}b" d="M 568 110 C 638 200, 658 340, 608 440 C 558 540, 468 610, 398 620" fill="none"/><path id="${id}c" d="M 180 520 C 260 560, 448 560, 528 520" fill="none"/></defs><g opacity="0.28" stroke="#ff4444" stroke-width="20" fill="none"><use href="#${id}a"/><use href="#${id}b"/><use href="#${id}c"/></g><g filter="url(#${id}g)"><circle r="40" fill="#fff"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0s"><mpath href="#${id}a"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0s"/><animate attributeName="r" values="24;48;32;0" keyTimes="0;0.3;0.7;1" dur="1.2s" repeatCount="indefinite" begin="0s"/></circle><circle r="40" fill="#ffaaaa"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0.5s"><mpath href="#${id}b"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.2s" repeatCount="indefinite" begin="0.5s"/><animate attributeName="r" values="24;48;32;0" keyTimes="0;0.3;0.7;1" dur="1.2s" repeatCount="indefinite" begin="0.5s"/></circle><circle r="28" fill="#fff"><animateMotion dur="0.9s" repeatCount="indefinite" begin="0.25s"><mpath href="#${id}c"/></animateMotion><animate attributeName="opacity" values="0;0.9;0.9;0" keyTimes="0;0.1;0.85;1" dur="0.9s" repeatCount="indefinite" begin="0.25s"/></circle></g></svg>${label}</div>`;
-}
 
 async function handleLogout() {
   await fetch('/api/logout', { method: 'POST' });
@@ -3273,7 +3269,7 @@ async function doSearch(query, episodeFilter) {
   if (bar) bar.style.display = 'none';
   currentQuery = query; chatHistory = []; hasResults = false;
   const area = document.getElementById('results-area');
-  area.innerHTML = _synapseLoader('Searching...');
+  area.innerHTML = '<div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Searching...</div>';
   try {
     const body = { query };
     const ep = episodeFilter || lockedEpisode;
@@ -3333,7 +3329,7 @@ function renderResults(query, results, autoExpand = false) {
   <div id="ai-section">
     <div class="ai-card">
       ${queryLabel}
-      <div id="ai-content" class="ai-body">${_synapseLoader('Analyzing transcripts...')}</div>
+      <div id="ai-content" class="ai-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
       ${btnLabel}
@@ -3500,7 +3496,7 @@ async function doFollowup(question) {
   const itemId = `chat-${Date.now()}`;
   thread.innerHTML += `<div class="chat-item" id="${itemId}">
     <div class="chat-q-label">&ldquo;${question.replace(/"/g, '&quot;')}&rdquo;</div>
-    <div class="chat-a-body">${_synapseLoader('Thinking...')}</div>
+    <div class="chat-a-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Thinking...</div></div>
   </div>`;
   scrollToBottom();
   try {
@@ -3971,7 +3967,7 @@ function loadVideoSummary() {
   card.style.marginBottom = '8px';
   card.innerHTML = `
     <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:10px">${safeTitle}</div>
-    <div id="ai-content" class="ai-body">${_synapseLoader('Generating summary...')}</div>`;
+    <div id="ai-content" class="ai-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Generating summary...</div></div>`;
   btn.replaceWith(card);
   runAnalysisForVideo(currentQuery, currentResults);
 }
@@ -5141,7 +5137,7 @@ function hideSplash() {
           bsBtn.addEventListener('click', toggleVoiceRecording);
           bsBtn.setAttribute('aria-label', 'Voice Note');
           const icon = document.getElementById('brainstorm-icon');
-          if (icon) icon.innerHTML = '<text x="14" y="21" text-anchor="middle" font-size="24" fill="white" font-family="-apple-system,\'Helvetica Neue\',sans-serif">♠</text>';
+          if (icon) { icon.setAttribute('viewBox', '0 0 24 24'); icon.innerHTML = '<path d="M12 2C8.5 2 5 5 5 8.5c0 2.8 1.8 5.2 4.5 6.5L8 18h8l-1.5-3C17.2 13.7 19 11.3 19 8.5 19 5 15.5 2 12 2zm-2 19v.5a2 2 0 004 0V21h-4z" fill="white"/>'; }
           const label = bsBtn.querySelector('span:last-child');
           if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
         }
@@ -5420,14 +5416,14 @@ function _andyToggleCenterMode() {
     var label = bsBtn.querySelector('span:last-child');
     if (window._andyCenterMode === 'voice') {
       window._andyCenterMode = 'brainstorm';
-      icon.innerHTML = '<path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>';
+      icon.setAttribute('viewBox', '0 0 28 28'); icon.innerHTML = '<path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>';
       if (label) label.innerHTML = '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
       bsBtn.removeEventListener('click', toggleVoiceRecording);
       bsBtn.onclick = doBrainStorm;
       bsBtn.setAttribute('aria-label', 'BrainStorm');
     } else {
       window._andyCenterMode = 'voice';
-      icon.innerHTML = '<text x="14" y="21" text-anchor="middle" font-size="24" fill="white" font-family="-apple-system,\'Helvetica Neue\',sans-serif">♠</text>';
+      icon.setAttribute('viewBox', '0 0 24 24'); icon.innerHTML = '<path d="M12 2C8.5 2 5 5 5 8.5c0 2.8 1.8 5.2 4.5 6.5L8 18h8l-1.5-3C17.2 13.7 19 11.3 19 8.5 19 5 15.5 2 12 2zm-2 19v.5a2 2 0 004 0V21h-4z" fill="white"/>';
       if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
       bsBtn.onclick = null;
       bsBtn.addEventListener('click', toggleVoiceRecording);
