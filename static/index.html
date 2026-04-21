@@ -5137,18 +5137,7 @@ function hideSplash() {
       loadSavedIdeasContext();
       if (role === 'andy') {
         document.getElementById('voice-btn').style.display = 'flex';
-        // Replace the center BrainStorm button with a Voice Note button for Andy
-        const bsBtn = document.querySelector('.tab-brainstorm');
-        if (bsBtn) {
-          bsBtn.removeAttribute('onclick');
-          bsBtn.addEventListener('click', toggleVoiceRecording);
-          bsBtn.setAttribute('aria-label', 'Voice Note');
-          const icon = document.getElementById('brainstorm-icon');
-          if (icon) { icon.setAttribute('viewBox', '0 0 24 24'); icon.innerHTML = '<path d="M12 2C11.2 3.2 4 7 4 12c0 2.8 2 5 5.2 5.5-.8 1.8-2 3.2-3.5 4.5h12.6c-1.5-1.3-2.7-2.7-3.5-4.5C18 17 20 14.8 20 12c0-5-7.2-8.8-8-10z M10.5 22v.2a1.5 1.5 0 003 0V22h-3z" fill="white"/>'; }
-          const label = bsBtn.querySelector('span:last-child');
-          if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
-        }
-        window._andyCenterMode = 'voice';
+        window._andyViewMode = 'andy';
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
         const vnSec = document.getElementById('vn-section');
@@ -5407,14 +5396,10 @@ function hideSplash() {
 })();
 </script>
 <script>
-// Andy-only: double-tap on chat area toggles BrainStorm ↔ Voice Note
-function _andyToggleCenterMode() {
+// Andy-only: double-tap the chat area to toggle Andy ↔ Team view
+function _andySwitchView() {
   var circle = document.getElementById('brainstorm-circle');
-  var bsBtn = document.querySelector('.tab-brainstorm');
-  if (!circle || !bsBtn) return;
-
-  var BOLT_HTML = '<svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>';
-  var SPADE_HTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" style="display:block;margin:0 auto;transform-origin:center center"><path d="M12 2C11.2 3.2 4 7 4 12c0 2.8 2 5 5.2 5.5-.8 1.8-2 3.2-3.5 4.5h12.6c-1.5-1.3-2.7-2.7-3.5-4.5C18 17 20 14.8 20 12c0-5-7.2-8.8-8-10z M10.5 22v.2a1.5 1.5 0 003 0V22h-3z" fill="white"/></svg>';
+  if (!circle) return;
 
   circle.classList.remove('lightning-strike');
   void circle.offsetWidth;
@@ -5422,22 +5407,16 @@ function _andyToggleCenterMode() {
 
   setTimeout(function() {
     circle.classList.remove('lightning-strike');
-    var label = bsBtn.querySelector('span:last-child');
-    if (window._andyCenterMode === 'voice') {
-      window._andyCenterMode = 'brainstorm';
-      circle.innerHTML = BOLT_HTML;
-      if (label) label.innerHTML = '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
-      bsBtn.removeEventListener('click', toggleVoiceRecording);
-      bsBtn.onclick = doBrainStorm;
-      bsBtn.setAttribute('aria-label', 'BrainStorm');
+    var voiceBtn = document.getElementById('voice-btn');
+    var vnSec = document.getElementById('vn-section');
+    if (window._andyViewMode === 'andy') {
+      window._andyViewMode = 'team';
+      if (voiceBtn) voiceBtn.style.display = 'none';
+      if (vnSec) vnSec.style.display = 'none';
     } else {
-      window._andyCenterMode = 'voice';
-      circle.innerHTML = SPADE_HTML;
-      if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
-      bsBtn.onclick = null;
-      bsBtn.removeEventListener('click', doBrainStorm);
-      bsBtn.addEventListener('click', toggleVoiceRecording);
-      bsBtn.setAttribute('aria-label', 'Voice Note');
+      window._andyViewMode = 'andy';
+      if (voiceBtn) voiceBtn.style.display = 'flex';
+      if (vnSec) vnSec.style.display = '';
     }
   }, 350);
 }
@@ -5447,7 +5426,7 @@ function _andyToggleCenterMode() {
   if (!scrollArea) return;
 
   scrollArea.addEventListener('dblclick', function() {
-    if (window._userRole === 'andy') _andyToggleCenterMode();
+    if (window._userRole === 'andy') _andySwitchView();
   });
 
   var _lastTapTime = 0;
@@ -5456,7 +5435,7 @@ function _andyToggleCenterMode() {
     var now = Date.now();
     if (now - _lastTapTime < 300) {
       e.preventDefault();
-      _andyToggleCenterMode();
+      _andySwitchView();
     }
     _lastTapTime = now;
   });
