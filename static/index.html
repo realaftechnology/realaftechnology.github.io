@@ -773,8 +773,8 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 #brainstorm-icon {
   display: block;
-  margin: 0;
-  flex-shrink: 0;
+  margin: 0 auto;
+  transform-origin: center center;
 }
 .tab-brainstorm:active .tab-brainstorm-circle {
   transform: scale(0.91);
@@ -2406,9 +2406,8 @@ body.views-no-anim #input-area { transition: none; }
       </button>
       <button class="tab-brainstorm" onclick="doBrainStorm()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg id="brainstorm-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
-            <path d="M48 28a10 10 0 0 0-9.5-10A14 14 0 0 0 12 24a8 8 0 0 0 2 15.76" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <polyline points="34,38 28,50 35,50 29,62" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <svg id="brainstorm-icon" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center;">
+            <path d="M15.5 3L4 16h10l-1.5 9L24 12h-10z" fill="white"/>
           </svg>
         </div>
         <span><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
