@@ -169,6 +169,53 @@ def _job_log(job, msg_type, msg, msg_q=None):
     if msg_q is not None:
         msg_q.put({"type": msg_type, "msg": msg})
 
+
+def _emit_progress(msg_q, *, overall_idx, overall_total, stage, current_name, bytes_done=None):
+    """Emit a structured progress event for the drive-import UI.
+    overall_idx / overall_total: which file are we on (1-based, N of M).
+    stage: 'downloading' | 'transcribing' | 'ingesting' | 'done_file'.
+    current_name: the file currently being processed.
+    bytes_done: bytes currently on disk for the in-progress download (optional).
+    """
+    if msg_q is None:
+        return
+    msg_q.put({
+        "type":          "progress",
+        "overall_idx":   overall_idx,
+        "overall_total": overall_total,
+        "stage":         stage,
+        "current_name":  current_name,
+        "bytes_done":    bytes_done,
+    })
+
+
+def _start_download_size_monitor(tmp_dir, msg_q, *, overall_idx, overall_total, current_name, stop_event):
+    """Poll tmp_dir size every ~500ms and emit progress events while gdown downloads.
+    Returns the thread so the caller can stop it via stop_event.set()."""
+    def _poll():
+        last_bytes = -1
+        while not stop_event.is_set():
+            try:
+                total = 0
+                for root, _dirs, files in os.walk(tmp_dir):
+                    for f in files:
+                        try:
+                            total += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+                if total != last_bytes:
+                    _emit_progress(msg_q,
+                                   overall_idx=overall_idx, overall_total=overall_total,
+                                   stage="downloading", current_name=current_name,
+                                   bytes_done=total)
+                    last_bytes = total
+            except Exception:
+                pass
+            stop_event.wait(0.5)
+    t = threading.Thread(target=_poll, daemon=True)
+    t.start()
+    return t
+
 def _finish_job(job, status="done"):
     with _jobs_lock:
         job["status"]      = status
@@ -2363,7 +2410,18 @@ def _drive_worker(job, urls, msg_q=None):
                              f"[{idx+1}/{len(new_files)}] Downloading {f['name']} "
                              f"({_fmt_bytes(_disk_free_bytes())} free)…", msg_q)
 
-                    out, stop = _drive_download_one(job, gdown, f["id"], tmp_dir, msg_q)
+                    _emit_progress(msg_q,
+                                   overall_idx=idx + 1, overall_total=len(new_files),
+                                   stage="downloading", current_name=f["name"], bytes_done=0)
+                    stop_event = threading.Event()
+                    _start_download_size_monitor(
+                        tmp_dir, msg_q,
+                        overall_idx=idx + 1, overall_total=len(new_files),
+                        current_name=f["name"], stop_event=stop_event)
+                    try:
+                        out, stop = _drive_download_one(job, gdown, f["id"], tmp_dir, msg_q)
+                    finally:
+                        stop_event.set()
                     if stop:
                         shutil.rmtree(tmp_dir, ignore_errors=True)
                         break   # disk full — stop this folder
@@ -2374,8 +2432,14 @@ def _drive_worker(job, urls, msg_q=None):
                     dst = os.path.join(vdir, safe)
                     shutil.move(out, dst)
                     shutil.rmtree(tmp_dir, ignore_errors=True)
+                    _emit_progress(msg_q,
+                                   overall_idx=idx + 1, overall_total=len(new_files),
+                                   stage="transcribing", current_name=f["name"])
                     # Transcribe + ingest; temp audio is cleaned up inside _ingest_one
                     _ingest_one(job, dst, safe, msg_q)
+                    _emit_progress(msg_q,
+                                   overall_idx=idx + 1, overall_total=len(new_files),
+                                   stage="done_file", current_name=f["name"])
 
             else:
                 # ── SINGLE FILE ───────────────────────────────────────────────
@@ -2387,7 +2451,19 @@ def _drive_worker(job, urls, msg_q=None):
                          f"Downloading file {i+1}/{len(urls)} "
                          f"({_fmt_bytes(_disk_free_bytes())} free)…", msg_q)
 
-                out, stop = _drive_download_one(job, gdown, url, tmp_dir, msg_q)
+                current_name = f"file {i+1}"  # we don't know the real name until after download
+                _emit_progress(msg_q,
+                               overall_idx=i + 1, overall_total=len(urls),
+                               stage="downloading", current_name=current_name, bytes_done=0)
+                stop_event = threading.Event()
+                _start_download_size_monitor(
+                    tmp_dir, msg_q,
+                    overall_idx=i + 1, overall_total=len(urls),
+                    current_name=current_name, stop_event=stop_event)
+                try:
+                    out, stop = _drive_download_one(job, gdown, url, tmp_dir, msg_q)
+                finally:
+                    stop_event.set()
                 if stop or not out:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
                     if stop: break
@@ -2398,7 +2474,13 @@ def _drive_worker(job, urls, msg_q=None):
                 dst  = os.path.join(vdir, safe)
                 shutil.move(out, dst)
                 shutil.rmtree(tmp_dir, ignore_errors=True)
+                _emit_progress(msg_q,
+                               overall_idx=i + 1, overall_total=len(urls),
+                               stage="transcribing", current_name=fn)
                 _ingest_one(job, dst, safe, msg_q)
+                _emit_progress(msg_q,
+                               overall_idx=i + 1, overall_total=len(urls),
+                               stage="done_file", current_name=fn)
 
         except Exception as e:
             _job_log(job, "error", str(e), msg_q)

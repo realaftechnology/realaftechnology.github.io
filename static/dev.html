@@ -431,6 +431,21 @@
         <button class="import-btn" id="dev-import-btn" onclick="devStartImport()">Import</button>
         <span id="dev-import-status" style="font-size:12px;color:var(--text3)"></span>
       </div>
+      <!-- Progress bar — visible only while an import is running -->
+      <div id="dev-import-progress" style="display:none;margin-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px">
+          <div id="dev-import-progress-label"
+               style="font-size:12px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+          <div id="dev-import-progress-pct"
+               style="font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums;flex-shrink:0">0%</div>
+        </div>
+        <div style="height:6px;background:rgba(120,120,128,0.24);border-radius:3px;overflow:hidden">
+          <div id="dev-import-progress-fill"
+               style="height:100%;width:0%;background:var(--red,#ff453a);transition:width 0.25s ease;border-radius:3px"></div>
+        </div>
+        <div id="dev-import-progress-sub"
+             style="font-size:11px;color:var(--text3);margin-top:4px;font-variant-numeric:tabular-nums"></div>
+      </div>
       <div class="import-log" id="dev-import-log"></div>
     </div>
   </div>
@@ -712,6 +727,80 @@ function startRename(id, currentTitle) {
 // ── Drive import (dev) ────────────────────────────────────────────────────────
 let _devImportES = null;
 
+// Format bytes like "12.3 MB" for the progress sub-label
+function _fmtBytes(b) {
+  if (b == null) return '';
+  if (b >= 1e9) return (b / 1e9).toFixed(2) + ' GB';
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+
+// Update the progress bar based on a structured {type:"progress"} event from the server.
+// Overall % = (files_completed + current_fractional) / total_files.
+// Inside a file we don't know total bytes (Drive doesn't tell us ahead of time),
+// so we approximate per-file fractional progress by stage:
+//   downloading  → 0.0 + partial based on bytes (but capped since we don't know total)
+//   transcribing → 0.6
+//   ingesting    → 0.8
+//   done_file    → 1.0
+function _renderImportProgress(d) {
+  const box     = document.getElementById('dev-import-progress');
+  const label   = document.getElementById('dev-import-progress-label');
+  const pctEl   = document.getElementById('dev-import-progress-pct');
+  const fill    = document.getElementById('dev-import-progress-fill');
+  const sub     = document.getElementById('dev-import-progress-sub');
+  if (!box) return;
+  box.style.display = 'block';
+
+  const total  = d.overall_total || 1;
+  const idx    = d.overall_idx   || 1;
+  // Completed files before this one
+  const done   = Math.max(0, idx - 1);
+
+  let stageFraction = 0;
+  let stageLabel    = '';
+  let subLabel      = '';
+  switch (d.stage) {
+    case 'downloading':
+      // Without a known total, assume each file's download is ~0-0.6 of its slot.
+      // Use bytes_done as a soft visual — cap at 0.55 until we hear transcribing.
+      stageFraction = 0.0 + (d.bytes_done ? Math.min(0.55, Math.log10(1 + d.bytes_done) / 12) : 0);
+      stageLabel = 'Downloading';
+      subLabel   = d.bytes_done ? `${_fmtBytes(d.bytes_done)} downloaded` : 'Connecting…';
+      break;
+    case 'transcribing':
+      stageFraction = 0.60;
+      stageLabel = 'Transcribing';
+      subLabel   = 'Running speech-to-text…';
+      break;
+    case 'ingesting':
+      stageFraction = 0.85;
+      stageLabel = 'Saving';
+      subLabel   = 'Writing episode + segments to the database…';
+      break;
+    case 'done_file':
+      stageFraction = 1.0;
+      stageLabel = 'Done';
+      subLabel   = '';
+      break;
+  }
+  const overallPct = Math.min(100, Math.round(((done + stageFraction) / total) * 100));
+  fill.style.width = overallPct + '%';
+  pctEl.textContent = overallPct + '%';
+  label.textContent = `${stageLabel} — ${d.current_name || ''} (file ${idx} of ${total})`;
+  sub.textContent   = subLabel;
+}
+
+function _resetImportProgress() {
+  const box  = document.getElementById('dev-import-progress');
+  const fill = document.getElementById('dev-import-progress-fill');
+  const pct  = document.getElementById('dev-import-progress-pct');
+  if (box)  box.style.display = 'none';
+  if (fill) fill.style.width  = '0%';
+  if (pct)  pct.textContent   = '0%';
+}
+
 function devStartImport() {
   const urls = document.getElementById('dev-drive-urls').value.trim();
   if (!urls) return;
@@ -722,6 +811,7 @@ function devStartImport() {
   log.style.display = 'block';
   log.innerHTML = '';
   status.textContent = 'Importing…';
+  _resetImportProgress();
 
   if (_devImportES) _devImportES.close();
   const params = new URLSearchParams({urls});
@@ -735,7 +825,17 @@ function devStartImport() {
         btn.disabled = false;
         _devImportES.close();
         _epsLoaded = false;
+        // Force 100% then fade out after a beat.
+        const fill = document.getElementById('dev-import-progress-fill');
+        const pct  = document.getElementById('dev-import-progress-pct');
+        if (fill) fill.style.width = '100%';
+        if (pct)  pct.textContent  = '100%';
+        setTimeout(_resetImportProgress, 2500);
         refresh();
+        return;
+      }
+      if (d.type === 'progress') {
+        _renderImportProgress(d);
         return;
       }
       if (d.msg) {
@@ -751,6 +851,7 @@ function devStartImport() {
     status.textContent = 'Connection lost.';
     btn.disabled = false;
     _devImportES.close();
+    _resetImportProgress();
   };
 }
 
