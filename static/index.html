@@ -741,6 +741,15 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   padding-bottom: 6px;
   position: relative;
 }
+@keyframes brainstorm-glow {
+  0%, 100% { box-shadow: 0 0 10px 2px rgba(255, 120, 0, 0.5), 0 4px 15px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 22px 6px rgba(255, 60, 0, 0.8), 0 4px 15px rgba(0,0,0,0.3); }
+}
+@keyframes brainstorm-flash {
+  0% { filter: brightness(1); }
+  20% { filter: brightness(3); background: white; }
+  100% { filter: brightness(1); }
+}
 .tab-brainstorm-circle {
   position: absolute;
   top: -22px;
@@ -751,12 +760,14 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 -2px 12px rgba(255,69,0,0.4), 0 4px 14px rgba(255,69,0,0.45);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  animation: brainstorm-glow 2s ease-in-out infinite;
+  transition: transform 0.12s ease;
 }
 .tab-brainstorm:active .tab-brainstorm-circle {
   transform: scale(0.91);
-  box-shadow: 0 2px 6px rgba(255,69,0,0.3);
+}
+.tab-brainstorm-circle.flashing {
+  animation: brainstorm-flash 0.4s ease-out forwards;
 }
 .tab-brainstorm > span {
   font-family: var(--sf);
@@ -2354,9 +2365,10 @@ body.views-no-anim .view { transition: none !important; }
         <span>Chat</span>
       </button>
       <button class="tab-brainstorm" onclick="doBrainStorm()" aria-label="BrainStorm">
-        <div class="tab-brainstorm-circle">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M13 2L4.5 13.5H11L10 22L20.5 10.5H14L13 2Z" fill="white"/>
+        <div class="tab-brainstorm-circle" id="brainstorm-circle">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28" aria-hidden="true">
+            <path d="M6 19a4 4 0 0 1-.5-7.97A6 6 0 0 1 17.5 12H18a4 4 0 0 1 0 8H6z" fill="white" opacity="0.9"/>
+            <path d="M13 12l-2 4h3l-2 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>
         </div>
         <span>BrainStorm</span>
@@ -2858,8 +2870,14 @@ function handleSubmit() {
 }
 
 function doBrainStorm() {
+  const circle = document.getElementById('brainstorm-circle');
+  if (circle) {
+    circle.classList.add('flashing');
+    setTimeout(() => circle.classList.remove('flashing'), 400);
+  }
   navigate('chat');
   hasResults = false;
+  window._brainstormMode = true;
   doSearch("Give me a random content idea for Andy Frisella's brand. Make it specific, actionable, and on-brand with his messaging around mental toughness, entrepreneurship, and no-excuse execution.");
 }
 
@@ -2921,10 +2939,13 @@ function renderResults(query, results, autoExpand = false) {
   const sectionLabel = autoExpand ? 'AI Summary' : 'AI Analysis';
   const btnLabel = `View Transcripts (${results.length}) &#8964;`;
 
+  const isBrainstorm = !!window._brainstormMode;
+  window._brainstormMode = false;
+  const queryLabel = isBrainstorm ? '' : `<div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>`;
   let html = `<div class="section-header">${sectionLabel}</div>
   <div id="ai-section">
     <div class="ai-card">
-      <div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>
+      ${queryLabel}
       <div id="ai-content" class="ai-body"><div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Analyzing transcripts...</div></div>
     </div>
     <button class="view-transcripts-btn" id="transcripts-toggle" onclick="toggleTranscripts()">
