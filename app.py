@@ -2983,17 +2983,26 @@ def data_center_page():
 @app.route("/api/brand-analytics")
 @requires_auth
 def brand_analytics():
+    """Return the latest brand analytics JSON. Sends Cache-Control: no-store so
+    the Refresh button in the Data Center actually re-fetches instead of
+    replaying a cached response (which was making refreshes look like no-ops)."""
+    def _nocache(resp):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"]        = "no-cache"
+        resp.headers["Expires"]       = "0"
+        return resp
+
     path = _brand_analytics_path()
     if not path:
-        return jsonify({"error": "no brand analytics data available",
-                        "platforms": {},
-                        "meta": {"lastUpdated": None, "period": "—",
-                                 "source": "data file not found — run the refresh pipeline"}}), 200
+        return _nocache(jsonify({"error": "no brand analytics data available",
+                                 "platforms": {},
+                                 "meta": {"lastUpdated": None, "period": "—",
+                                          "source": "data file not found — run the refresh pipeline"}}))
     try:
         with open(path) as f:
-            return jsonify(json.load(f))
+            return _nocache(jsonify(json.load(f)))
     except Exception as e:
-        return jsonify({"error": f"failed to read brand analytics: {e}"}), 500
+        return _nocache(jsonify({"error": f"failed to read brand analytics: {e}"})), 500
 
 
 @app.route("/dev")

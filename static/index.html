@@ -4821,7 +4821,12 @@ function hideSplash() {
     }));
   }
   async function loadDataCenterData() {
-    const r = await fetch("/api/brand-analytics", { credentials: "include" });
+    // Cache-bust so the Refresh button actually forces a round-trip. Without
+    // either a unique query string or cache:'no-store', iOS Safari and service
+    // workers will happily replay the cached response and the UI shows stale
+    // numbers even after the server has updated.
+    const url = `/api/brand-analytics?t=${Date.now()}`;
+    const r = await fetch(url, { credentials: "include", cache: "no-store" });
     if (!r.ok) throw new Error("fetch failed: " + r.status);
     return r.json();
   }
