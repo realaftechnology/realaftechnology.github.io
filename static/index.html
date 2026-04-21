@@ -823,8 +823,14 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: brainstorm-glow 2s ease-in-out infinite;
+  /* Use a gentler, tighter glow that stays within the pill's rounded bounds
+     instead of the big pulsing halo used by the mobile tab-bar variant. */
+  animation: input-bs-glow 2s ease-in-out infinite;
   transition: transform 0.12s ease;
+}
+@keyframes input-bs-glow {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(220, 20, 20, 0.35); }
+  50%      { box-shadow: 0 0 8px 1px rgba(220, 20, 20, 0.55); }
 }
 #brainstorm-circle-desktop.brainstorm-spinning svg {
   animation: brainstorm-spin 1s linear infinite;
