@@ -390,6 +390,11 @@
         <tbody id="search-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
+    <div id="search-pagination" style="display:none;align-items:center;justify-content:center;gap:14px;padding:10px 0;font-size:12px;color:var(--text3)">
+      <button class="back-btn" id="search-prev" onclick="searchPage(-1)">← Prev</button>
+      <span id="search-page-label"></span>
+      <button class="back-btn" id="search-next" onclick="searchPage(1)">Next →</button>
+    </div>
   </div>
 
   <!-- Users & roles — dev-only. Invite, role-toggle, and remove. -->
@@ -627,20 +632,46 @@ function switchJobTab(e, jobId, tab) {
 }
 
 // ── Search history ────────────────────────────────────────────────────────────
+const SEARCH_PAGE_SIZE = 12;
+let _allSearches = [];
+let _searchPage  = 0;
+
 function renderSearchHistory(searches) {
+  _allSearches = searches;
+  const totalPages = Math.max(1, Math.ceil(searches.length / SEARCH_PAGE_SIZE));
+  _searchPage = Math.min(_searchPage, totalPages - 1);
+
   const tbody = document.getElementById('search-tbody');
   document.getElementById('search-badge').textContent = searches.length;
+
   if (!searches.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="empty">No searches recorded yet</td></tr>';
+    document.getElementById('search-pagination').style.display = 'none';
     return;
   }
-  tbody.innerHTML = searches.map(s => `
+
+  const start = _searchPage * SEARCH_PAGE_SIZE;
+  const page  = searches.slice(start, start + SEARCH_PAGE_SIZE);
+
+  tbody.innerHTML = page.map(s => `
     <tr>
       <td class="search-q" onclick="this.classList.toggle('expanded')"><div class="search-q-text">${esc(s.query)}</div></td>
       <td>${s.ep_filter ? `<span class="search-ep">Ep ${esc(s.ep_filter)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
       <td class="search-count">${s.results}</td>
       <td class="search-ts">${timeAgo(s.searched_at)}</td>
     </tr>`).join('');
+
+  const pag = document.getElementById('search-pagination');
+  pag.style.display = totalPages > 1 ? 'flex' : 'none';
+  document.getElementById('search-page-label').textContent = `Page ${_searchPage + 1} of ${totalPages}`;
+  document.getElementById('search-prev').disabled = _searchPage === 0;
+  document.getElementById('search-next').disabled = _searchPage >= totalPages - 1;
+}
+
+function searchPage(delta) {
+  const totalPages = Math.ceil(_allSearches.length / SEARCH_PAGE_SIZE);
+  _searchPage = Math.max(0, Math.min(_searchPage + delta, totalPages - 1));
+  renderSearchHistory(_allSearches);
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
