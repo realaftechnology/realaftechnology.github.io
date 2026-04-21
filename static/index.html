@@ -2880,6 +2880,55 @@ function handleSubmit() {
   if (hasResults) { doFollowup(val); } else { doSearch(val); }
 }
 
+function getBrainstormPrompt() {
+  const formats = [
+    'short-form video (60-90 seconds)',
+    'long-form YouTube video (10-20 minutes)',
+    'podcast episode or segment',
+    'Instagram carousel post',
+    'Twitter/X thread',
+    'email newsletter',
+    'Instagram Reel',
+    'YouTube Shorts',
+    'live stream topic',
+    'keynote or speech topic',
+  ];
+
+  const angles = [
+    'a personal story or failure Andy has overcome',
+    'a hard truth most people don\'t want to hear',
+    'a common excuse Andy would destroy',
+    'a behind-the-scenes look at running 1st Phorm or REAL AF',
+    'a deep dive on one of Andy\'s core philosophies',
+    'a rant about mediocrity or average thinking',
+    'a breakdown of a specific mental toughness concept',
+    'a lesson from Andy\'s early entrepreneurship days',
+    'a challenge or call to action for the audience',
+    'a controversial take on success, discipline, or hustle culture',
+    'a response to a common criticism or misconception about Andy',
+    'a day-in-the-life or routine breakdown',
+    'a "what I wish I knew" style reflection',
+    'a tactical breakdown of sales, marketing, or leadership',
+    'a raw, unfiltered opinion on current events in business or culture',
+  ];
+
+  const audiences = [
+    'aspiring entrepreneurs just starting out',
+    'people stuck in a job they hate',
+    'athletes or competitors looking for mental edge',
+    'business owners who are plateauing',
+    'young men looking for direction',
+    'people who keep failing to follow through',
+    'existing 75 Hard participants or alumni',
+  ];
+
+  const format = formats[Math.floor(Math.random() * formats.length)];
+  const angle = angles[Math.floor(Math.random() * angles.length)];
+  const audience = audiences[Math.floor(Math.random() * audiences.length)];
+
+  return `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Angle: ${angle}. Target audience: ${audience}. Be specific with a working title, a 1-sentence hook, and 3 bullet points of what it covers. Make it feel like something Andy would actually say or post — raw, direct, no fluff.`;
+}
+
 function doBrainStorm() {
   const circle = document.getElementById('brainstorm-circle');
   if (circle) {
@@ -2892,7 +2941,7 @@ function doBrainStorm() {
   navigate('chat');
   hasResults = false;
   window._brainstormMode = true;
-  doSearch("Give me a random content idea for Andy Frisella's brand. Make it specific, actionable, and on-brand with his messaging around mental toughness, entrepreneurship, and no-excuse execution.");
+  doSearch(getBrainstormPrompt());
 }
 
 async function doSearch(query, episodeFilter) {
@@ -2971,7 +3020,7 @@ function renderResults(query, results, autoExpand = false) {
 
   area.innerHTML = html;
   scrollToTop();
-  runAnalysis(query, results, autoExpand);
+  runAnalysis(query, results, autoExpand, isBrainstorm);
 }
 
 function toggleTranscripts() {
@@ -3053,12 +3102,12 @@ async function consumeStream(res, onChunk, onDone, onError) {
   }
 }
 
-async function runAnalysis(query, results) {
+async function runAnalysis(query, results, autoExpand, brainstorm) {
   analyzing = true;
   const el = document.getElementById('ai-content');
   if (!el) { analyzing = false; return; }
   try {
-    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results: results.slice(0, 20)}) });
+    const res = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, results: results.slice(0, 20), brainstorm: !!brainstorm}) });
     await consumeStream(res,
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {

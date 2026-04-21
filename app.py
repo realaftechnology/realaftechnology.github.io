@@ -952,9 +952,10 @@ def search_endpoint():
 def analyze():
     if not ANTHROPIC_KEY:
         return jsonify({"error": "No Anthropic API key configured"})
-    data    = request.get_json()
-    query   = data.get("query", "")
-    results = data.get("results", [])
+    data      = request.get_json()
+    query     = data.get("query", "")
+    results   = data.get("results", [])
+    brainstorm = data.get("brainstorm", False)
 
     context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in results])
 
@@ -991,7 +992,7 @@ CITATIONS:
             messages=[{"role": "user", "content": user_msg}],
             model="claude-sonnet-4-6",
             max_tokens=4096,
-            temperature=0.4,
+            temperature=0.95 if brainstorm else 0.4,
         )),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
