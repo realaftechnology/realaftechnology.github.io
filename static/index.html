@@ -5145,6 +5145,7 @@ function hideSplash() {
           const label = bsBtn.querySelector('span:last-child');
           if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
         }
+        window._andyCenterMode = 'voice';
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
         const vnSec = document.getElementById('vn-section');
@@ -5400,6 +5401,59 @@ function hideSplash() {
       }
     }
   };
+})();
+</script>
+<script>
+// Andy-only: double-tap on chat area toggles BrainStorm ↔ Voice Note
+function _andyToggleCenterMode() {
+  var circle = document.getElementById('brainstorm-circle');
+  var icon = document.getElementById('brainstorm-icon');
+  var bsBtn = document.querySelector('.tab-brainstorm');
+  if (!circle || !icon || !bsBtn) return;
+
+  circle.classList.remove('lightning-strike');
+  void circle.offsetWidth;
+  circle.classList.add('lightning-strike');
+
+  setTimeout(function() {
+    circle.classList.remove('lightning-strike');
+    var label = bsBtn.querySelector('span:last-child');
+    if (window._andyCenterMode === 'voice') {
+      window._andyCenterMode = 'brainstorm';
+      icon.innerHTML = '<path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>';
+      if (label) label.innerHTML = '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
+      bsBtn.removeEventListener('click', toggleVoiceRecording);
+      bsBtn.onclick = doBrainStorm;
+      bsBtn.setAttribute('aria-label', 'BrainStorm');
+    } else {
+      window._andyCenterMode = 'voice';
+      icon.innerHTML = '<text x="14" y="21" text-anchor="middle" font-size="24" fill="white" font-family="-apple-system,\'Helvetica Neue\',sans-serif">♠</text>';
+      if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
+      bsBtn.onclick = null;
+      bsBtn.addEventListener('click', toggleVoiceRecording);
+      bsBtn.setAttribute('aria-label', 'Voice Note');
+    }
+  }, 400);
+}
+
+(function() {
+  var scrollArea = document.getElementById('scroll-area');
+  if (!scrollArea) return;
+
+  scrollArea.addEventListener('dblclick', function() {
+    if (window._userRole === 'andy') _andyToggleCenterMode();
+  });
+
+  var _lastTapTime = 0;
+  scrollArea.addEventListener('touchend', function(e) {
+    if (window._userRole !== 'andy') return;
+    var now = Date.now();
+    if (now - _lastTapTime < 300) {
+      e.preventDefault();
+      _andyToggleCenterMode();
+    }
+    _lastTapTime = now;
+  });
 })();
 </script>
 </body>
