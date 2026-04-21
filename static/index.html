@@ -894,6 +894,90 @@ body.keyboard-open .input-area { margin-bottom: 0; }
 .profile-row:hover { background: var(--bg-tertiary); }
 .profile-row .caret { color: var(--label-tertiary); font-size: 16px; }
 .profile-row.danger { color: var(--red); }
+/* ── SAVE IDEA BUTTON ── */
+.save-idea-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 7px 14px;
+  background: var(--bg-secondary);
+  color: var(--label);
+  border: 1px solid var(--separator);
+  border-radius: 20px;
+  font-family: var(--sf);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.save-idea-btn:disabled { opacity: 0.55; cursor: default; }
+/* ── SAVED IDEAS SECTION ── */
+.saved-ideas-section { margin-top: 8px; }
+.saved-ideas-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 4px;
+  margin: 0 0 10px;
+}
+.saved-idea-card {
+  position: relative;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 14px 40px 14px 14px;
+  margin-bottom: 10px;
+}
+.saved-idea-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 5px;
+}
+.saved-idea-card-body {
+  font-size: 13px;
+  color: var(--label-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.saved-idea-card-body.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.saved-idea-card-expand {
+  background: none;
+  border: none;
+  color: var(--accent, #007AFF);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0 0;
+  font-family: var(--sf);
+}
+.saved-idea-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.5;
+  padding: 4px;
+  line-height: 1;
+}
+.saved-idea-delete:hover { opacity: 1; }
+.saved-ideas-empty {
+  font-size: 14px;
+  color: var(--label-tertiary);
+  text-align: center;
+  padding: 20px 10px;
+}
 .profile-sheet-backdrop {
   position: fixed;
   inset: 0;
@@ -2452,6 +2536,10 @@ body.views-no-anim #input-area { transition: none; }
       <div class="profile-actions">
         <button class="profile-row danger" onclick="handleLogout()">Log out</button>
       </div>
+      <div class="saved-ideas-section" id="saved-ideas-section">
+        <h3>Saved Ideas</h3>
+        <div id="saved-ideas-list"><div class="saved-ideas-empty">Loading...</div></div>
+      </div>
     </div>
   </aside>
 
@@ -2464,6 +2552,7 @@ let hasResults = false;
 let lockedEpisode = null;
 let allEpisodes = [];
 let currentVideoContext = null; // {filename} set when AI response can reference a known video
+window._savedIdeasContext = '';
 
 async function handleLogout() {
   await fetch('/api/logout', { method: 'POST' });
@@ -2589,6 +2678,7 @@ function openProfileSheet() {
   if (bd) bd.classList.add('visible');
   sheet.setAttribute('aria-hidden', 'false');
   setActiveTab('profile');
+  loadSavedIdeas();
 }
 function closeProfileSheet(opts) {
   opts = opts || {};
@@ -2603,6 +2693,66 @@ function closeProfileSheet(opts) {
 function isProfileSheetOpen() {
   const sheet = document.getElementById('profile-sheet');
   return !!(sheet && sheet.classList.contains('open'));
+}
+
+// ── SAVED IDEAS ──────────────────────────────────────────────────────────────
+
+async function loadSavedIdeasContext() {
+  try {
+    const res = await fetch('/api/ideas/context');
+    if (!res.ok) return;
+    const data = await res.json();
+    window._savedIdeasContext = data.context || '';
+  } catch { /* ignore */ }
+}
+
+async function loadSavedIdeas() {
+  const list = document.getElementById('saved-ideas-list');
+  if (!list) return;
+  try {
+    const res = await fetch('/api/ideas');
+    if (!res.ok) { list.innerHTML = '<div class="saved-ideas-empty">Failed to load.</div>'; return; }
+    const data = await res.json();
+    const ideas = data.ideas || [];
+    if (!ideas.length) {
+      list.innerHTML = '<div class="saved-ideas-empty">No saved ideas yet. Tap 💾 on any BrainStorm response to save it.</div>';
+      return;
+    }
+    list.innerHTML = ideas.map(idea => `
+      <div class="saved-idea-card" id="idea-card-${idea.id}">
+        <button class="saved-idea-delete" onclick="deleteSavedIdea(${idea.id})" aria-label="Delete">🗑</button>
+        <div class="saved-idea-card-title">${escapeHtml(idea.title || 'Untitled')}</div>
+        <div class="saved-idea-card-body" id="idea-body-${idea.id}">${escapeHtml(idea.body)}</div>
+        <button class="saved-idea-card-expand" onclick="toggleIdeaExpand(${idea.id})">Show more</button>
+      </div>`).join('');
+  } catch {
+    list.innerHTML = '<div class="saved-ideas-empty">Failed to load.</div>';
+  }
+}
+
+async function deleteSavedIdea(id) {
+  try {
+    await fetch(`/api/ideas/${id}`, { method: 'DELETE' });
+    const card = document.getElementById(`idea-card-${id}`);
+    if (card) card.remove();
+    const list = document.getElementById('saved-ideas-list');
+    if (list && !list.querySelector('.saved-idea-card')) {
+      list.innerHTML = '<div class="saved-ideas-empty">No saved ideas yet. Tap 💾 on any BrainStorm response to save it.</div>';
+    }
+    loadSavedIdeasContext();
+  } catch { /* ignore */ }
+}
+
+function toggleIdeaExpand(id) {
+  const body = document.getElementById(`idea-body-${id}`);
+  const btn = body?.nextElementSibling;
+  if (!body) return;
+  body.classList.toggle('expanded');
+  if (btn) btn.textContent = body.classList.contains('expanded') ? 'Show less' : 'Show more';
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // Highlight the active tab in the bottom bar. `which` in {'chat','data','profile'}.
@@ -2988,7 +3138,11 @@ function getBrainstormPrompt() {
     ? 'Andy has serious wealth and is willing to spend whatever it takes to make a statement. This should be a concept that would go massively viral and only someone with real money and real credibility could pull off.'
     : 'Keep it on-brand — raw, direct, no fluff.';
 
-  return `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. ${budgetContext} Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.`;
+  let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. ${budgetContext} Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.`;
+  if (window._savedIdeasContext) {
+    prompt += `\n\n${window._savedIdeasContext}\n\nUse these as inspiration to suggest related but fresh ideas — don't repeat them, but build on the themes and formats that worked. Avoid suggesting ideas similar to any listed under "Ideas to avoid" — the user explicitly didn't find them useful.`;
+  }
+  return prompt;
 }
 
 function doBrainStorm() {
@@ -3174,7 +3328,12 @@ async function runAnalysis(query, results, autoExpand, brainstorm) {
       (text) => { el.innerHTML = marked.parse(text); },
       (text) => {
         el.innerHTML = text ? marked.parse(text) : '<span style="color:var(--label-tertiary)">No answer — try rephrasing or adding more context.</span>';
-        if (text) { chatHistory.push({q: query, a: text}); addEpisodeButtons(el.parentElement, text); addAllClipButtons(el.parentElement, text); }
+        if (text) {
+          chatHistory.push({q: query, a: text});
+          addEpisodeButtons(el.parentElement, text);
+          addAllClipButtons(el.parentElement, text);
+          if (brainstorm) addBrainstormActionButtons(el, text);
+        }
       },
       (err) => { el.innerHTML = `<span style="color:var(--label-tertiary)">${err}</span>`; }
     );
@@ -3183,6 +3342,48 @@ async function runAnalysis(query, results, autoExpand, brainstorm) {
   }
   analyzing = false;
   document.getElementById('brainstorm-circle')?.classList.remove('brainstorm-spinning');
+}
+
+function addBrainstormActionButtons(el, fullText) {
+  const existing = el.parentElement.querySelector('.brainstorm-actions');
+  if (existing) existing.remove();
+
+  const titleMatch = fullText.match(/^#+ (.+)|^\*\*(.+?)\*\*/m);
+  const title = titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : fullText.split('\n')[0].replace(/^#+\s*/, '').trim().slice(0, 80);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'brainstorm-actions';
+  wrap.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'save-idea-btn';
+  saveBtn.innerHTML = '💾 Save idea';
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    try {
+      await fetch('/api/ideas/save', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, body: fullText}) });
+      saveBtn.innerHTML = '✓ Saved';
+      loadSavedIdeasContext();
+    } catch { saveBtn.disabled = false; }
+  };
+  wrap.appendChild(saveBtn);
+
+  if (window._userRole === 'dev') {
+    const dislikeBtn = document.createElement('button');
+    dislikeBtn.className = 'save-idea-btn';
+    dislikeBtn.innerHTML = '👎 Suggest fewer like this';
+    dislikeBtn.onclick = async () => {
+      dislikeBtn.disabled = true;
+      try {
+        await fetch('/api/ideas/dislike', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, body: fullText}) });
+        dislikeBtn.innerHTML = '✗ Noted';
+        loadSavedIdeasContext();
+      } catch { dislikeBtn.disabled = false; }
+    };
+    wrap.appendChild(dislikeBtn);
+  }
+
+  el.parentElement.insertBefore(wrap, el.nextSibling);
 }
 
 async function doFollowup(question) {
@@ -4821,6 +5022,8 @@ function hideSplash() {
       // Role-based UI. 'andy' gets the voice-note mic; 'dev' gets a link to
       // the developer dashboard in the header. 'team' (default) gets neither.
       const role = user.role || 'team';
+      window._userRole = role;
+      loadSavedIdeasContext();
       if (role === 'andy') {
         document.getElementById('voice-btn').style.display = 'flex';
       } else {

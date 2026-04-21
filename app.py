@@ -523,6 +523,18 @@ def get_db():
             state      TEXT PRIMARY KEY,
             created_at TEXT DEFAULT (datetime('now'))
         )""",
+        """CREATE TABLE IF NOT EXISTS saved_ideas (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            title    TEXT,
+            body     TEXT NOT NULL,
+            saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS disliked_ideas (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            title    TEXT,
+            body     TEXT NOT NULL,
+            saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]:
         try:
             conn.execute(stmt)
@@ -3098,6 +3110,87 @@ def dev_status():
         "jobs":                jobs_snapshot,
         "searches":            searches,
     })
+
+
+# ── SAVED IDEAS ───────────────────────────────────────────────────────────────
+
+@app.route('/api/ideas/save', methods=['POST'])
+@requires_auth
+def save_idea():
+    data = request.get_json(force=True)
+    body = (data.get('body') or '').strip()
+    if not body:
+        return jsonify({'error': 'body required'}), 400
+    title = (data.get('title') or '').strip() or None
+    conn = get_db()
+    cur = conn.execute('INSERT INTO saved_ideas (title, body) VALUES (?, ?)', (title, body))
+    conn.commit()
+    idea_id = cur.lastrowid
+    conn.close()
+    return jsonify({'id': idea_id})
+
+
+@app.route('/api/ideas', methods=['GET'])
+@requires_auth
+def list_ideas():
+    conn = get_db()
+    rows = conn.execute('SELECT id, title, body, saved_at FROM saved_ideas ORDER BY saved_at DESC').fetchall()
+    conn.close()
+    return jsonify({'ideas': [dict(r) for r in rows]})
+
+
+@app.route('/api/ideas/<int:idea_id>', methods=['DELETE'])
+@requires_auth
+def delete_idea(idea_id):
+    conn = get_db()
+    conn.execute('DELETE FROM saved_ideas WHERE id = ?', (idea_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/ideas/dislike', methods=['POST'])
+@requires_auth
+def dislike_idea():
+    data = request.get_json(force=True)
+    body = (data.get('body') or '').strip()
+    if not body:
+        return jsonify({'error': 'body required'}), 400
+    title = (data.get('title') or '').strip() or None
+    conn = get_db()
+    cur = conn.execute('INSERT INTO disliked_ideas (title, body) VALUES (?, ?)', (title, body))
+    conn.commit()
+    idea_id = cur.lastrowid
+    conn.close()
+    return jsonify({'id': idea_id})
+
+
+@app.route('/api/ideas/context', methods=['GET'])
+@requires_auth
+def ideas_context():
+    conn = get_db()
+    saved_rows = conn.execute('SELECT title, body FROM saved_ideas ORDER BY saved_at DESC LIMIT 10').fetchall()
+    disliked_rows = conn.execute('SELECT title, body FROM disliked_ideas ORDER BY saved_at DESC LIMIT 10').fetchall()
+    conn.close()
+
+    parts = []
+    if saved_rows:
+        lines = []
+        for i, r in enumerate(saved_rows, 1):
+            title = r['title'] or 'Untitled'
+            snippet = (r['body'] or '')[:100].replace('\n', ' ')
+            lines.append(f'{i}. {title}: {snippet}')
+        parts.append('Previously saved good ideas:\n' + '\n'.join(lines))
+
+    if disliked_rows:
+        lines = []
+        for i, r in enumerate(disliked_rows, 1):
+            title = r['title'] or 'Untitled'
+            snippet = (r['body'] or '')[:100].replace('\n', ' ')
+            lines.append(f'{i}. {title}: {snippet}')
+        parts.append('Ideas to avoid (user didn\'t like these directions):\n' + '\n'.join(lines))
+
+    return jsonify({'context': '\n\n'.join(parts)})
 
 
 # ── STARTUP HOOKS ─────────────────────────────────────────────────────────────
