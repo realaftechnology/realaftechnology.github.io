@@ -764,7 +764,8 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #e5181f;
+  background: radial-gradient(circle at 40% 35%, #ff3b3b 0%, #c0121a 70%, #a00f16 100%);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -776,8 +777,10 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   margin: 0 auto;
   transform-origin: center center;
 }
-.tab-brainstorm:active .tab-brainstorm-circle {
-  transform: scale(0.91);
+.tab-brainstorm:active .tab-brainstorm-circle,
+.tab-brainstorm-circle:active {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  transform: translateY(1px);
 }
 .lightning-strike {
   animation: lightning-strike 0.5s steps(1) forwards !important;
