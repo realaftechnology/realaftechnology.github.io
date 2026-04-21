@@ -2904,6 +2904,11 @@ function getBrainstormPrompt() {
     'YouTube Shorts',
     'live stream topic',
     'keynote or speech topic',
+    'cinematic YouTube documentary (30-60 min)',
+    'viral stunt/challenge video',
+    'big-budget production video (film-quality)',
+    'experiential content series',
+    'social experiment with real money on the line',
   ];
 
   const angles = [
@@ -2924,6 +2929,24 @@ function getBrainstormPrompt() {
     'a raw, unfiltered opinion on current events in business or culture',
   ];
 
+  const bigBudgetAngles = [
+    'renting out an entire city block or venue to prove a point about scale',
+    'giving away $100k to someone who completes a brutal real-world challenge',
+    'buying something most people say is impossible and documenting the process',
+    'hiring 10 strangers off the street, putting them through 75 Hard, filming the transformation',
+    'a 30-day survival challenge with no luxuries — starting from zero with just $100',
+    'renting a private jet and surprising a struggling entrepreneur with a life-changing meeting',
+    'buying a failing business, turning it around in 90 days, documenting everything raw',
+    'funding a competitor\'s business to prove mindset beats resources every time',
+    'building something physical — a gym, a facility, a compound — and documenting it start to finish',
+    'going undercover in an average 9-5 job for a week with no special treatment',
+    'staging a fake job interview for someone who gave up, then revealing the real opportunity',
+    'a road trip across America stopping in small towns, finding hungry entrepreneurs and funding one',
+    'living on minimum wage for 30 days while still executing at full capacity',
+    'paying off someone\'s debt live on camera after they prove they\'ve earned it',
+    'hosting a no-excuses summit where only people who completed 75 Hard can attend',
+  ];
+
   const audiences = [
     'aspiring entrepreneurs just starting out',
     'people stuck in a job they hate',
@@ -2935,10 +2958,17 @@ function getBrainstormPrompt() {
   ];
 
   const format = formats[Math.floor(Math.random() * formats.length)];
-  const angle = angles[Math.floor(Math.random() * angles.length)];
+  const usesBigBudget = Math.random() > 0.5;
+  const angle = usesBigBudget
+    ? bigBudgetAngles[Math.floor(Math.random() * bigBudgetAngles.length)]
+    : angles[Math.floor(Math.random() * angles.length)];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
-  return `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Angle: ${angle}. Target audience: ${audience}. Be specific with a working title, a 1-sentence hook, and 3 bullet points of what it covers. Make it feel like something Andy would actually say or post — raw, direct, no fluff.`;
+  const budgetContext = usesBigBudget
+    ? 'Andy has serious wealth and is willing to spend whatever it takes to make a statement. This should be a concept that would go massively viral and only someone with real money and real credibility could pull off.'
+    : 'Keep it on-brand — raw, direct, no fluff.';
+
+  return `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. ${budgetContext} Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.`;
 }
 
 function doBrainStorm() {
