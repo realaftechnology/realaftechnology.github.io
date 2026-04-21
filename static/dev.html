@@ -264,6 +264,27 @@
     font-family: var(--mono); font-size: 12px; line-height: 1.6;
     color: var(--text2); display: none;
   }
+  /* Direct-upload file picker + drop zone (matches the chat-side file-drop) */
+  .file-drop {
+    margin-top: 10px;
+    border: 2px dashed var(--sep);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--bg3);
+  }
+  .file-drop:hover,
+  .file-drop.drag-over { border-color: var(--red); background: rgba(255,69,58,0.06); }
+  .file-drop.has-file  { border-color: var(--red); background: rgba(255,69,58,0.06); }
+  .file-drop-label { font-size: 13px; color: var(--text3); line-height: 1.5; }
+  .file-drop-label strong { color: var(--text2); }
+  .import-subtitle {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text3); margin: 18px 0 6px;
+  }
+  .import-subtitle:first-child { margin-top: 0; }
 
   /* ── Mobile tightening (≤640px) ───────────────────────────────────────────── */
   @media (max-width: 640px) {
@@ -426,19 +447,40 @@
     </div>
   </div>
 
-  <!-- Drive Import -->
+  <!-- Import (direct upload + Drive URL) -->
   <div class="section" id="import-section">
-    <div class="section-title">Drive Import</div>
+    <div class="section-title">Import</div>
     <div class="upload-card">
+      <!-- ── Direct upload from this computer ─────────────────────────────── -->
+      <div class="import-subtitle">Upload from your computer</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5">
-        Paste a Google Drive folder or file URL (must be shared as <strong style="color:var(--text1)">"Anyone with the link"</strong>). One URL per line.
+        Pick one or more MP4 files. They'll be chunk-uploaded (50 MB per chunk), then transcribed and ingested just like a Drive import.
+      </div>
+      <div class="file-drop" id="dev-file-drop"
+           onclick="document.getElementById('dev-file-input').click()">
+        <div class="file-drop-label" id="dev-file-drop-label">
+          <strong>Choose MP4(s)</strong> or drag and drop
+        </div>
+        <input type="file" id="dev-file-input" accept=".mp4,video/mp4" multiple
+               style="display:none" onchange="devOnFileSelected(this)">
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <button class="import-btn" id="dev-upload-btn" onclick="devStartUpload()" disabled>Upload</button>
+        <span id="dev-upload-status" style="font-size:12px;color:var(--text3)"></span>
+      </div>
+
+      <!-- ── Google Drive URL import ──────────────────────────────────────── -->
+      <div class="import-subtitle">Import from Google Drive</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5">
+        Paste a folder or file URL (must be shared as <strong style="color:var(--text1)">"Anyone with the link"</strong>). One URL per line.
       </div>
       <textarea id="dev-drive-urls" placeholder="https://drive.google.com/drive/folders/…"></textarea>
       <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
-        <button class="import-btn" id="dev-import-btn" onclick="devStartImport()">Import</button>
+        <button class="import-btn" id="dev-import-btn" onclick="devStartImport()">Import from Drive</button>
         <span id="dev-import-status" style="font-size:12px;color:var(--text3)"></span>
       </div>
-      <!-- Progress bar — visible only while an import is running -->
+
+      <!-- ── Shared progress bar (used by both upload and drive import) ──── -->
       <div id="dev-import-progress" style="display:none;margin-top:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px">
           <div id="dev-import-progress-label"
@@ -755,6 +797,163 @@ function startRename(id, currentTitle) {
     if (e.key === 'Escape') { input.replaceWith(titleEl); }
   });
   input.addEventListener('blur', save);
+}
+
+// ── Direct file upload (dev) ──────────────────────────────────────────────────
+// Uses the same /api/upload-chunk + /api/finalize-upload endpoints that the
+// chat-side uploader uses, so we get chunked upload + server-side transcription
+// for free. Progress is rendered through the SHARED #dev-import-progress bar.
+let _devUploadFiles  = [];
+const _DEV_CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — stays under Railway's proxy limit
+
+function devOnFileSelected(input) {
+  const files = Array.from(input.files || []).filter(f => f.size > 0);
+  _devUploadFiles = files;
+  const label = document.getElementById('dev-file-drop-label');
+  const drop  = document.getElementById('dev-file-drop');
+  const btn   = document.getElementById('dev-upload-btn');
+  if (!files.length) {
+    label.innerHTML = '<strong>Choose MP4(s)</strong> or drag and drop';
+    drop.classList.remove('has-file');
+    btn.disabled = true;
+    return;
+  }
+  const totalMB = (files.reduce((a, f) => a + f.size, 0) / 1024 / 1024).toFixed(1);
+  if (files.length === 1) {
+    label.innerHTML = `<strong>${files[0].name}</strong><br><span style="font-size:11px">${(files[0].size/1024/1024).toFixed(1)} MB</span>`;
+  } else {
+    label.innerHTML = `<strong>${files.length} files selected</strong><br><span style="font-size:11px">${totalMB} MB total</span>`;
+  }
+  drop.classList.add('has-file');
+  btn.disabled = false;
+}
+
+// Drag-and-drop onto the file-drop region
+(function() {
+  const drop = document.getElementById('dev-file-drop');
+  if (!drop) return;
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.add('drag-over');
+  }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('drag-over');
+  }));
+  drop.addEventListener('drop', e => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    const input = document.getElementById('dev-file-input');
+    // DataTransferList → FileList via a DataTransfer shim so input.files stays consistent
+    const dt = new DataTransfer();
+    for (const f of files) if (f.type.startsWith('video/') || f.name.toLowerCase().endsWith('.mp4')) dt.items.add(f);
+    input.files = dt.files;
+    devOnFileSelected(input);
+  });
+})();
+
+function _devUploadOneChunk(uploadId, index, chunk) {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('upload_id', uploadId);
+    form.append('chunk_index', index);
+    form.append('chunk', chunk);
+    const xhr = new XMLHttpRequest();
+    xhr.addEventListener('load',  () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`Chunk ${index} failed (${xhr.status})`)));
+    xhr.addEventListener('error', () => reject(new Error('Network error on chunk ' + index)));
+    xhr.open('POST', '/api/upload-chunk');
+    xhr.send(form);
+  });
+}
+
+async function _devUploadOneFile(file, fileIdx, fileTotal) {
+  const uploadId    = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / _DEV_CHUNK_SIZE);
+  let bytesDone = 0;
+  // Kick the shared progress bar into "downloading" style so the same visual
+  // language works for uploads too (we reuse the renderer).
+  _renderImportProgress({
+    overall_idx: fileIdx, overall_total: fileTotal,
+    stage: 'downloading',  // reusing the same stage label → shows "Downloading"
+    current_name: file.name, bytes_done: 0,
+  });
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * _DEV_CHUNK_SIZE;
+    const end   = Math.min(start + _DEV_CHUNK_SIZE, file.size);
+    await _devUploadOneChunk(uploadId, i, file.slice(start, end));
+    bytesDone += (end - start);
+    _renderImportProgress({
+      overall_idx: fileIdx, overall_total: fileTotal,
+      stage: 'downloading', current_name: file.name, bytes_done: bytesDone,
+    });
+  }
+  _renderImportProgress({
+    overall_idx: fileIdx, overall_total: fileTotal,
+    stage: 'transcribing', current_name: file.name,
+  });
+  const res = await fetch('/api/finalize-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ upload_id: uploadId, filename: file.name, total_chunks: totalChunks }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || 'Finalization failed');
+  _renderImportProgress({
+    overall_idx: fileIdx, overall_total: fileTotal,
+    stage: 'done_file', current_name: file.name,
+  });
+  return data;
+}
+
+async function devStartUpload() {
+  if (!_devUploadFiles.length) return;
+  const btn    = document.getElementById('dev-upload-btn');
+  const status = document.getElementById('dev-upload-status');
+  const log    = document.getElementById('dev-import-log');
+  btn.disabled = true;
+  log.style.display = 'block';
+  log.innerHTML = '';
+  status.textContent = 'Uploading…';
+  _resetImportProgress();
+
+  const total = _devUploadFiles.length;
+  let hadError = false;
+  for (let i = 0; i < _devUploadFiles.length; i++) {
+    const file = _devUploadFiles[i];
+    const line = document.createElement('div');
+    line.textContent = `[${i + 1}/${total}] Uploading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)…`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    try {
+      await _devUploadOneFile(file, i + 1, total);
+      const done = document.createElement('div');
+      done.style.color = '#30d158';
+      done.textContent = `✓ ${file.name} uploaded and queued for transcription.`;
+      log.appendChild(done);
+    } catch (e) {
+      hadError = true;
+      const err = document.createElement('div');
+      err.style.color = '#ff453a';
+      err.textContent = `✗ ${file.name}: ${e.message}`;
+      log.appendChild(err);
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  status.textContent = hadError ? 'Done (with errors).' : 'Done.';
+  btn.disabled = false;
+  // Force 100% then fade the bar after a beat.
+  const fill = document.getElementById('dev-import-progress-fill');
+  const pct  = document.getElementById('dev-import-progress-pct');
+  if (fill) fill.style.width = '100%';
+  if (pct)  pct.textContent  = '100%';
+  setTimeout(_resetImportProgress, 2500);
+  // Reset picker so subsequent selections work.
+  _devUploadFiles = [];
+  document.getElementById('dev-file-input').value = '';
+  devOnFileSelected(document.getElementById('dev-file-input'));
+  _epsLoaded = false;
+  refresh();
 }
 
 // ── Drive import (dev) ────────────────────────────────────────────────────────
