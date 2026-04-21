@@ -5413,30 +5413,33 @@ function _andyToggleCenterMode() {
   var bsBtn = document.querySelector('.tab-brainstorm');
   if (!circle || !bsBtn) return;
 
+  var BOLT_HTML = '<svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>';
+  var SPADE_HTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" style="display:block;margin:0 auto;transform-origin:center center"><path d="M12 2C9.5 4.5 4 8 4 12.5c0 2.8 2.2 5 5 5-.6 1.5-1.8 2.8-3 3.5h12c-1.2-.7-2.4-2-3-3.5 2.8 0 5-2.2 5-5C20 8 14.5 4.5 12 2z" fill="white"/></svg>';
+
   circle.classList.remove('lightning-strike');
   void circle.offsetWidth;
   circle.classList.add('lightning-strike');
 
   setTimeout(function() {
     circle.classList.remove('lightning-strike');
-    var icon = circle.querySelector('svg') || document.getElementById('brainstorm-icon');
     var label = bsBtn.querySelector('span:last-child');
     if (window._andyCenterMode === 'voice') {
       window._andyCenterMode = 'brainstorm';
-      if (icon) { icon.setAttribute('viewBox', '0 0 28 28'); icon.innerHTML = '<path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>'; }
+      circle.innerHTML = BOLT_HTML;
       if (label) label.innerHTML = '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
       bsBtn.removeEventListener('click', toggleVoiceRecording);
       bsBtn.onclick = doBrainStorm;
       bsBtn.setAttribute('aria-label', 'BrainStorm');
     } else {
       window._andyCenterMode = 'voice';
-      if (icon) { icon.setAttribute('viewBox', '0 0 24 24'); icon.innerHTML = '<path d="M12 2C9.5 4.5 4 8 4 12.5c0 2.8 2.2 5 5 5-.6 1.5-1.8 2.8-3 3.5h12c-1.2-.7-2.4-2-3-3.5 2.8 0 5-2.2 5-5C20 8 14.5 4.5 12 2z" fill="white"/>'; }
+      circle.innerHTML = SPADE_HTML;
       if (label) label.innerHTML = '<span style="color:white">Voice Note</span>';
       bsBtn.onclick = null;
+      bsBtn.removeEventListener('click', doBrainStorm);
       bsBtn.addEventListener('click', toggleVoiceRecording);
       bsBtn.setAttribute('aria-label', 'Voice Note');
     }
-  }, 400);
+  }, 350);
 }
 
 (function() {
