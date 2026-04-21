@@ -755,8 +755,8 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   100% { filter: brightness(1); }
 }
 @keyframes brainstorm-spin {
-  from { transform: rotate(0deg) translateY(-22px); }
-  to   { transform: rotate(360deg) translateY(-22px); }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 .tab-brainstorm-circle {
   position: absolute;
@@ -777,8 +777,9 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 .lightning-strike {
   animation: lightning-strike 0.5s steps(1) forwards !important;
 }
-.brainstorm-spinning {
-  animation: brainstorm-spin 1s linear infinite !important;
+#brainstorm-circle.brainstorm-spinning #brainstorm-icon {
+  animation: brainstorm-spin 1s linear infinite;
+  transform-origin: center center;
 }
 .tab-brainstorm > span {
   font-family: var(--sf);
@@ -2376,7 +2377,7 @@ body.views-no-anim .view { transition: none !important; }
       </button>
       <button class="tab-brainstorm" onclick="doBrainStorm()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+          <svg id="brainstorm-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
             <path d="M48 28a10 10 0 0 0-9.5-10A14 14 0 0 0 12 24a8 8 0 0 0 2 15.76" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <polyline points="34,38 28,50 35,50 29,62" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>
