@@ -1117,7 +1117,10 @@ body.views-no-anim .view { transition: none !important; }
 .input-area-inner {
   max-width: 720px;
   margin: 0 auto;
-  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  /* Symmetric 12px top/bottom padding. The hotbar now covers the home-indicator
+     safe area on mobile, so adding env(safe-area-inset-bottom) here just made
+     the space below the input bar visibly heavier than the space above it. */
+  padding: 12px 20px;
 }
 .input-bar {
   display: flex;
