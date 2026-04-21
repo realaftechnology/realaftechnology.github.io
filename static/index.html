@@ -5487,36 +5487,65 @@ const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
 function _andySwitchView() {
-  window._andyViewMode = (window._andyViewMode === 'andy') ? 'team' : 'andy';
-
   const circle = document.getElementById('brainstorm-circle');
   if (!circle) return;
 
+  // Start flash
   circle.classList.remove('lightning-strike');
   void circle.offsetWidth;
   circle.classList.add('lightning-strike');
-  setTimeout(() => circle.classList.remove('lightning-strike'), 400);
 
-  if (window._andyViewMode === 'andy') {
-    circle.innerHTML = ANDY_SPADE_HTML;
-    circle.onclick = function(e) { e.stopPropagation(); document.getElementById('voice-btn') && document.getElementById('voice-btn').click(); };
-  } else {
-    circle.innerHTML = ANDY_BOLT_HTML;
-    circle.onclick = function(e) { e.stopPropagation(); doBrainStorm(); };
-  }
+  // Change icon/function mid-flash
+  setTimeout(function() {
+    window._andyViewMode = (window._andyViewMode === 'andy') ? 'team' : 'andy';
+
+    if (window._andyViewMode === 'andy') {
+      circle.innerHTML = ANDY_SPADE_HTML;
+      circle.onclick = function(e) {
+        e.stopPropagation();
+        var vb = document.getElementById('voice-btn');
+        if (vb) vb.click();
+      };
+    } else {
+      circle.innerHTML = ANDY_BOLT_HTML;
+      circle.onclick = function(e) {
+        e.stopPropagation();
+        if (typeof doBrainStorm === 'function') doBrainStorm();
+      };
+    }
+  }, 200);
+
+  // Remove flash class
+  setTimeout(function() {
+    circle.classList.remove('lightning-strike');
+  }, 450);
 }
 
 // Called from Andy role init — only attaches when user is confirmed Andy
 function _andyAttachDoubleTap() {
-  const area = document.getElementById('scroll-area');
-  if (!area) return;
   let lastTap = 0;
-  area.addEventListener('dblclick', function(e) { e.preventDefault(); _andySwitchView(); });
-  area.addEventListener('touchend', function(e) {
+
+  function handleDoubleTap(e) {
+    const scrollArea = document.getElementById('scroll-area');
+    if (!scrollArea) return;
+    if (!scrollArea.contains(e.target) && e.target !== scrollArea) return;
     const now = Date.now();
-    if (now - lastTap < 300) { e.preventDefault(); _andySwitchView(); }
+    if (now - lastTap < 350) {
+      e.preventDefault();
+      _andySwitchView();
+    }
     lastTap = now;
-  }, { passive: false });
+  }
+
+  document.addEventListener('dblclick', function(e) {
+    const scrollArea = document.getElementById('scroll-area');
+    if (!scrollArea) return;
+    if (!scrollArea.contains(e.target) && e.target !== scrollArea) return;
+    e.preventDefault();
+    _andySwitchView();
+  });
+
+  document.addEventListener('touchend', handleDoubleTap, { passive: false });
 }
 
 // Dispatcher for the left-of-pill action button. On Andy's account the button
