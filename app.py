@@ -535,6 +535,8 @@ def get_db():
             body     TEXT NOT NULL,
             saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        # Remove any BrainStorm auto-generated prompts that slipped into history
+        "DELETE FROM search_history WHERE query LIKE 'Generate ONE specific content idea for Andy Frisella%'",
     ]:
         try:
             conn.execute(stmt)
@@ -943,18 +945,19 @@ def search_endpoint():
 
     results = sort_by_episode(results)
 
-    # Log to search history (best-effort, never block the response)
-    try:
-        conn = get_db()
-        if conn:
-            conn.execute(
-                "INSERT INTO search_history (query, ep_filter, results) VALUES (?, ?, ?)",
-                (query, ep_filter or None, len(results))
-            )
-            conn.commit()
-            conn.close()
-    except Exception:
-        pass
+    # Log to search history — skip BrainStorm auto-generated queries
+    if not data.get("brainstorm", False):
+        try:
+            conn = get_db()
+            if conn:
+                conn.execute(
+                    "INSERT INTO search_history (query, ep_filter, results) VALUES (?, ?, ?)",
+                    (query, ep_filter or None, len(results))
+                )
+                conn.commit()
+                conn.close()
+        except Exception:
+            pass
 
     return jsonify({"results": results, "count": len(results)})
 

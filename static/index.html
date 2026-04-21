@@ -3191,6 +3191,7 @@ async function doSearch(query, episodeFilter) {
     const body = { query };
     const ep = episodeFilter || lockedEpisode;
     if (ep) body.episode_filter = ep;
+    if (window._brainstormMode) body.brainstorm = true;
     const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!res.ok) return;
     const data = await res.json();
