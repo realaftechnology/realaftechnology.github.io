@@ -796,6 +796,50 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   animation: brainstorm-spin 1s linear infinite;
   transform-origin: center center;
 }
+/* ── SIDEBAR BRAINSTORM BUTTON (desktop) ── */
+.sidebar-search-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.sidebar-brainstorm-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sidebar-brainstorm-btn:active .sidebar-brainstorm-circle {
+  transform: scale(0.91);
+}
+.sidebar-brainstorm-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #e5181f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: brainstorm-glow 2s ease-in-out infinite;
+  transition: transform 0.12s ease;
+}
+#brainstorm-circle-desktop.brainstorm-spinning svg {
+  animation: brainstorm-spin 1s linear infinite;
+  transform-origin: center center;
+}
+.sidebar-search-row input {
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .sidebar-brainstorm-btn { display: none; }
+}
 .tab-brainstorm > span {
   font-family: var(--sf);
   font-size: 10px;
@@ -2344,7 +2388,16 @@ body.views-no-anim #input-area { transition: none; }
               onclick="navigate('data');">Data Center</button>
     </nav>
     <div class="sidebar-search">
-      <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
+      <div class="sidebar-search-row">
+        <button class="sidebar-brainstorm-btn" onclick="doBrainStorm()" aria-label="BrainStorm">
+          <div class="sidebar-brainstorm-circle" id="brainstorm-circle-desktop">
+            <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="20" height="20" style="display:block;margin:0;transform-origin:center center;">
+              <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
+            </svg>
+          </div>
+        </button>
+        <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
+      </div>
     </div>
     <div class="sidebar-scroll">
       <div class="sidebar-list" id="episode-list">
@@ -3256,14 +3309,13 @@ function getBrainstormPrompt() {
 }
 
 function doBrainStorm() {
-  const circle = document.getElementById('brainstorm-circle');
-  if (circle) {
+  document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop').forEach(function(circle) {
     circle.classList.remove('lightning-strike');
     void circle.offsetWidth;
     circle.classList.add('lightning-strike');
     setTimeout(() => circle.classList.remove('lightning-strike'), 500);
     circle.classList.add('brainstorm-spinning');
-  }
+  });
   navigate('chat');
   hasResults = false;
   window._brainstormMode = true;
@@ -3452,7 +3504,7 @@ async function runAnalysis(query, results, autoExpand, brainstorm) {
     el.innerHTML = '<span style="color:var(--label-tertiary)">Analysis unavailable.</span>';
   }
   analyzing = false;
-  document.getElementById('brainstorm-circle')?.classList.remove('brainstorm-spinning');
+  document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop').forEach(c => c.classList.remove('brainstorm-spinning'));
 }
 
 function addBrainstormActionButtons(el, fullText) {
@@ -5136,8 +5188,12 @@ function hideSplash() {
       window._userRole = role;
       loadSavedIdeasContext();
       if (role === 'andy') {
-        document.getElementById('voice-btn').style.display = 'flex';
+        const voiceBtn = document.getElementById('voice-btn');
+        if (voiceBtn) voiceBtn.style.display = 'flex';
+        const vnSec = document.getElementById('vn-section');
+        if (vnSec) vnSec.style.display = '';
         window._andyViewMode = 'andy';
+        _andyAttachDoubleTap();
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
         const vnSec = document.getElementById('vn-section');
@@ -5398,15 +5454,17 @@ function hideSplash() {
 <script>
 // Andy-only: double-tap the chat area to toggle Andy ↔ Team view
 function _andySwitchView() {
-  var circle = document.getElementById('brainstorm-circle');
-  if (!circle) return;
+  var circles = document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop');
+  if (!circles.length) return;
 
-  circle.classList.remove('lightning-strike');
-  void circle.offsetWidth;
-  circle.classList.add('lightning-strike');
+  circles.forEach(function(c) {
+    c.classList.remove('lightning-strike');
+    void c.offsetWidth;
+    c.classList.add('lightning-strike');
+  });
 
   setTimeout(function() {
-    circle.classList.remove('lightning-strike');
+    circles.forEach(function(c) { c.classList.remove('lightning-strike'); });
     var voiceBtn = document.getElementById('voice-btn');
     var vnSec = document.getElementById('vn-section');
     if (window._andyViewMode === 'andy') {
@@ -5421,25 +5479,26 @@ function _andySwitchView() {
   }, 350);
 }
 
-(function() {
+// Called from Andy role init — only attaches when user is confirmed Andy
+function _andyAttachDoubleTap() {
   var scrollArea = document.getElementById('scroll-area');
   if (!scrollArea) return;
 
-  scrollArea.addEventListener('dblclick', function() {
-    if (window._userRole === 'andy') _andySwitchView();
+  scrollArea.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+    _andySwitchView();
   });
 
   var _lastTapTime = 0;
   scrollArea.addEventListener('touchend', function(e) {
-    if (window._userRole !== 'andy') return;
     var now = Date.now();
     if (now - _lastTapTime < 300) {
       e.preventDefault();
       _andySwitchView();
     }
     _lastTapTime = now;
-  });
-})();
+  }, { passive: false });
+}
 </script>
 </body>
 </html>
