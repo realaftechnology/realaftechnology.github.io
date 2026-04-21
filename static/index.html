@@ -2999,11 +2999,11 @@ function renderResults(query, results, autoExpand = false) {
     </div>`;
   });
 
-  const sectionLabel = autoExpand ? 'AI Summary' : 'AI Analysis';
-  const btnLabel = `View Transcripts (${results.length}) &#8964;`;
-
   const isBrainstorm = !!window._brainstormMode;
   window._brainstormMode = false;
+  const sectionLabel = isBrainstorm ? 'BrainStorm' : (autoExpand ? 'AI Summary' : 'AI Analysis');
+  const btnLabel = `View Transcripts (${results.length}) &#8964;`;
+
   const queryLabel = isBrainstorm ? '' : `<div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>`;
   let html = `<div class="section-header">${sectionLabel}</div>
   <div id="ai-section">
