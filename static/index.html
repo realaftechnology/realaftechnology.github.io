@@ -939,16 +939,11 @@ body.keyboard-open .input-area { margin-bottom: 0; }
 .saved-idea-card-body {
   font-size: 13px;
   color: var(--label-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 .saved-idea-card-body.expanded {
-  display: block;
-  -webkit-line-clamp: unset;
-  overflow: visible;
+  white-space: pre-wrap;
 }
 .saved-idea-card-expand {
   background: none;
@@ -2718,13 +2713,19 @@ async function loadSavedIdeas() {
       list.innerHTML = '<div class="saved-ideas-empty">No saved ideas yet. Click Save on any BrainStorm response to save it.</div>';
       return;
     }
-    list.innerHTML = ideas.map(idea => `
-      <div class="saved-idea-card" id="idea-card-${idea.id}">
+    list.innerHTML = ideas.map(idea => {
+      const titleClean = stripMarkdown(idea.title) || 'Untitled';
+      const bodyClean = stripMarkdown(idea.body);
+      const cutAt = bodyClean.lastIndexOf(' ', 180);
+      const preview = bodyClean.length > 180 ? bodyClean.slice(0, cutAt > 0 ? cutAt : 180) + '...' : bodyClean;
+      const needsExpand = bodyClean.length > 180;
+      return `<div class="saved-idea-card" id="idea-card-${idea.id}">
         <button class="saved-idea-delete" onclick="deleteSavedIdea(${idea.id})" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-        <div class="saved-idea-card-title">${escapeHtml(idea.title || 'Untitled')}</div>
-        <div class="saved-idea-card-body" id="idea-body-${idea.id}">${escapeHtml(idea.body)}</div>
-        <button class="saved-idea-card-expand" onclick="toggleIdeaExpand(${idea.id})">Show more</button>
-      </div>`).join('');
+        <div class="saved-idea-card-title">${escapeHtml(titleClean)}</div>
+        <div class="saved-idea-card-body" id="idea-body-${idea.id}" data-preview="${escapeHtml(preview)}" data-full="${escapeHtml(bodyClean)}">${escapeHtml(preview)}</div>
+        ${needsExpand ? `<button class="saved-idea-card-expand" onclick="toggleIdeaExpand(${idea.id})">Show more</button>` : ''}
+      </div>`;
+    }).join('');
   } catch {
     list.innerHTML = '<div class="saved-ideas-empty">Failed to load.</div>';
   }
@@ -2747,12 +2748,27 @@ function toggleIdeaExpand(id) {
   const body = document.getElementById(`idea-body-${id}`);
   const btn = body?.nextElementSibling;
   if (!body) return;
-  body.classList.toggle('expanded');
-  if (btn) btn.textContent = body.classList.contains('expanded') ? 'Show less' : 'Show more';
+  const isExpanded = body.classList.toggle('expanded');
+  body.textContent = isExpanded ? body.dataset.full : body.dataset.preview;
+  if (btn) btn.textContent = isExpanded ? 'Show less' : 'Show more';
 }
 
 function escapeHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stripMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^---+$/gm, '')
+    .replace(/^___+$/gm, '')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // Highlight the active tab in the bottom bar. `which` in {'chat','data','profile'}.
@@ -3349,7 +3365,7 @@ function addBrainstormActionButtons(el, fullText) {
   if (existing) existing.remove();
 
   const titleMatch = fullText.match(/^#+ (.+)|^\*\*(.+?)\*\*/m);
-  const title = titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : fullText.split('\n')[0].replace(/^#+\s*/, '').trim().slice(0, 80);
+  const title = stripMarkdown(titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : fullText.split('\n')[0].replace(/^#+\s*/, '').trim()).slice(0, 80);
 
   const wrap = document.createElement('div');
   wrap.className = 'brainstorm-actions';
