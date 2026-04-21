@@ -2615,17 +2615,7 @@ body.views-no-anim #input-area { transition: none; }
       </button>
       <button class="tab-brainstorm" id="tab-action-btn" onclick="handleLeftActionButton()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <!-- BrainStorm bolt (default) -->
-          <svg id="brainstorm-icon" class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center;">
-            <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
-          </svg>
-          <!-- Voice-recorder mic (shown for Andy when body.andy-voice-mode) -->
-          <svg class="bs-icon bs-icon-mic" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" style="display:none;margin:0 auto;transform-origin:center center;">
-            <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
-            <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="26" height="26" style="display:block;margin:0 auto"><path d="M50 5C48 8 10 28 10 52C10 66 20 76 35 78C31 84 26 90 18 95H82C74 90 69 84 65 78C80 76 90 66 90 52C90 28 52 8 50 5Z M38 95H62V108H38Z" fill="white"/></svg>
         </div>
         <span id="tab-action-label"><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
@@ -5230,8 +5220,7 @@ function hideSplash() {
         window._andyViewMode = 'andy';
         const andyCircle = document.getElementById('brainstorm-circle');
         if (andyCircle) {
-          const iconEl = andyCircle.querySelector('#brainstorm-icon') || andyCircle.querySelector('svg');
-          if (iconEl) iconEl.outerHTML = ANDY_SPADE_HTML;
+          andyCircle.innerHTML = ANDY_SPADE_HTML;
           andyCircle.onclick = function(e) { e.stopPropagation(); document.getElementById('voice-btn') && document.getElementById('voice-btn').click(); };
         }
         _andyAttachDoubleTap();
@@ -5494,7 +5483,7 @@ function hideSplash() {
 </script>
 <script>
 const ANDY_BOLT_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="22" height="22" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
-const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="24" height="24" style="display:block;margin:0 auto"><path d="M50 5C48 8 10 28 10 52C10 66 20 76 35 78C31 84 26 90 18 95H82C74 90 69 84 65 78C80 76 90 66 90 52C90 28 52 8 50 5Z M38 95H62V108H38Z" fill="white"/></svg>`;
+const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="26" height="26" style="display:block;margin:0 auto"><path d="M50 5C48 8 10 28 10 52C10 66 20 76 35 78C31 84 26 90 18 95H82C74 90 69 84 65 78C80 76 90 66 90 52C90 28 52 8 50 5Z M38 95H62V108H38Z" fill="white"/></svg>`;
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
 function _andySwitchView() {
@@ -5508,12 +5497,11 @@ function _andySwitchView() {
   circle.classList.add('lightning-strike');
   setTimeout(() => circle.classList.remove('lightning-strike'), 400);
 
-  const iconEl = circle.querySelector('#brainstorm-icon') || circle.querySelector('svg');
   if (window._andyViewMode === 'andy') {
-    if (iconEl) iconEl.outerHTML = ANDY_SPADE_HTML;
+    circle.innerHTML = ANDY_SPADE_HTML;
     circle.onclick = function(e) { e.stopPropagation(); document.getElementById('voice-btn') && document.getElementById('voice-btn').click(); };
   } else {
-    if (iconEl) iconEl.outerHTML = ANDY_BOLT_HTML;
+    circle.innerHTML = ANDY_BOLT_HTML;
     circle.onclick = function(e) { e.stopPropagation(); doBrainStorm(); };
   }
 }
