@@ -810,10 +810,13 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 @media (min-width: 768px) {
   .input-bs-btn { display: flex; }
-  /* padding-left: 0 so the 32px button's left edge is tangent to the pill's
-     22px cap at the midpoint — the circle nestles into the curve and reads
-     like part of the bar rather than a sticker on top. */
+  /* Position the button so its CENTER sits on the pill's left edge:
+     half the 32px circle overlaps the pill, half pokes outside to the left.
+     Pill's left cap is a 22px-radius curve; centering the button on the
+     midpoint makes the two circles intersect at that curve — the effect
+     the mockup was going for. */
   .input-bar { padding-left: 0; }
+  .input-bs-btn { margin-left: -16px; }
 }
 .input-bs-btn:active .input-bs-circle {
   transform: scale(0.91);
@@ -1428,9 +1431,6 @@ body.views-no-anim #input-area { transition: none; }
   padding: 6px 6px 6px 16px;
   gap: 8px;
   min-height: 44px;
-  /* Clip children to the pill so the BrainStorm button's soft red glow doesn't
-     bleed past the pill's rounded left cap. */
-  overflow: hidden;
 }
 .input-bar textarea {
   flex: 1;
