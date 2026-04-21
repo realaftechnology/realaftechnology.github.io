@@ -518,7 +518,7 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 .view-data .page {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 24px 20px calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 32px);
+  padding: 24px 20px calc(var(--tab-bar-height) + 32px);
 }
 .view-data .page-title {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -642,20 +642,18 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
 }
 
 /* ── MOBILE BOTTOM TAB BAR ── */
-/* Pinned to the physical screen bottom — plain position:fixed + bottom:0
-   and NO transform. A transform on a fixed element creates a new containing
-   block on iOS and shifts the anchor, which is what was causing the bar to
-   ride up with the keyboard and leave dead space underneath. With no
-   transform, iOS pins the bar to the layout viewport bottom; when the
-   software keyboard comes up it simply overlays the bar. */
+/* Pinned flush to the screen bottom — no transform, no safe-area padding.
+   Including safe-area-inset-bottom as padding was adding ~34 CSS px of
+   dead space below the icons on notched iPhones, making the bar look
+   unusually tall. The home indicator will render lightly on top of the
+   bar's bottom strip which is fine — icons are tappable above it. */
 :root { --tab-bar-height: 56px; }
 .bottom-tab-bar {
   display: none;
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 150;
-  height: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: var(--tab-bar-height);
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -755,7 +753,7 @@ body.keyboard-open .input-area { margin-bottom: 0; }
 .profile-sheet-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 16px calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 24px);
+  padding: 20px 16px calc(var(--tab-bar-height) + 24px);
 }
 .profile-avatar-row {
   display: flex;
