@@ -1212,6 +1212,18 @@ body.views-no-anim .view { transition: none !important; }
   -webkit-backdrop-filter: blur(20px);
   border-top: 0.5px solid var(--separator);
 }
+#input-area {
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  pointer-events: none;
+}
+#input-area.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+body.views-no-anim #input-area { transition: none; }
 .input-area-inner {
   max-width: 720px;
   margin: 0 auto;
@@ -2503,6 +2515,8 @@ function toggleSidebar() {
     loadVoiceNotes();
     document.getElementById('sidebar-search-input').value = '';
   }
+  const ia = document.getElementById('input-area');
+  if (ia) ia.classList.toggle('visible', !opening && document.body.dataset.view === 'chat');
 }
 
 // Bottom tab bar + header hamburger: open the sidebar (Episodes / Voice Notes /
@@ -2593,6 +2607,8 @@ function setActiveTab(which) {
     const el = document.getElementById('tab-' + k);
     if (el) el.classList.toggle('active', k === which);
   });
+  const ia = document.getElementById('input-area');
+  if (ia) ia.classList.toggle('visible', which === 'chat');
 }
 // Initial view from URL — done without animation so the initial render is instant.
 (function initView() {
