@@ -3001,7 +3001,7 @@ function renderResults(query, results, autoExpand = false) {
 
   const isBrainstorm = !!window._brainstormMode;
   window._brainstormMode = false;
-  const sectionLabel = isBrainstorm ? 'BrainStorm' : (autoExpand ? 'AI Summary' : 'AI Analysis');
+  const sectionLabel = isBrainstorm ? 'BRAINSTORM' : (autoExpand ? 'AI Summary' : 'AI Analysis');
   const btnLabel = `View Transcripts (${results.length}) &#8964;`;
 
   const queryLabel = isBrainstorm ? '' : `<div class="chat-q-label">&ldquo;${query.replace(/"/g, '&quot;')}&rdquo;</div>`;
