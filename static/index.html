@@ -825,6 +825,11 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   animation: input-bs-glow 2s ease-in-out infinite;
   transition: transform 0.12s ease;
 }
+/* Andy-only: mic mode swaps the bolt icon for the mic inside the left-of-pill
+   BrainStorm button (desktop) and the tab-brainstorm button (mobile hotbar).
+   body.andy-voice-mode is toggled by the double-tap handler on the scroll area. */
+body.andy-voice-mode .bs-icon-bolt { display: none !important; }
+body.andy-voice-mode .bs-icon-mic  { display: block !important; }
 @keyframes input-bs-glow {
   0%, 100% { box-shadow: 0 0 4px 0 rgba(220, 20, 20, 0.35); }
   50%      { box-shadow: 0 0 8px 1px rgba(220, 20, 20, 0.55); }
@@ -2486,10 +2491,18 @@ body.views-no-anim #input-area { transition: none; }
             <button id="voice-discard-btn" onclick="discardPendingVoiceNote()">Discard</button>
           </div>
           <div class="input-row">
-            <button class="input-bs-btn" onclick="doBrainStorm()" aria-label="BrainStorm">
+            <button class="input-bs-btn" onclick="handleLeftActionButton()" id="left-action-btn" aria-label="BrainStorm">
               <div class="input-bs-circle" id="brainstorm-circle-desktop">
-                <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="18" height="18" style="display:block;margin:0;transform-origin:center center;">
+                <!-- BrainStorm bolt (default for everyone except Andy) -->
+                <svg class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="18" height="18" style="display:block;margin:0;transform-origin:center center;">
                   <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
+                </svg>
+                <!-- Voice-recorder mic (default for Andy; double-tap on scroll-area toggles) -->
+                <svg class="bs-icon bs-icon-mic" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" style="display:none;margin:0;transform-origin:center center;">
+                  <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+                  <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
                 </svg>
               </div>
             </button>
@@ -2600,13 +2613,21 @@ body.views-no-anim #input-area { transition: none; }
         </svg>
         <span>Chat</span>
       </button>
-      <button class="tab-brainstorm" onclick="doBrainStorm()" aria-label="BrainStorm">
+      <button class="tab-brainstorm" id="tab-action-btn" onclick="handleLeftActionButton()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg id="brainstorm-icon" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center;">
+          <!-- BrainStorm bolt (default) -->
+          <svg id="brainstorm-icon" class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="display:block;margin:0 auto;transform-origin:center center;">
             <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
           </svg>
+          <!-- Voice-recorder mic (shown for Andy when body.andy-voice-mode) -->
+          <svg class="bs-icon bs-icon-mic" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" style="display:none;margin:0 auto;transform-origin:center center;">
+            <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+            <path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
         </div>
-        <span><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
+        <span id="tab-action-label"><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
       <button class="tab-item" id="tab-data" onclick="navigate('data')" aria-label="Data Center">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -5190,11 +5211,22 @@ function hideSplash() {
       window._userRole = role;
       loadSavedIdeasContext();
       if (role === 'andy') {
+        // Andy's default is the voice-recorder mode on the left action button.
+        // Double-tapping the chat results area flips it between mic and the
+        // BrainStorm lightning bolt. The in-pill voice-btn is retired in
+        // favour of the unified left-of-pill button.
+        document.body.classList.add('andy-voice-mode');
+        const leftBtn = document.getElementById('left-action-btn');
+        if (leftBtn) leftBtn.setAttribute('aria-label', 'Record voice note');
+        const tabBtn = document.getElementById('tab-action-btn');
+        if (tabBtn) tabBtn.setAttribute('aria-label', 'Record voice note');
+        const tabLabel = document.getElementById('tab-action-label');
+        if (tabLabel) tabLabel.innerHTML =
+          '<span style="color:white">Voice</span> <span style="color:#e5181f">Note</span>';
         const voiceBtn = document.getElementById('voice-btn');
-        if (voiceBtn) voiceBtn.style.display = 'flex';
+        if (voiceBtn) voiceBtn.style.display = 'none';
         const vnSec = document.getElementById('vn-section');
         if (vnSec) vnSec.style.display = '';
-        window._andyViewMode = 'andy';
         _andyAttachDoubleTap();
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
@@ -5467,17 +5499,21 @@ function _andySwitchView() {
 
   setTimeout(function() {
     circles.forEach(function(c) { c.classList.remove('lightning-strike'); });
-    var voiceBtn = document.getElementById('voice-btn');
-    var vnSec = document.getElementById('vn-section');
-    if (window._andyViewMode === 'andy') {
-      window._andyViewMode = 'team';
-      if (voiceBtn) voiceBtn.style.display = 'none';
-      if (vnSec) vnSec.style.display = 'none';
-    } else {
-      window._andyViewMode = 'andy';
-      if (voiceBtn) voiceBtn.style.display = 'flex';
-      if (vnSec) vnSec.style.display = '';
-    }
+    // Andy-only double-tap toggles the LEFT ACTION BUTTON between mic (voice
+    // note recorder) and lightning (BrainStorm). State tracked on the body
+    // via .andy-voice-mode; see CSS for the icon swap + handleLeftActionButton
+    // for click dispatch. Applies to desktop (input-bs-btn) and mobile
+    // (tab-brainstorm) — both share the .bs-icon-bolt / .bs-icon-mic swap.
+    var isVoice = document.body.classList.toggle('andy-voice-mode');
+    var leftBtn   = document.getElementById('left-action-btn');
+    var tabBtn    = document.getElementById('tab-action-btn');
+    var tabLabel  = document.getElementById('tab-action-label');
+    var labelText = isVoice ? 'Record voice note' : 'BrainStorm';
+    if (leftBtn) leftBtn.setAttribute('aria-label', labelText);
+    if (tabBtn)  tabBtn.setAttribute('aria-label', labelText);
+    if (tabLabel) tabLabel.innerHTML = isVoice
+      ? '<span style="color:white">Voice</span> <span style="color:#e5181f">Note</span>'
+      : '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
   }, 350);
 }
 
@@ -5500,6 +5536,18 @@ function _andyAttachDoubleTap() {
     }
     _lastTapTime = now;
   }, { passive: false });
+}
+
+// Dispatcher for the left-of-pill action button. On Andy's account the button
+// defaults to voice-recorder mode; a double-tap on the scroll area flips it
+// back and forth between that and BrainStorm. Everyone else only ever sees
+// BrainStorm, so the dispatcher just calls doBrainStorm().
+function handleLeftActionButton() {
+  if (document.body.classList.contains('andy-voice-mode')) {
+    toggleVoiceRecording();
+  } else {
+    doBrainStorm();
+  }
 }
 </script>
 </body>
