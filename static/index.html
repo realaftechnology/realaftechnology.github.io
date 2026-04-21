@@ -742,13 +742,21 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   position: relative;
 }
 @keyframes brainstorm-glow {
-  0%, 100% { box-shadow: 0 0 10px 2px rgba(255, 120, 0, 0.5), 0 4px 15px rgba(0,0,0,0.3); }
-  50% { box-shadow: 0 0 22px 6px rgba(255, 60, 0, 0.8), 0 4px 15px rgba(0,0,0,0.3); }
+  0%, 100% { box-shadow: 0 0 10px 2px rgba(220, 20, 20, 0.5), 0 4px 15px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 22px 6px rgba(220, 20, 20, 0.8), 0 4px 15px rgba(0,0,0,0.3); }
 }
-@keyframes brainstorm-flash {
-  0% { filter: brightness(1); }
-  20% { filter: brightness(3); background: white; }
+@keyframes lightning-strike {
+  0%   { filter: brightness(1); }
+  10%  { filter: brightness(4) hue-rotate(30deg); }
+  20%  { filter: brightness(1); }
+  30%  { filter: brightness(3) hue-rotate(20deg); }
+  40%  { filter: brightness(1.2); }
+  60%  { filter: brightness(2.5) hue-rotate(15deg); }
   100% { filter: brightness(1); }
+}
+@keyframes brainstorm-spin {
+  from { transform: rotate(0deg) translateY(-22px); }
+  to   { transform: rotate(360deg) translateY(-22px); }
 }
 .tab-brainstorm-circle {
   position: absolute;
@@ -756,7 +764,7 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #FF4500, #FF8C00);
+  background: #e5181f;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -766,14 +774,16 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 .tab-brainstorm:active .tab-brainstorm-circle {
   transform: scale(0.91);
 }
-.tab-brainstorm-circle.flashing {
-  animation: brainstorm-flash 0.4s ease-out forwards;
+.lightning-strike {
+  animation: lightning-strike 0.5s steps(1) forwards !important;
+}
+.brainstorm-spinning {
+  animation: brainstorm-spin 1s linear infinite !important;
 }
 .tab-brainstorm > span {
   font-family: var(--sf);
   font-size: 10px;
   font-weight: 600;
-  color: #FF6B35;
   letter-spacing: 0.2px;
 }
 @media (max-width: 767px) {
@@ -2366,12 +2376,12 @@ body.views-no-anim .view { transition: none !important; }
       </button>
       <button class="tab-brainstorm" onclick="doBrainStorm()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28" aria-hidden="true">
-            <path d="M6 19a4 4 0 0 1-.5-7.97A6 6 0 0 1 17.5 12H18a4 4 0 0 1 0 8H6z" fill="white" opacity="0.9"/>
-            <path d="M13 12l-2 4h3l-2 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+            <path d="M48 28a10 10 0 0 0-9.5-10A14 14 0 0 0 12 24a8 8 0 0 0 2 15.76" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <polyline points="34,38 28,50 35,50 29,62" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>
         </div>
-        <span>BrainStorm</span>
+        <span><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
       <button class="tab-item" id="tab-data" onclick="navigate('data')" aria-label="Data Center">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -2872,8 +2882,11 @@ function handleSubmit() {
 function doBrainStorm() {
   const circle = document.getElementById('brainstorm-circle');
   if (circle) {
-    circle.classList.add('flashing');
-    setTimeout(() => circle.classList.remove('flashing'), 400);
+    circle.classList.remove('lightning-strike');
+    void circle.offsetWidth;
+    circle.classList.add('lightning-strike');
+    setTimeout(() => circle.classList.remove('lightning-strike'), 500);
+    circle.classList.add('brainstorm-spinning');
   }
   navigate('chat');
   hasResults = false;
@@ -3040,7 +3053,6 @@ async function consumeStream(res, onChunk, onDone, onError) {
 }
 
 async function runAnalysis(query, results) {
-  if (analyzing) return;
   analyzing = true;
   const el = document.getElementById('ai-content');
   if (!el) { analyzing = false; return; }
@@ -3058,6 +3070,7 @@ async function runAnalysis(query, results) {
     el.innerHTML = '<span style="color:var(--label-tertiary)">Analysis unavailable.</span>';
   }
   analyzing = false;
+  document.getElementById('brainstorm-circle')?.classList.remove('brainstorm-spinning');
 }
 
 async function doFollowup(question) {
