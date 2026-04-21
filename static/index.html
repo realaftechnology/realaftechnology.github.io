@@ -810,27 +810,29 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 }
 @media (min-width: 768px) {
   .input-bs-btn { display: flex; }
-  /* Position the button so its CENTER sits on the pill's left edge:
-     half the 32px circle overlaps the pill, half pokes outside to the left.
-     Pill's left cap is a 22px-radius curve; centering the button on the
-     midpoint makes the two circles intersect at that curve — the effect
-     the mockup was going for. */
+  /* Center the 44px button on the pill's left edge: its radius (22) matches
+     the pill's left-cap radius, so when we shift it -22px, the right half
+     of the button is concentric with the pill's left cap — the two curves
+     share an outline and there's no visible gap between the button and the
+     pill at any vertical position. */
   .input-bar { padding-left: 0; }
-  .input-bs-btn { margin-left: -16px; }
+  .input-bs-btn { margin-left: -22px; }
 }
 .input-bs-btn:active .input-bs-circle {
   transform: scale(0.91);
 }
 .input-bs-circle {
-  width: 32px;
-  height: 32px;
+  /* 44px matches the pill's height so the button's radius (22) equals the
+     pill's left-cap radius — when we center this button on the pill's left
+     edge, the two curves match and there's no wedge-shaped dark gap at the
+     top/bottom corners like there was with the smaller 32px version. */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #e5181f;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Use a gentler, tighter glow that stays within the pill's rounded bounds
-     instead of the big pulsing halo used by the mobile tab-bar variant. */
   animation: input-bs-glow 2s ease-in-out infinite;
   transition: transform 0.12s ease;
 }
@@ -2488,7 +2490,7 @@ body.views-no-anim #input-area { transition: none; }
           <div class="input-bar">
             <button class="input-bs-btn" onclick="doBrainStorm()" aria-label="BrainStorm">
               <div class="input-bs-circle" id="brainstorm-circle-desktop">
-                <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="18" height="18" style="display:block;margin:0;transform-origin:center center;">
+                <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="22" height="22" style="display:block;margin:0;transform-origin:center center;">
                   <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
                 </svg>
               </div>
