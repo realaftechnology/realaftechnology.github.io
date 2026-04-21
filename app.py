@@ -273,9 +273,14 @@ Every title must be grounded in what is actually in the transcript — no fabric
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+
+
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if ADMIN_KEY and request.headers.get("X-Admin-Key") == ADMIN_KEY:
+            return f(*args, **kwargs)
         if not session.get("user"):
             return jsonify({"error": "unauthorized"}), 401
         return f(*args, **kwargs)
