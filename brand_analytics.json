@@ -1,9 +1,9 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-04-20T17:06:30.474977+00:00",
+    "lastUpdated": "2026-04-21T02:08:56.249605+00:00",
     "period": "Last 28 days",
-    "source": "Live data from Windsor.ai (values not currently returned by Windsor are left blank)"
+    "source": "Live data from Windsor.ai \u2014 follower counts refreshed across all connected accounts on Instagram, Facebook, and YouTube"
   },
   "platforms": {
     "instagram": {
@@ -12,7 +12,7 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 379147,
+        "current": 573211,
         "prior": null
       },
       "reach": {
@@ -28,7 +28,7 @@
         "prior": 474002
       },
       "posts": {
-        "current": 1074,
+        "current": 12554,
         "prior": null
       },
       "topPosts": [],
@@ -69,20 +69,158 @@
           "id": "17841462297134104",
           "username": "realafshow",
           "name": "Real AF Clips",
-          "followers": 379147,
-          "mediaCount": 1074,
-          "reach": {
-            "current": 1603516,
-            "prior": 2843675
-          },
-          "engagement": {
-            "current": 263796,
-            "prior": 474002
-          },
-          "impressions": {
-            "current": 2446903,
-            "prior": 4001696
-          }
+          "followers": 379185,
+          "mediaCount": 1075
+        },
+        {
+          "id": "17841460302945899",
+          "username": "realandyfrisellafan",
+          "name": "Real Andy Frisella Fan",
+          "followers": 60330,
+          "mediaCount": 3793
+        },
+        {
+          "id": "17841460176292177",
+          "username": "motivatedbyfreedom1776",
+          "name": "Motivated By Freedom",
+          "followers": 109592,
+          "mediaCount": 2838
+        },
+        {
+          "id": "17841468020255374",
+          "username": "newamericanage",
+          "name": "New American Age",
+          "followers": 19556,
+          "mediaCount": 3422
+        },
+        {
+          "id": "17841469443528222",
+          "username": "mfceomentality",
+          "name": "MFCEO Mentality",
+          "followers": 4542,
+          "mediaCount": 1406
+        },
+        {
+          "id": "17841477407943556",
+          "username": "realafanswers",
+          "name": "RealAF Answers",
+          "followers": 6,
+          "mediaCount": 20
+        }
+      ]
+    },
+    "facebook": {
+      "name": "Facebook",
+      "handle": "@MFCEOMind",
+      "connected": true,
+      "color": "#1877F2",
+      "followers": {
+        "current": 299443,
+        "prior": null
+      },
+      "reach": {
+        "current": null,
+        "prior": null
+      },
+      "impressions": {
+        "current": null,
+        "prior": null
+      },
+      "engagement": {
+        "current": null,
+        "prior": null
+      },
+      "posts": {
+        "current": null,
+        "prior": null
+      },
+      "topPosts": [],
+      "timeseries": [],
+      "accounts": [
+        {
+          "id": "190174520852138",
+          "name": "Real American Freedom 1776",
+          "followers": 175284,
+          "username": "realamericanfreedom1776"
+        },
+        {
+          "id": "536657016208009",
+          "name": "MFCEO Mind",
+          "followers": 103938,
+          "username": "mfceomind"
+        },
+        {
+          "id": "573689945825386",
+          "name": "Motivated By Freedom",
+          "followers": 15240,
+          "username": "motivatedbyfreedom"
+        },
+        {
+          "id": "842151302309410",
+          "name": "Real AF Fans",
+          "followers": 4355,
+          "username": "realaffans"
+        },
+        {
+          "id": "360600887146803",
+          "name": "Frisella Fire",
+          "followers": 432,
+          "username": "frisellafire"
+        },
+        {
+          "id": "836082946254067",
+          "name": "Real AF Answers",
+          "followers": 160,
+          "username": "realafanswers"
+        },
+        {
+          "id": "928761296984064",
+          "name": "New American Age",
+          "followers": 28,
+          "username": "newamericanage"
+        },
+        {
+          "id": "932370366618861",
+          "name": "Frisella Hot Takes",
+          "followers": 6,
+          "username": "frisellahottakes"
+        }
+      ]
+    },
+    "youtube": {
+      "name": "YouTube",
+      "handle": "The MFCEO Project",
+      "connected": true,
+      "color": "#FF0000",
+      "followers": {
+        "current": 696000,
+        "prior": null
+      },
+      "reach": {
+        "current": null,
+        "prior": null
+      },
+      "impressions": {
+        "current": null,
+        "prior": null
+      },
+      "engagement": {
+        "current": null,
+        "prior": null
+      },
+      "posts": {
+        "current": 215,
+        "prior": null
+      },
+      "topPosts": [],
+      "timeseries": [],
+      "accounts": [
+        {
+          "id": "8100",
+          "name": "The MFCEO Project",
+          "username": "realandyfrisella",
+          "followers": 696000,
+          "videoCount": 215
         }
       ]
     }
