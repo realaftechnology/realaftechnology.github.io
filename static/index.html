@@ -2069,12 +2069,15 @@ body.views-no-anim .view { transition: none !important; }
       <span class="sidebar-head-title">Episodes</span>
       <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
     </div>
-    <!-- Desktop view switcher: hotbar is mobile-only so desktop users use this -->
+    <!-- Desktop view switcher: hotbar is mobile-only so desktop users use this.
+         navigate() now auto-closes the sidebar when leaving Chat, so we only
+         need to explicitly close it when the user taps the already-active
+         view. -->
     <nav class="sidebar-views" aria-label="Views">
       <button class="sidebar-view-link" data-sv="chat"
-              onclick="navigate('chat'); toggleSidebar();">Chat</button>
+              onclick="navigate('chat'); if (document.body.dataset.view === 'chat') toggleSidebar();">Chat</button>
       <button class="sidebar-view-link" data-sv="data"
-              onclick="navigate('data'); toggleSidebar();">Data Center</button>
+              onclick="navigate('data');">Data Center</button>
     </nav>
     <div class="sidebar-search">
       <input type="text" id="sidebar-search-input" placeholder="Filter episodes..." oninput="filterEpisodes(this.value)">
@@ -2096,7 +2099,7 @@ body.views-no-anim .view { transition: none !important; }
 
   <div class="app-header">
     <div class="header-inner">
-      <button class="sidebar-btn" onclick="toggleSidebar()" aria-label="Open menu">
+      <button class="sidebar-btn" onclick="openSidebarFromTab()" aria-label="Open menu">
         <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
       </button>
       <h1 class="app-title-header" translate="no"><span>AF</span>Brain</h1>
@@ -2387,12 +2390,17 @@ function toggleSidebar() {
   }
 }
 
-// Bottom tab bar: Content tab opens the sidebar (and dismisses the keyboard first
-// so the tab bar isn't racing the keyboard-open class).
+// Bottom tab bar + header hamburger: open the sidebar (Episodes / Voice Notes /
+// view-switcher) — but gate it to the Chat view. The sidebar only makes sense
+// while the user is on Chat, so if they tap Content from Data Center or have
+// the Profile sheet up, we navigate them to Chat first and THEN open the
+// sidebar so the content they see is relevant to what's on screen.
 function openSidebarFromTab() {
   const input = document.getElementById('search-input');
   if (input) input.blur();
   if (isProfileSheetOpen()) closeProfileSheet({ silent: true });
+  const current = document.body.dataset.view || 'chat';
+  if (current !== 'chat') navigate('chat');
   const sidebar = document.getElementById('sidebar');
   if (sidebar && !sidebar.classList.contains('open')) toggleSidebar();
 }
@@ -2412,6 +2420,12 @@ function navigate(view, opts) {
   // Dismiss the keyboard so the input doesn't remain focused in the off-screen view
   const input = document.getElementById('search-input');
   if (input && document.activeElement === input) input.blur();
+  // The sidebar (Content) is only meaningful on Chat. If we're leaving Chat
+  // with the sidebar open, close it so it doesn't hover over the wrong view.
+  if (current === 'chat' && view !== 'chat') {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) toggleSidebar();
+  }
   document.body.dataset.view = view;
   setActiveTab(view);
   if (!opts.skipPush) {
