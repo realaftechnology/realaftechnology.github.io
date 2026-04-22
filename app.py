@@ -1390,6 +1390,18 @@ def finalize_upload():
     if not os.path.isdir(upload_dir):
         return jsonify({"error": "Upload session not found"}), 404
 
+    # Skip if this episode is already in the DB — don't overwrite or re-transcribe.
+    episode_id = filename.rsplit(".", 1)[0]
+    if _already_ingested(episode_id):
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        print(f"[upload] finalize skipped {filename} — already in DB", flush=True)
+        return jsonify({
+            "ok": True,
+            "skipped": True,
+            "episode_id": episode_id,
+            "title": title or episode_id,
+        })
+
     vdir = videos_dir()
     os.makedirs(vdir, exist_ok=True)
     video_path = os.path.join(vdir, filename)
@@ -1444,14 +1456,25 @@ def upload_video():
     if file.filename.upper().startswith("VOICENOTE_") and current_role() != "andy":
         return jsonify({"error": "Voice notes are not enabled for your account"}), 403
 
+    filename = secure_filename(file.filename) or f"upload_{int(time.time())}.bin"
+    episode_id = filename.rsplit(".", 1)[0]
+
+    # Skip if this episode is already in the DB — don't overwrite or re-transcribe.
+    if _already_ingested(episode_id):
+        print(f"[upload] skipped {filename} — already in DB", flush=True)
+        return jsonify({
+            "ok": True,
+            "skipped": True,
+            "episode_id": episode_id,
+            "title": episode_id,
+        })
+
     vdir = videos_dir()
     os.makedirs(vdir, exist_ok=True)
-    filename = secure_filename(file.filename) or f"upload_{int(time.time())}.bin"
     video_path = os.path.join(vdir, filename)
     file.save(video_path)
     print(f"[upload] saved {filename} ({os.path.getsize(video_path)} bytes) to {video_path}", flush=True)
 
-    episode_id = filename.rsplit(".", 1)[0]
     title = request.form.get("title", "").strip() or episode_id
 
     is_voice_note = episode_id.startswith("VOICENOTE_")
