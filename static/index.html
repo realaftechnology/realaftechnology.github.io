@@ -799,6 +799,13 @@ img#brainstorm-icon {
 .lightning-strike {
   animation: lightning-strike 0.5s steps(1) forwards !important;
 }
+/* Strike-flash the tab label in sync with the BrainStorm circle. The label
+   span sits immediately after #brainstorm-circle inside #tab-action-btn,
+   so the adjacent-sibling selector fires every time the circle picks up
+   .lightning-strike — no JS coordination needed. */
+#brainstorm-circle.lightning-strike + #tab-action-label {
+  animation: lightning-strike 0.5s steps(1) forwards;
+}
 #brainstorm-circle.brainstorm-spinning #brainstorm-icon {
   animation: brainstorm-spin 1s linear infinite;
   transform-origin: center center;
