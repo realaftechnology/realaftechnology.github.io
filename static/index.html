@@ -2615,7 +2615,7 @@ body.views-no-anim #input-area { transition: none; }
       </button>
       <button class="tab-brainstorm" id="tab-action-btn" onclick="handleLeftActionButton()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="22" height="22" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>
+          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>
         </div>
         <span id="tab-action-label"><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
@@ -5223,6 +5223,8 @@ function hideSplash() {
           andyCircle.innerHTML = ANDY_SPADE_HTML;
           andyCircle.onclick = function(e) { e.stopPropagation(); document.getElementById('voice-btn') && document.getElementById('voice-btn').click(); };
         }
+        const andyLabel = document.getElementById('tab-action-label');
+        if (andyLabel) andyLabel.innerHTML = '<span style="color:white">Voice</span><span style="color:#e5181f">Notes</span>';
         _andyAttachDoubleTap();
       } else {
         // Non-andy users don't get the Voice Notes sidebar section either.
@@ -5482,7 +5484,7 @@ function hideSplash() {
 })();
 </script>
 <script>
-const ANDY_BOLT_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="22" height="22" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
+const ANDY_BOLT_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
 const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="28" height="28" style="display:block;margin:0 auto"><path d="M50 4 C50 4 5 30 5 58 C5 76 18 86 36 82 C30 93 21 100 9 105 L91 105 C79 100 70 93 64 82 C82 86 95 76 95 58 C95 30 50 4 50 4Z M36 105 L64 105 L64 120 L36 120Z" fill="white"/></svg>`;
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
@@ -5499,6 +5501,7 @@ function _andySwitchView() {
   setTimeout(function() {
     window._andyViewMode = (window._andyViewMode === 'andy') ? 'team' : 'andy';
 
+    var label = document.getElementById('tab-action-label');
     if (window._andyViewMode === 'andy') {
       circle.innerHTML = ANDY_SPADE_HTML;
       circle.onclick = function(e) {
@@ -5506,12 +5509,14 @@ function _andySwitchView() {
         var vb = document.getElementById('voice-btn');
         if (vb) vb.click();
       };
+      if (label) label.innerHTML = '<span style="color:white">Voice</span><span style="color:#e5181f">Notes</span>';
     } else {
       circle.innerHTML = ANDY_BOLT_HTML;
       circle.onclick = function(e) {
         e.stopPropagation();
         if (typeof doBrainStorm === 'function') doBrainStorm();
       };
+      if (label) label.innerHTML = '<span style="color:white">Brain</span><span style="color:#e5181f">Storm</span>';
     }
   }, 200);
 
