@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AFBrain">
@@ -2756,6 +2756,21 @@ body.views-no-anim #input-area { transition: none; }
   </aside>
 
 <script>
+// ── NATIVE-APP FEEL ──────────────────────────────────────────────────────────
+// Kill pinch-zoom, double-tap zoom, and rubber-band scroll gestures that make
+// the WebView feel like a browser page. Viewport meta already sets
+// user-scalable=no; these listeners are the belt-and-suspenders.
+document.addEventListener('gesturestart',  e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend',    e => e.preventDefault());
+// Block double-tap zoom by swallowing the second tap within 300ms.
+let _lastTap = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - _lastTap < 300) e.preventDefault();
+  _lastTap = now;
+}, { passive: false });
+
 let currentResults = [];
 let chatHistory = [];
 let currentQuery = '';
