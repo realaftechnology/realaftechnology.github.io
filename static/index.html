@@ -5115,6 +5115,18 @@ function _stopWaveform(restoreInputBar = true) {
 }
 
 async function toggleVoiceRecording() {
+  // Flash + spin the action-button circle on every tap, matching the
+  // BrainStorm behaviour on other views. We do this before the active-check
+  // so the stopping tap also re-flashes (same as doBrainStorm). The spin
+  // class is cleared in _voiceRecorder.onstop and on mic-denied below.
+  document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop').forEach(function(circle) {
+    circle.classList.remove('lightning-strike');
+    void circle.offsetWidth;
+    circle.classList.add('lightning-strike');
+    setTimeout(() => circle.classList.remove('lightning-strike'), 500);
+    circle.classList.add('brainstorm-spinning');
+  });
+
   if (_voiceActive) {
     _voiceRecorder.stop();
     return;
@@ -5125,6 +5137,7 @@ async function toggleVoiceRecording() {
     stream = await _getAudioStream();
   } catch(e) {
     _voiceStatus('Mic access denied', 3000);
+    document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop').forEach(c => c.classList.remove('brainstorm-spinning'));
     return;
   }
 
@@ -5145,6 +5158,8 @@ async function toggleVoiceRecording() {
 
   _voiceRecorder.onstop = () => {
     _voiceActive = false;
+    // Stop the action-button spin that was started on the opening tap.
+    document.querySelectorAll('#brainstorm-circle, #brainstorm-circle-desktop').forEach(c => c.classList.remove('brainstorm-spinning'));
     // Keep stream alive — reused on next recording so iOS doesn't re-ask permission
     _stopWaveform(false); // keep input-bar hidden — save/discard row takes over
 
@@ -5484,8 +5499,8 @@ function hideSplash() {
 })();
 </script>
 <script>
-const ANDY_BOLT_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
-const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="28" height="28" style="display:block;margin:0 auto"><path d="M50,5 C80,5 93,30 93,52 C93,68 80,76 65,75 C85,75 85,100 50,100 C15,100 15,75 35,75 C20,76 7,68 7,52 C7,30 20,5 50,5 Z M37,100 L63,100 L57,115 L43,115 Z" fill="white"/></svg>`;
+const ANDY_BOLT_HTML = `<svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
+const ANDY_SPADE_HTML = `<img id="brainstorm-icon" src="/static/af-icon.svg" width="28" height="33" style="display:block;margin:0 auto" alt="">`;
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
 function _andySwitchView() {
