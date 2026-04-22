@@ -784,6 +784,13 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
   margin: 0 auto;
   transform-origin: center center;
 }
+/* The AF mark is drawn off-center inside its 673 × 804.55 viewBox:
+   its true centroid sits at ~(326.6, 422.7), i.e. 48.54% / 52.54%.
+   Rotate around that point so the mark spins in place rather than
+   orbiting the geometric center of the <img> box. */
+img#brainstorm-icon {
+  transform-origin: 48.54% 52.54%;
+}
 .tab-brainstorm:active .tab-brainstorm-circle,
 .tab-brainstorm-circle:active {
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
@@ -795,6 +802,11 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 #brainstorm-circle.brainstorm-spinning #brainstorm-icon {
   animation: brainstorm-spin 1s linear infinite;
   transform-origin: center center;
+}
+/* Preserve the centroid-based origin for the AF img while spinning;
+   the rule above is just a more specific override. */
+#brainstorm-circle.brainstorm-spinning img#brainstorm-icon {
+  transform-origin: 48.54% 52.54%;
 }
 /* ── INPUT BAR BRAINSTORM BUTTON (desktop) ── */
 .input-bs-btn {
