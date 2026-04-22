@@ -2126,9 +2126,34 @@ body.views-no-anim #input-area { transition: none; }
   font-size: 9px;
   color: var(--label-tertiary);
   flex-shrink: 0;
+  display: inline-block;
+  transform-origin: center;
+  transition: transform 220ms cubic-bezier(.2, .7, .2, 1);
 }
-.ep-folder-body { overflow: hidden; }
-.ep-folder-body.collapsed { display: none; }
+.ep-folder-chevron.open { transform: rotate(90deg); }
+
+/* Folder body: animate open/close via max-height + opacity instead of
+   display:none, so it feels native. The max-height ceiling is larger than any
+   realistic folder; ease-out timing means short folders finish quickly and
+   big ones (CTI) still feel snappy. */
+.ep-folder-body {
+  overflow: hidden;
+  max-height: 4000px;
+  opacity: 1;
+  transition: max-height 280ms cubic-bezier(.2, .7, .2, 1),
+              opacity   200ms ease-out 40ms;
+}
+.ep-folder-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 220ms cubic-bezier(.4, 0, .6, 1),
+              opacity   120ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep-folder-chevron,
+  .ep-folder-body,
+  .ep-folder-body.collapsed { transition: none; }
+}
 
 /* ── SPLASH SCREEN ── */
 #splash-screen {
@@ -3271,8 +3296,10 @@ function toggleFolder(safeId) {
   const body = document.getElementById(`folder-body-${safeId}`);
   const chevron = document.getElementById(`folder-chevron-${safeId}`);
   if (!body) return;
+  // Read state BEFORE toggling so we know which direction the chevron spins.
+  const willOpen = body.classList.contains('collapsed');
   body.classList.toggle('collapsed');
-  chevron.textContent = body.classList.contains('collapsed') ? '▶' : '▼';
+  if (chevron) chevron.classList.toggle('open', willOpen);
 }
 
 function loadEpisode(epNum, title) {
