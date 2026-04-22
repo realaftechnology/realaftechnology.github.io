@@ -5483,7 +5483,7 @@ function hideSplash() {
 </script>
 <script>
 const ANDY_BOLT_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="22" height="22" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
-const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="26" height="26" style="display:block;margin:0 auto"><path d="M50 5C48 8 10 28 10 52C10 66 20 76 35 78C31 84 26 90 18 95H82C74 90 69 84 65 78C80 76 90 66 90 52C90 28 52 8 50 5Z M38 95H62V108H38Z" fill="white"/></svg>`;
+const ANDY_SPADE_HTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="28" height="28" style="display:block;margin:0 auto"><path d="M50 4 C50 4 5 30 5 58 C5 76 18 86 36 82 C30 93 21 100 9 105 L91 105 C79 100 70 93 64 82 C82 86 95 76 95 58 C95 30 50 4 50 4Z M36 105 L64 105 L64 120 L36 120Z" fill="white"/></svg>`;
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
 function _andySwitchView() {
@@ -5523,29 +5523,39 @@ function _andySwitchView() {
 
 // Called from Andy role init — only attaches when user is confirmed Andy
 function _andyAttachDoubleTap() {
-  let lastTap = 0;
+  let lastSwitchTime = 0;
+  let lastTouchEnd = 0;
 
-  function handleDoubleTap(e) {
+  document.addEventListener('touchend', function(e) {
     const scrollArea = document.getElementById('scroll-area');
     if (!scrollArea) return;
     if (!scrollArea.contains(e.target) && e.target !== scrollArea) return;
-    const now = Date.now();
-    if (now - lastTap < 350) {
-      e.preventDefault();
-      _andySwitchView();
-    }
-    lastTap = now;
-  }
 
+    const now = Date.now();
+    if (now - lastTouchEnd < 350) {
+      // It's a double-tap — debounce to prevent re-entry from extra touchend/dblclick events
+      if (now - lastSwitchTime > 600) {
+        lastSwitchTime = now;
+        e.preventDefault();
+        _andySwitchView();
+      }
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  // Desktop fallback only — on mobile dblclick fires after touchend and would double-invoke
   document.addEventListener('dblclick', function(e) {
     const scrollArea = document.getElementById('scroll-area');
     if (!scrollArea) return;
     if (!scrollArea.contains(e.target) && e.target !== scrollArea) return;
-    e.preventDefault();
-    _andySwitchView();
-  });
 
-  document.addEventListener('touchend', handleDoubleTap, { passive: false });
+    const now = Date.now();
+    if (now - lastSwitchTime > 600) {
+      lastSwitchTime = now;
+      e.preventDefault();
+      _andySwitchView();
+    }
+  });
 }
 
 // Dispatcher for the left-of-pill action button. On Andy's account the button
