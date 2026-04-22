@@ -4032,6 +4032,7 @@ function closeVideoPanel() {
 
 async function openVideoEpisode(videoFilename, title, episodeId) {
   toggleSidebar();
+  navigate('chat');
 
   // Empty-state affordances (rotating quote + suggestion chips) aren't
   // needed once the user has landed on a specific episode. Hide them.
