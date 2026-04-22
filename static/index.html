@@ -3,6 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<script>
+// Mobile-app detection — sets .is-mobile-app on <html> (immediately) and
+// <body> (when body exists) when running inside the Capacitor iOS shell.
+// Used to apply app-only CSS tweaks (e.g. hotbar padding over home indicator).
+(function() {
+  function isNative() {
+    return !!(window.Capacitor && (
+      (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+      (window.Capacitor.platform && window.Capacitor.platform !== 'web')
+    ));
+  }
+  if (isNative()) {
+    document.documentElement.classList.add('is-mobile-app');
+    var apply = function() { if (document.body) document.body.classList.add('is-mobile-app'); };
+    apply();
+    document.addEventListener('DOMContentLoaded', apply);
+  }
+})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AFBrain">
@@ -679,6 +698,12 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
    unusually tall. The home indicator will render lightly on top of the
    bar's bottom strip which is fine — icons are tappable above it. */
 :root { --tab-bar-height: 56px; }
+/* Mobile app only — grow the tab bar to include the home-indicator safe area.
+   Inner stays 56px so the icons stay flush to the top of the bar (padding lives
+   below them). This pushes the input area, scroll padding, and any other
+   layout keyed off var(--tab-bar-height) up accordingly — no web-app impact. */
+body.is-mobile-app { --tab-bar-height: calc(56px + env(safe-area-inset-bottom, 0px)); }
+body.is-mobile-app .bottom-tab-bar-inner { height: 56px; }
 .bottom-tab-bar {
   display: none;
   position: fixed;
