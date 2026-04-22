@@ -1160,6 +1160,38 @@ def temp_uploads_dir():
     return os.path.join(os.path.dirname(DB_PATH), "temp_uploads")
 
 
+# ── CONTENT CLASSIFICATION ──────────────────────────────────────────────────
+# Small helpers so filename-based routing stays in one place. The frontend has
+# mirrors of these in renderEpisodeList (static/index.html) — keep them in sync.
+
+def is_voice_note(filename_or_id):
+    """Voice notes are identified by the VOICENOTE_ prefix on the filename/id."""
+    if not filename_or_id:
+        return False
+    return filename_or_id.upper().startswith("VOICENOTE_")
+
+
+def is_andygram(filename_or_id):
+    """Andygram files are identified by ANDYGRAM appearing anywhere in the
+    filename/id (case-insensitive). Backs the 'Andygram' folder in the sidebar.
+    Andygram content is text — Andy's email-list posts. The upload path for
+    text files is still TBD; when we add it, route through this helper so
+    classification stays consistent with the /api/upload-video path below."""
+    if not filename_or_id:
+        return False
+    return "ANDYGRAM" in filename_or_id.upper()
+
+
+def content_folder_for(filename_or_id, title=""):
+    """Return the content-section folder name for a given file. Used for
+    logging today; will be used by future text-file ingest flows too."""
+    if is_voice_note(filename_or_id):
+        return "Voice Notes"
+    if is_andygram(filename_or_id) or is_andygram(title):
+        return "Andygram"
+    return None  # let the UI fall back to title-keyword detection
+
+
 def secs_to_timestamp(secs):
     secs = int(secs)
     h, rem = divmod(secs, 3600)
@@ -1453,11 +1485,17 @@ def upload_video():
         return jsonify({"error": "No file selected"}), 400
 
     # Voice notes are an Andy-only feature. Block uploads from anyone else.
-    if file.filename.upper().startswith("VOICENOTE_") and current_role() != "andy":
+    if is_voice_note(file.filename) and current_role() != "andy":
         return jsonify({"error": "Voice notes are not enabled for your account"}), 403
 
     filename = secure_filename(file.filename) or f"upload_{int(time.time())}.bin"
     episode_id = filename.rsplit(".", 1)[0]
+
+    # Log the content folder this upload is headed to, so it's easy to trace
+    # (and easy to spot if classification ever drifts from the frontend).
+    folder = content_folder_for(filename, request.form.get("title", ""))
+    if folder:
+        print(f"[upload] {filename} → content folder: {folder}", flush=True)
 
     # Skip if this episode is already in the DB — don't overwrite or re-transcribe.
     if _already_ingested(episode_id):
@@ -1477,7 +1515,7 @@ def upload_video():
 
     title = request.form.get("title", "").strip() or episode_id
 
-    is_voice_note = episode_id.startswith("VOICENOTE_")
+    voice_note_flag = is_voice_note(episode_id)
     started_at = datetime.now().isoformat(timespec='seconds')
 
     conn = get_db()
@@ -1490,11 +1528,11 @@ def upload_video():
         )
         conn.commit()
         conn.close()
-        print(f"[upload] {episode_id}: stub row created (voice_note={is_voice_note})", flush=True)
+        print(f"[upload] {episode_id}: stub row created (voice_note={voice_note_flag}, folder={folder or '(auto)'} )", flush=True)
     else:
         print(f"[upload] {episode_id}: WARNING — get_db() returned None, no stub row", flush=True)
 
-    spawn_transcription(episode_id, title, video_path, is_voice_note)
+    spawn_transcription(episode_id, title, video_path, voice_note_flag)
     return jsonify({"ok": True, "episode_id": episode_id, "title": title})
 
 

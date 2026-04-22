@@ -2481,13 +2481,10 @@ body.views-no-anim #input-area { transition: none; }
       <div class="sidebar-list" id="episode-list">
         <div class="loading-row" style="padding:20px"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span></div>
       </div>
-      <div id="vn-section">
-        <div class="vn-section-header" onclick="toggleVNSection()">
-          <span>Voice Notes</span>
-          <span class="vn-chevron" id="vn-chevron">▾</span>
-        </div>
-        <div id="vn-list"></div>
-      </div>
+      <!-- Voice Notes are now rendered as a first-class folder inside
+           #episode-list (see renderEpisodeList's FOLDERS array). The old
+           standalone #vn-section used to live here. -->
+
     </div>
   </div>
   <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
@@ -3112,17 +3109,26 @@ function renderEpisodeList(episodes) {
     return;
   }
   const isVN = ep => (ep.video_filename || ep.id || '').toUpperCase().startsWith('VOICENOTE_');
+  // Andygram: filename/id/title contains ANDYGRAM anywhere (case-insensitive).
+  // Matches the backend is_andygram() helper in app.py. The backing content is
+  // Andy's email list posts, uploaded with ANDYGRAM somewhere in the title.
+  const isAG = ep => /ANDYGRAM/i.test(
+    (ep.video_filename || '') + ' ' + (ep.id || '') + ' ' + (ep.title || '')
+  );
   const numDesc = (a, b) => {
     const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
     const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
     return nb - na;
   };
-  const contentEps  = episodes.filter(ep => !isVN(ep)).sort(numDesc);
-  const voiceNoteEps = episodes.filter(ep => isVN(ep)).sort((a, b) =>
-    new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
+  const dateDesc = (a, b) =>
+    new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0);
 
-  const detectType = title => {
-    const t = title.toUpperCase();
+  const detectType = ep => {
+    // Route voice notes and Andygram first — they use filename markers that
+    // beat any keyword match on the title.
+    if (isVN(ep)) return 'Voice Notes';
+    if (isAG(ep)) return 'Andygram';
+    const t = (ep.title || '').toUpperCase();
     if (t.includes('CTI')) return 'CTI';
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
@@ -3131,14 +3137,21 @@ function renderEpisodeList(episodes) {
     return 'Other';
   };
 
-  const FOLDERS = ['CTI', 'Q&AF', 'Real Talk', 'OS', 'MFCEO'];
+  // Display order in the sidebar. Voice Notes and Andygram are newest-first
+  // (date sort); the podcast folders keep the existing numeric sort.
+  const FOLDERS = ['CTI', 'Q&AF', 'Real Talk', 'OS', 'MFCEO', 'Voice Notes', 'Andygram'];
+  const DATE_SORTED = new Set(['Voice Notes', 'Andygram']);
   const grouped = {};
   FOLDERS.forEach(f => grouped[f] = []);
   grouped['Other'] = [];
-  contentEps.forEach(ep => {
-    const type = detectType(ep.title);
+  episodes.forEach(ep => {
+    const type = detectType(ep);
     (grouped[type] || grouped['Other']).push(ep);
   });
+  FOLDERS.forEach(f => {
+    grouped[f].sort(DATE_SORTED.has(f) ? dateDesc : numDesc);
+  });
+  grouped['Other'].sort(numDesc);
 
   const renderEp = ep => {
     if (ep.has_video) {
@@ -3188,6 +3201,9 @@ function renderEpisodeList(episodes) {
   const renderFolder = name => {
     const eps = grouped[name] || [];
     const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
+    // Voice Notes items use the voice-note title formatter (strip VOICENOTE_
+    // prefix, show upload date). Everything else uses the episode renderer.
+    const itemRenderer = name === 'Voice Notes' ? renderVoiceNote : renderEp;
     return `<div class="ep-folder-header" onclick="toggleFolder('${safeId}')">
         <div style="display:flex;align-items:center">
           <span class="ep-folder-name">${name}</span>
@@ -3195,13 +3211,12 @@ function renderEpisodeList(episodes) {
         </div>
         <span class="ep-folder-chevron" id="folder-chevron-${safeId}">▶</span>
       </div>
-      <div class="ep-folder-body collapsed" id="folder-body-${safeId}">${eps.map(renderEp).join('')}</div>`;
+      <div class="ep-folder-body collapsed" id="folder-body-${safeId}">${eps.map(itemRenderer).join('')}</div>`;
   };
 
   list.innerHTML =
     FOLDERS.map(renderFolder).join('') +
-    (grouped['Other'].length ? sectionLabel('Other') + grouped['Other'].map(renderEp).join('') : '') +
-    (voiceNoteEps.length ? sectionLabel('Voice Notes') + voiceNoteEps.map(renderVoiceNote).join('') : '');
+    (grouped['Other'].length ? sectionLabel('Other') + grouped['Other'].map(renderEp).join('') : '');
 }
 
 function filterEpisodes(query) {
@@ -4908,13 +4923,21 @@ document.body.addEventListener('touchmove', function(e) {
 })();
 
 // ── VOICE NOTES SIDEBAR ──────────────────────────────────────────────────────
+// NOTE: Voice Notes are now a first-class folder inside the main episode list
+// (see FOLDERS in renderEpisodeList). The standalone #vn-section was removed.
+// The functions below are kept for backwards compatibility — they early-return
+// when the old DOM is absent so existing callers (post-upload refresh hooks,
+// role-setup code, etc.) don't throw.
 
 let _vnCollapsed = false;
 
 function toggleVNSection() {
+  const list = document.getElementById('vn-list');
+  if (!list) return;
   _vnCollapsed = !_vnCollapsed;
-  document.getElementById('vn-list').style.display = _vnCollapsed ? 'none' : '';
-  document.getElementById('vn-chevron').classList.toggle('collapsed', _vnCollapsed);
+  list.style.display = _vnCollapsed ? 'none' : '';
+  const chev = document.getElementById('vn-chevron');
+  if (chev) chev.classList.toggle('collapsed', _vnCollapsed);
 }
 
 function _formatVNTitle(id) {
@@ -4928,6 +4951,9 @@ function _formatVNTitle(id) {
 
 function renderVoiceNotes(notes) {
   const list = document.getElementById('vn-list');
+  // Standalone #vn-list was removed — voice notes now render via
+  // renderEpisodeList's 'Voice Notes' folder. Bail out quietly.
+  if (!list) return;
   if (!notes || !notes.length) {
     list.innerHTML = '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">No voice notes yet.</div>';
     return;
@@ -4982,6 +5008,14 @@ function _scheduleVoiceNotePoll(notes) {
 }
 
 async function loadVoiceNotes() {
+  // The standalone Voice Notes sidebar section was replaced by a first-class
+  // 'Voice Notes' folder inside the main episode list. If the legacy DOM is
+  // gone, just refresh the episode list instead — that's how new voice notes
+  // now surface after an upload or transcription completes.
+  if (!document.getElementById('vn-list')) {
+    if (typeof loadEpisodeList === 'function') loadEpisodeList();
+    return;
+  }
   try {
     const res  = await fetch('/api/voice-notes');
     const data = await res.json();
@@ -4989,8 +5023,11 @@ async function loadVoiceNotes() {
     renderVoiceNotes(notes);
     _scheduleVoiceNotePoll(notes);
   } catch(e) {
-    document.getElementById('vn-list').innerHTML =
-      '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">Failed to load.</div>';
+    const list = document.getElementById('vn-list');
+    if (list) {
+      list.innerHTML =
+        '<div style="padding:12px 16px;color:var(--label-tertiary);font-size:13px">Failed to load.</div>';
+    }
   }
 }
 
