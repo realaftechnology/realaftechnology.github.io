@@ -2494,7 +2494,7 @@ body.views-no-anim #input-area { transition: none; }
             <button class="input-bs-btn" onclick="handleLeftActionButton()" id="left-action-btn" aria-label="BrainStorm">
               <div class="input-bs-circle" id="brainstorm-circle-desktop">
                 <!-- BrainStorm bolt (default for everyone except Andy) -->
-                <svg class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="18" height="18" style="display:block;margin:0;transform-origin:center center;">
+                <svg class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="21" height="21" style="display:block;margin:0;transform-origin:center center;">
                   <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
                 </svg>
                 <!-- Voice-recorder mic (default for Andy; double-tap on scroll-area toggles) -->
@@ -2615,7 +2615,7 @@ body.views-no-anim #input-area { transition: none; }
       </button>
       <button class="tab-brainstorm" id="tab-action-btn" onclick="handleLeftActionButton()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>
+          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="29" height="29" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>
         </div>
         <span id="tab-action-label"><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
@@ -3332,32 +3332,36 @@ function doBrainStorm() {
   navigate('chat');
   hasResults = false;
   window._brainstormMode = true;
-  doSearch(getBrainstormPrompt());
+  doSearch(getBrainstormPrompt(), undefined, { brainstorm: true });
 }
 
-async function doSearch(query, episodeFilter) {
+async function doSearch(query, episodeFilter, opts) {
   clearInterval(_quoteTimer);
   const bar = document.getElementById('suggestion-bar');
   if (bar) bar.style.display = 'none';
   currentQuery = query; chatHistory = []; hasResults = false;
+  // brainstorm state is captured up front from an explicit opts flag (falling
+  // back to window._brainstormMode for legacy callers) so a later mutation of
+  // the window flag can't cause the prompt to leak into the chat-q-label.
+  const brainstorm = !!((opts && opts.brainstorm) || window._brainstormMode);
   const area = document.getElementById('results-area');
   area.innerHTML = '<div class="loading-row"><span class="brain-loader"><span class="brain-dot"></span><span class="brain-dot"></span><span class="brain-dot"></span></span>Searching...</div>';
   try {
     const body = { query };
     const ep = episodeFilter || lockedEpisode;
     if (ep) body.episode_filter = ep;
-    if (window._brainstormMode) body.brainstorm = true;
+    if (brainstorm) body.brainstorm = true;
     const res = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!res.ok) return;
     const data = await res.json();
     currentResults = data.results || [];
-    renderResults(query, currentResults, !!ep);
+    renderResults(query, currentResults, !!ep, brainstorm);
   } catch(e) {
     area.innerHTML = '<div class="loading-row">Search failed. Try again.</div>';
   }
 }
 
-function renderResults(query, results, autoExpand = false) {
+function renderResults(query, results, autoExpand = false, brainstorm = false) {
   const area = document.getElementById('results-area');
   if (!results.length) {
     area.innerHTML = `<div class="empty-state"><div class="empty-title">No Results</div><div class="empty-sub">Nothing found for "${query}".</div></div>`;
@@ -3391,7 +3395,9 @@ function renderResults(query, results, autoExpand = false) {
     </div>`;
   });
 
-  const isBrainstorm = !!window._brainstormMode;
+  // Prefer the explicit parameter threaded through from doSearch; fall back
+  // to the legacy global for any callers that haven't been updated.
+  const isBrainstorm = !!(brainstorm || window._brainstormMode);
   window._brainstormMode = false;
   const sectionLabel = isBrainstorm ? 'BRAINSTORM' : (autoExpand ? 'AI Summary' : 'AI Analysis');
   const btnLabel = `View Transcripts (${results.length}) &#8964;`;
@@ -5499,7 +5505,7 @@ function hideSplash() {
 })();
 </script>
 <script>
-const ANDY_BOLT_HTML = `<svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="25" height="25" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
+const ANDY_BOLT_HTML = `<svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="29" height="29" style="display:block;margin:0 auto"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>`;
 const ANDY_SPADE_HTML = `<img id="brainstorm-icon" src="/static/af-icon.svg" width="28" height="33" style="display:block;margin:0 auto" alt="">`;
 
 // Andy-only: double-tap the chat area to toggle center button between voice note and brainstorm
