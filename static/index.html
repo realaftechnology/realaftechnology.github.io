@@ -5527,7 +5527,10 @@ function hideSplash() {
       if (window.location.hash === '#menu') {
         history.replaceState(null, '', '/');
         toggleSidebar();
-      } else {
+      } else if (!document.documentElement.classList.contains('is-mobile-app')) {
+        // On the mobile app, auto-focusing the search input pops the keyboard
+        // open on launch — bad native-app feel. Skip it there; web and mobile
+        // web still focus as before.
         document.getElementById('search-input').focus();
       }
     } else {
