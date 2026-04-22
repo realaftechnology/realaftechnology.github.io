@@ -878,6 +878,32 @@ body.andy-voice-mode .bs-icon-mic  { display: block !important; }
   /* Lift the input-area above the tab bar. Its inner already carries its own
      safe-area padding, so only add the tab-bar-height margin here. */
   body.is-authed .input-area { margin-bottom: var(--tab-bar-height); }
+
+  /* ── Content as a first-class view on mobile ────────────────────────────
+     On mobile the sidebar stops being a narrow left-overlay and instead
+     behaves like .view-chat / .view-data: it occupies the band between
+     the app header and the bottom tab bar, and slides horizontally when
+     body[data-view="content"] flips. */
+  .sidebar {
+    top: calc(env(safe-area-inset-top) + 62px);
+    left: 0;
+    right: auto;
+    bottom: var(--tab-bar-height);
+    width: 100%;
+    height: auto;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+    border-right: none;
+    z-index: 45; /* below app-header (50) and hotbar (230); above views */
+  }
+  body[data-view="content"] .sidebar { transform: translateX(0); }
+  /* The overlay-era chrome isn't needed when the sidebar IS the screen. */
+  .sidebar-close { display: none; }
+  .sidebar-views { display: none; }
+  #sidebar-backdrop { display: none !important; }
+  body.views-no-anim .sidebar { transition: none !important; }
+  /* App header already owns the notch inset — drop the extra padding. */
+  .sidebar-head { padding: 14px 16px 12px; }
 }
 /* When the software keyboard is open, the keyboard sits on top of the tab bar
    (iOS pins position:fixed to the layout viewport, so the tab bar stays at
@@ -2767,12 +2793,16 @@ function toggleSidebar() {
   if (ia) ia.classList.toggle('visible', !opening && document.body.dataset.view === 'chat');
 }
 
-// Bottom tab bar + header hamburger: open the sidebar (Episodes / Voice Notes /
-// view-switcher) — but gate it to the Chat view. The sidebar only makes sense
-// while the user is on Chat, so if they tap Content from Data Center or have
-// the Profile sheet up, we navigate them to Chat first and THEN open the
-// sidebar so the content they see is relevant to what's on screen.
+// Bottom tab bar + header hamburger: on mobile the sidebar is the Content
+// VIEW, so route through navigate() — that drives body[data-view="content"]
+// (which slides the sidebar in via CSS) and marks the hotbar Content tab
+// red via setActiveTab(). On desktop the sidebar is still an overlay on
+// top of Chat, so we keep the prior toggleSidebar() behavior.
 function openSidebarFromTab() {
+  if (window.matchMedia('(max-width: 767px)').matches) {
+    navigate('content');
+    return;
+  }
   const input = document.getElementById('search-input');
   if (input) input.blur();
   if (isProfileSheetOpen()) closeProfileSheet({ silent: true });
@@ -2783,13 +2813,21 @@ function openSidebarFromTab() {
 }
 
 // ── SPA NAVIGATION ──────────────────────────────────────────────────────────
-// navigate('chat'|'data') swaps the active view with a CSS slide transition.
-// Uses pushState so URL stays meaningful and deep links keep working.
-const VIEW_PATHS = { chat: '/', data: '/data-center' };
+// navigate('content'|'chat'|'data') swaps the active view with a CSS slide
+// transition. Uses pushState so URL stays meaningful and deep links keep
+// working. On desktop, 'content' is redirected to chat + sidebar-overlay,
+// since the sidebar there is still an overlay rather than a full view.
+const VIEW_PATHS = { content: '/content', chat: '/', data: '/data-center' };
 let _dataLoaded = false;
 function navigate(view, opts) {
   opts = opts || {};
-  if (view !== 'chat' && view !== 'data') return;
+  if (view !== 'chat' && view !== 'data' && view !== 'content') return;
+  // Desktop has no "content" screen — it still has the overlay sidebar.
+  // Translate the request so URL routes / back-button work cross-device.
+  if (view === 'content' && !window.matchMedia('(max-width: 767px)').matches) {
+    openSidebarFromTab();
+    return;
+  }
   const current = document.body.dataset.view || 'chat';
   if (current === view && !opts.force) { setActiveTab(view); return; }
   // Close profile sheet if it's open, since navigating should return to a real view
@@ -2797,8 +2835,8 @@ function navigate(view, opts) {
   // Dismiss the keyboard so the input doesn't remain focused in the off-screen view
   const input = document.getElementById('search-input');
   if (input && document.activeElement === input) input.blur();
-  // The sidebar (Content) is only meaningful on Chat. If we're leaving Chat
-  // with the sidebar open, close it so it doesn't hover over the wrong view.
+  // Close any desktop-sidebar overlay when leaving Chat (mobile uses
+  // body[data-view] instead of the .open class, so this is a no-op there).
   if (current === 'chat' && view !== 'chat') {
     const sidebar = document.getElementById('sidebar');
     if (sidebar && sidebar.classList.contains('open')) toggleSidebar();
@@ -2807,7 +2845,7 @@ function navigate(view, opts) {
   setActiveTab(view);
   if (!opts.skipPush) {
     const path = VIEW_PATHS[view];
-    if (window.location.pathname !== path) {
+    if (path && window.location.pathname !== path) {
       history.pushState({ view }, '', path);
     }
   }
@@ -2815,10 +2853,21 @@ function navigate(view, opts) {
     _dataLoaded = true;
     initDataCenter().catch(err => console.error('[data-center] initial load failed:', err));
   }
+  if (view === 'content') {
+    // Lazy-load the episode list + voice notes each time content is opened,
+    // mirroring the behavior of toggleSidebar() on desktop.
+    loadEpisodeList();
+    loadVoiceNotes();
+    const si = document.getElementById('sidebar-search-input');
+    if (si) si.value = '';
+  }
 }
 window.addEventListener('popstate', (e) => {
   const path = window.location.pathname;
-  const view = path.startsWith('/data-center') ? 'data' : 'chat';
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+  let view = 'chat';
+  if (path.startsWith('/data-center')) view = 'data';
+  else if (path.startsWith('/content')) view = isMobile ? 'content' : 'chat';
   navigate(view, { skipPush: true });
 });
 
@@ -2952,7 +3001,7 @@ function stripMarkdown(text) {
 
 // Highlight the active tab in the bottom bar. `which` in {'chat','data','profile'}.
 function setActiveTab(which) {
-  ['chat','data','profile'].forEach(k => {
+  ['content','chat','data','profile'].forEach(k => {
     const el = document.getElementById('tab-' + k);
     if (el) el.classList.toggle('active', k === which);
   });
@@ -2962,10 +3011,19 @@ function setActiveTab(which) {
 // Initial view from URL — done without animation so the initial render is instant.
 (function initView() {
   const path = window.location.pathname;
-  const view = path.startsWith('/data-center') ? 'data' : 'chat';
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+  let view = 'chat';
+  if (path.startsWith('/data-center')) view = 'data';
+  else if (path.startsWith('/content')) view = isMobile ? 'content' : 'chat';
   document.body.classList.add('views-no-anim');
   document.body.dataset.view = view;
   setActiveTab(view);
+  // If we landed on /content on mobile, pre-load the lists so they're ready
+  // when the slide transition completes.
+  if (view === 'content') {
+    loadEpisodeList();
+    loadVoiceNotes();
+  }
   // Allow transitions after the next frame so subsequent nav animates.
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.body.classList.remove('views-no-anim');

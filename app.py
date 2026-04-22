@@ -3001,6 +3001,14 @@ def data_center_page():
     return send_from_directory("static", "index.html")
 
 
+@app.route("/content")
+def content_page():
+    # /content is the mobile Content screen (episodes + voice notes). On
+    # desktop the client router redirects it to chat + sidebar-overlay,
+    # but either way we just serve the SPA shell.
+    return send_from_directory("static", "index.html")
+
+
 @app.route("/api/brand-analytics")
 @requires_auth
 def brand_analytics():
