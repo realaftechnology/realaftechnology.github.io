@@ -2132,27 +2132,55 @@ body.views-no-anim #input-area { transition: none; }
 }
 .ep-folder-chevron.open { transform: rotate(90deg); }
 
-/* Folder body: animate open/close via max-height + opacity instead of
-   display:none, so it feels native. The max-height ceiling is larger than any
-   realistic folder; ease-out timing means short folders finish quickly and
-   big ones (CTI) still feel snappy. */
+/* Folder body: container just expands/collapses. Item-level transitions
+   (below) do the accordion "fall out" — each child slides down from above
+   its final position with a staggered delay, like files tumbling out of the
+   folder when it opens. */
 .ep-folder-body {
   overflow: hidden;
   max-height: 4000px;
-  opacity: 1;
-  transition: max-height 280ms cubic-bezier(.2, .7, .2, 1),
-              opacity   200ms ease-out 40ms;
+  transition: max-height 340ms cubic-bezier(.22, .9, .25, 1);
 }
 .ep-folder-body.collapsed {
   max-height: 0;
-  opacity: 0;
-  transition: max-height 220ms cubic-bezier(.4, 0, .6, 1),
-              opacity   120ms ease-out;
+  transition: max-height 220ms cubic-bezier(.4, 0, .6, 1);
 }
+
+/* Each item starts slightly above its final spot and invisible. Opening
+   drops them down + fades them in with cubic-bezier easing (snappy start,
+   soft landing). Closing uses the .collapsed rule (no delay) so everything
+   snaps shut quickly — close should feel decisive, not draggy. */
+.ep-folder-body .ep-item {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 220ms ease-out,
+              transform 300ms cubic-bezier(.22, .9, .25, 1);
+}
+.ep-folder-body.collapsed .ep-item {
+  opacity: 0;
+  transform: translateY(-14px);
+  transition: opacity 120ms ease-out,
+              transform 160ms ease-out;
+}
+/* Staggered reveal — only applies on the OPEN path (base rule has the
+   delays; .collapsed rule above has none, so close fires simultaneously).
+   nth-child covers the first ~8 items individually; 9+ all fire at 260ms
+   which is fine because they're mostly below the fold anyway. */
+.ep-folder-body .ep-item:nth-child(1) { transition-delay: 40ms; }
+.ep-folder-body .ep-item:nth-child(2) { transition-delay: 75ms; }
+.ep-folder-body .ep-item:nth-child(3) { transition-delay: 110ms; }
+.ep-folder-body .ep-item:nth-child(4) { transition-delay: 145ms; }
+.ep-folder-body .ep-item:nth-child(5) { transition-delay: 180ms; }
+.ep-folder-body .ep-item:nth-child(6) { transition-delay: 215ms; }
+.ep-folder-body .ep-item:nth-child(7) { transition-delay: 250ms; }
+.ep-folder-body .ep-item:nth-child(n+8) { transition-delay: 280ms; }
+
 @media (prefers-reduced-motion: reduce) {
   .ep-folder-chevron,
   .ep-folder-body,
-  .ep-folder-body.collapsed { transition: none; }
+  .ep-folder-body.collapsed,
+  .ep-folder-body .ep-item,
+  .ep-folder-body.collapsed .ep-item { transition: none; }
 }
 
 /* ── SPLASH SCREEN ── */
