@@ -3125,7 +3125,7 @@ function renderEpisodeList(episodes) {
     const t = title.toUpperCase();
     if (t.includes('CTI')) return 'CTI';
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
-    if (t.includes('REAL TALK')) return 'Real Talk';
+    if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
     if (t.includes('MFCEO')) return 'MFCEO';
     if (/\bOS\b/.test(t)) return 'OS';
     return 'Other';
