@@ -2070,6 +2070,41 @@ body.views-no-anim #input-area { transition: none; }
   text-overflow: ellipsis;
 }
 
+/* ── COLLAPSIBLE FOLDERS ── */
+.ep-folder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 8px 12px;
+  cursor: pointer;
+  border-left: 3px solid var(--red);
+  margin: 6px 8px 2px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  user-select: none;
+  transition: background 0.1s;
+}
+.ep-folder-header:hover { background: var(--bg-tertiary); }
+.ep-folder-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--label-secondary);
+}
+.ep-folder-count {
+  font-size: 11px;
+  color: var(--label-tertiary);
+  margin-left: 4px;
+}
+.ep-folder-chevron {
+  font-size: 9px;
+  color: var(--label-tertiary);
+  flex-shrink: 0;
+}
+.ep-folder-body { overflow: hidden; }
+.ep-folder-body.collapsed { display: none; }
+
 /* ── SPLASH SCREEN ── */
 #splash-screen {
   position: fixed;
@@ -3077,42 +3112,59 @@ function renderEpisodeList(episodes) {
     return;
   }
   const isVN = ep => (ep.video_filename || ep.id || '').toUpperCase().startsWith('VOICENOTE_');
-  // Split into video (Drive imports), regular (numbered), and voice notes
   const numDesc = (a, b) => {
     const na = parseInt(a.title.match(/(\d+)/)?.[1] || '0', 10);
     const nb = parseInt(b.title.match(/(\d+)/)?.[1] || '0', 10);
     return nb - na;
   };
-  const videoEps    = episodes.filter(ep => ep.has_video && !isVN(ep)).sort(numDesc);
-  const regularEps  = episodes.filter(ep => !ep.has_video && !isVN(ep)).sort(numDesc);
+  const contentEps  = episodes.filter(ep => !isVN(ep)).sort(numDesc);
   const voiceNoteEps = episodes.filter(ep => isVN(ep)).sort((a, b) =>
     new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
 
-  const renderVideo = ep => {
-    const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
-    const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
-    const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
-    const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
-    const isActive = lockedEpisode === epId;
-    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
-      <div style="flex:1;min-width:0">
-        <div class="ep-item-video-title">&#9654; ${ep.title.replace(/</g,'&lt;')}</div>
-        <div class="ep-item-title">${dateLabel}</div>
-      </div>
-    </div>`;
+  const detectType = title => {
+    const t = title.toUpperCase();
+    if (t.includes('CTI')) return 'CTI';
+    if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
+    if (t.includes('REAL TALK')) return 'Real Talk';
+    if (t.includes('MFCEO')) return 'MFCEO';
+    if (/\bOS\b/.test(t)) return 'OS';
+    return 'Other';
   };
 
-  const renderRegular = ep => {
-    const num = ep.title.match(/(\d+)/)?.[1] || '';
-    const subtitle = formatEpSubtitle(ep.title);
-    const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
-    const isActive = lockedEpisode === num;
-    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
-      <div style="flex:1;min-width:0">
-        <div class="ep-item-num">Ep ${num}</div>
-        <div class="ep-item-title">${subtitle}</div>
-      </div>
-    </div>`;
+  const FOLDERS = ['CTI', 'Q&AF', 'Real Talk', 'OS', 'MFCEO'];
+  const grouped = {};
+  FOLDERS.forEach(f => grouped[f] = []);
+  grouped['Other'] = [];
+  contentEps.forEach(ep => {
+    const type = detectType(ep.title);
+    (grouped[type] || grouped['Other']).push(ep);
+  });
+
+  const renderEp = ep => {
+    if (ep.has_video) {
+      const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
+      const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
+      const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
+      const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
+      const isActive = lockedEpisode === epId;
+      return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+        <div style="flex:1;min-width:0">
+          <div class="ep-item-video-title">&#9654; ${ep.title.replace(/</g,'&lt;')}</div>
+          <div class="ep-item-title">${dateLabel}</div>
+        </div>
+      </div>`;
+    } else {
+      const num = ep.title.match(/(\d+)/)?.[1] || '';
+      const subtitle = formatEpSubtitle(ep.title);
+      const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
+      const isActive = lockedEpisode === num;
+      return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
+        <div style="flex:1;min-width:0">
+          <div class="ep-item-num">Ep ${num}</div>
+          <div class="ep-item-title">${subtitle}</div>
+        </div>
+      </div>`;
+    }
   };
 
   const renderVoiceNote = ep => {
@@ -3130,13 +3182,26 @@ function renderEpisodeList(episodes) {
     </div>`;
   };
 
-  const sectionLabel = (text) =>
+  const sectionLabel = text =>
     `<div style="padding:10px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--label-tertiary);text-transform:uppercase">${text}</div>`;
 
+  const renderFolder = name => {
+    const eps = grouped[name] || [];
+    const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
+    return `<div class="ep-folder-header" onclick="toggleFolder('${safeId}')">
+        <div style="display:flex;align-items:center">
+          <span class="ep-folder-name">${name}</span>
+          <span class="ep-folder-count">(${eps.length})</span>
+        </div>
+        <span class="ep-folder-chevron" id="folder-chevron-${safeId}">▶</span>
+      </div>
+      <div class="ep-folder-body collapsed" id="folder-body-${safeId}">${eps.map(renderEp).join('')}</div>`;
+  };
+
   list.innerHTML =
-    (videoEps.length    ? sectionLabel('Video / Audio') + videoEps.map(renderVideo).join('')       : '') +
-    (regularEps.length  ? sectionLabel('Episodes')      + regularEps.map(renderRegular).join('')   : '') +
-    (voiceNoteEps.length ? sectionLabel('Voice Notes')  + voiceNoteEps.map(renderVoiceNote).join('') : '');
+    FOLDERS.map(renderFolder).join('') +
+    (grouped['Other'].length ? sectionLabel('Other') + grouped['Other'].map(renderEp).join('') : '') +
+    (voiceNoteEps.length ? sectionLabel('Voice Notes') + voiceNoteEps.map(renderVoiceNote).join('') : '');
 }
 
 function filterEpisodes(query) {
@@ -3145,6 +3210,14 @@ function filterEpisodes(query) {
     ep.title.toLowerCase().includes(q)
   ) : allEpisodes;
   renderEpisodeList(filtered);
+}
+
+function toggleFolder(safeId) {
+  const body = document.getElementById(`folder-body-${safeId}`);
+  const chevron = document.getElementById(`folder-chevron-${safeId}`);
+  if (!body) return;
+  body.classList.toggle('collapsed');
+  chevron.textContent = body.classList.contains('collapsed') ? '▶' : '▼';
 }
 
 function loadEpisode(epNum, title) {
