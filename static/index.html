@@ -807,6 +807,7 @@ body.light-mode .bottom-tab-bar { background: rgba(255,255,255,0.92); }
 #brainstorm-icon {
   display: block;
   margin: 0 auto;
+  transform-box: fill-box;
   transform-origin: center center;
 }
 /* The AF mark is drawn off-center inside its 673 × 804.55 viewBox:
@@ -833,6 +834,7 @@ img#brainstorm-icon {
 }
 #brainstorm-circle.brainstorm-spinning #brainstorm-icon {
   animation: brainstorm-spin 1s linear infinite;
+  transform-box: fill-box;
   transform-origin: center center;
 }
 /* Preserve the centroid-based origin for the AF img while spinning;
@@ -889,6 +891,7 @@ body.andy-voice-mode .bs-icon-mic  { display: block !important; }
 .input-row .input-bar { flex: 1; min-width: 0; }
 #brainstorm-circle-desktop.brainstorm-spinning svg {
   animation: brainstorm-spin 1s linear infinite;
+  transform-box: fill-box;
   transform-origin: center center;
 }
 .tab-brainstorm > span {
@@ -2649,8 +2652,8 @@ body.views-no-anim #input-area { transition: none; }
             <button class="input-bs-btn" onclick="handleLeftActionButton()" id="left-action-btn" aria-label="BrainStorm">
               <div class="input-bs-circle" id="brainstorm-circle-desktop">
                 <!-- BrainStorm bolt (default for everyone except Andy) -->
-                <svg class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="21" height="21" style="display:block;margin:0;transform-origin:center center;">
-                  <path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/>
+                <svg class="bs-icon bs-icon-bolt" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" width="21" height="21" style="display:block;margin:0;transform-box:fill-box;transform-origin:center center;">
+                  <path d="M16 4L8 15H13L12 24L20 13H15Z" fill="white"/>
                 </svg>
                 <!-- Voice-recorder mic (default for Andy; double-tap on scroll-area toggles) -->
                 <svg class="bs-icon bs-icon-mic" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" style="display:none;margin:0;transform-origin:center center;">
@@ -2770,7 +2773,11 @@ body.views-no-anim #input-area { transition: none; }
       </button>
       <button class="tab-brainstorm" id="tab-action-btn" onclick="handleLeftActionButton()" aria-label="BrainStorm">
         <div class="tab-brainstorm-circle" id="brainstorm-circle">
-          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="29" height="29" style="display:block;margin:0 auto;transform-origin:center center"><path d="M15 3L8.5 16H14L13 25L19.5 12H14Z" fill="white"/></svg>
+          <!-- Lightning bolt, drawn with its geometric AND optical center
+               at (14, 14) inside a 28×28 viewBox. transform-box: fill-box
+               anchors the rotation origin to the path's actual bbox so the
+               icon spins in place — not around a slightly-off element box. -->
+          <svg id="brainstorm-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" style="display:block;transform-box:fill-box;transform-origin:center center"><path d="M16 4L8 15H13L12 24L20 13H15Z" fill="white"/></svg>
         </div>
         <span id="tab-action-label"><span style="color:white">Brain</span><span style="color:#e5181f">Storm</span></span>
       </button>
@@ -3540,29 +3547,34 @@ function handleSubmit() {
 }
 
 function getBrainstormPrompt() {
+  // Formats Andy actually produces. No "viral stunts" or "social experiments
+  // with real money" — those trigger LLM stunt-tropes (see below) and aren't
+  // on-brand.
   const formats = [
     'short-form video (60-90 seconds)',
     'long-form YouTube video (10-20 minutes)',
-    'podcast episode or segment',
+    'podcast episode or segment (MFCEO/CTI/Q&AF style)',
     'Instagram carousel post',
     'Twitter/X thread',
-    'email newsletter',
+    'email newsletter / Andygram',
     'Instagram Reel',
     'YouTube Shorts',
     'live stream topic',
     'keynote or speech topic',
-    'cinematic YouTube documentary (30-60 min)',
-    'viral stunt/challenge video',
-    'big-budget production video (film-quality)',
-    'experiential content series',
-    'social experiment with real money on the line',
+    'long-form interview (60-90 min with a specific guest type)',
+    'multi-part breakdown series (3-5 episodes on one topic)',
+    'reaction/response video to a specific news story',
+    'deep-dive documentary-style segment',
   ];
 
+  // Angles rooted in what Andy actually talks about across 900+ episodes and
+  // 2k+ Andygrams: mindset, discipline, operations, leadership, current
+  // events, tactical business advice, direct responses to audience.
   const angles = [
     'a personal story or failure Andy has overcome',
     'a hard truth most people don\'t want to hear',
     'a common excuse Andy would destroy',
-    'a behind-the-scenes look at running 1st Phorm or REAL AF',
+    'a behind-the-scenes look at running 1st Phorm, Magnum Ammo, or REAL AF',
     'a deep dive on one of Andy\'s core philosophies',
     'a rant about mediocrity or average thinking',
     'a breakdown of a specific mental toughness concept',
@@ -3574,24 +3586,21 @@ function getBrainstormPrompt() {
     'a "what I wish I knew" style reflection',
     'a tactical breakdown of sales, marketing, or leadership',
     'a raw, unfiltered opinion on current events in business or culture',
-  ];
-
-  const bigBudgetAngles = [
-    'renting out an entire city block or venue to prove a point about scale',
-    'giving away $100k to someone who completes a brutal real-world challenge',
-    'buying something most people say is impossible and documenting the process',
-    'hiring 10 strangers off the street, putting them through 75 Hard, filming the transformation',
-    'a 30-day survival challenge with no luxuries — starting from zero with just $100',
-    'renting a private jet and surprising a struggling entrepreneur with a life-changing meeting',
-    'buying a failing business, turning it around in 90 days, documenting everything raw',
-    'funding a competitor\'s business to prove mindset beats resources every time',
-    'building something physical — a gym, a facility, a compound — and documenting it start to finish',
-    'going undercover in an average 9-5 job for a week with no special treatment',
-    'staging a fake job interview for someone who gave up, then revealing the real opportunity',
-    'a road trip across America stopping in small towns, finding hungry entrepreneurs and funding one',
-    'living on minimum wage for 30 days while still executing at full capacity',
-    'paying off someone\'s debt live on camera after they prove they\'ve earned it',
-    'hosting a no-excuses summit where only people who completed 75 Hard can attend',
+    'a direct answer to a specific listener question (coaching moment)',
+    'a teardown of a specific business or cultural trend that\'s getting traction',
+    'a steel-man of a position Andy disagrees with, then a rebuttal',
+    'a myth-bust on a popular fitness, business, or self-help claim',
+    'a reaction to a specific current news story (politics, economy, culture)',
+    'a case study of a specific company or entrepreneur doing it right (or wrong)',
+    'a tactical playbook for a specific problem (hiring, firing, scaling, focus)',
+    'an operational deep-dive on a specific department (ops, marketing, finance)',
+    'an emotional topic Andy rarely covers directly (grief, betrayal, regret, loyalty)',
+    'a reflection on a past episode or Andygram that sparked strong reaction',
+    'a real-world ROI breakdown of a habit or decision (money, health, relationships)',
+    'a response to a specific piece of feedback or hate Andy has received',
+    'a deep dive on 75 Hard or Live Hard — who it\'s working for, who it\'s not',
+    'a candid take on fatherhood, marriage, or long-term relationships',
+    'a tactical interview with a specific type of guest (operator, athlete, veteran, founder)',
   ];
 
   const audiences = [
@@ -3602,20 +3611,24 @@ function getBrainstormPrompt() {
     'young men looking for direction',
     'people who keep failing to follow through',
     'existing 75 Hard participants or alumni',
+    'mid-career operators running 7-8 figure businesses',
+    'parents raising sons',
+    'people recovering from a failure or setback',
   ];
 
   const format = formats[Math.floor(Math.random() * formats.length)];
-  const usesBigBudget = Math.random() > 0.5;
-  const angle = usesBigBudget
-    ? bigBudgetAngles[Math.floor(Math.random() * bigBudgetAngles.length)]
-    : angles[Math.floor(Math.random() * angles.length)];
+  const angle = angles[Math.floor(Math.random() * angles.length)];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
-  const budgetContext = usesBigBudget
-    ? 'Andy has serious wealth and is willing to spend whatever it takes to make a statement. This should be a concept that would go massively viral and only someone with real money and real credibility could pull off.'
-    : 'Keep it on-brand — raw, direct, no fluff.';
+  let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. Keep it realistic and on-brand — something Andy could produce in a week or two, grounded in the actual themes from his transcripts/posts. Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.
 
-  let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. ${budgetContext} Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.`;
+HARD CONSTRAINTS — IGNORE IF THEY SLIP INTO YOUR HEAD:
+- No "viral stunt" content. No giving away money. No lotteries, cash drops, or MrBeast-style prizes.
+- No handing over his companies to strangers. No "I let 10 random people run my business" concepts.
+- No survival/minimum-wage challenges or Undercover Boss cosplay.
+- No fake job interviews, fake ownership transfers, or manufactured emotional reveals.
+- No pretending to be broke, homeless, or starting from zero for a month.
+- If the angle starts to drift into "produce a reality show", pull back to a real piece of content.`;
   if (window._savedIdeasContext) {
     prompt += `\n\n(Soft taste signal only — do NOT repeat or remix these. Generate something completely different that a person with this taste profile would also enjoy:\n${window._savedIdeasContext})`;
   }

@@ -1143,6 +1143,22 @@ CITATIONS:
 - Cite sparingly. No horizontal rules. Bold labels, not headers.
 {YOUTUBE_TITLE_KNOWLEDGE}"""
 
+    if brainstorm:
+        system += """
+
+BRAINSTORM GUARDRAILS (this is a content-idea generation query):
+Andy is a disciplined operator who builds real businesses (1st Phorm, Magnum Ammo, REAL AF) and produces raw, direct, opinionated content. He is NOT a MrBeast-style stunt creator. Ideas must be things Andy would plausibly produce in a week or two with his existing team.
+
+Reject these patterns even if the prompt asks for them — quietly steer to a realistic alternative:
+- Giving away money / cash drops / lottery-style giveaways
+- Handing over a company or department to strangers
+- "I let 10 random people run my business" / Undercover Boss cosplay
+- Survival, minimum-wage, or homeless challenges
+- Fake job interviews or manufactured emotional reveals
+- Any concept that would require Andy to pretend he's something he isn't
+
+Prefer ideas grounded in the transcript excerpts you were given. If the excerpts strongly suggest a different (better) angle than what the prompt framed, take the better angle."""
+
     user_msg = f'Query: "{query}"\n\nTranscript excerpts:\n{context}'
 
     return Response(
