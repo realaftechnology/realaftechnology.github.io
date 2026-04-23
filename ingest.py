@@ -115,6 +115,44 @@ def parse_transcript(text):
     return segments
 
 
+def parse_andygram(text):
+    """
+    Parse an Andygram (Andy's email/blog post) docx into segments.
+
+    Andygrams are prose — no speaker labels, no timestamps. We synthesize a
+    single speaker ("Andy") at [00:00] for every body paragraph so downstream
+    chunking/embedding works identically to transcripts.
+
+    Skips the first bold line (the title) and any leading "Published:" line.
+    """
+    segments = []
+    saw_title = False
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        # First bold line is the title — skip it (caller uses it for episode.title).
+        if not saw_title and line.startswith("**") and line.endswith("**"):
+            saw_title = True
+            continue
+        saw_title = True  # After the first non-empty line, never skip-as-title again.
+        # Drop the italicized "Published: ..." metadata line.
+        if line.lower().startswith("published:"):
+            continue
+        # Strip stray bold markers inside body text (rare, but possible).
+        clean = re.sub(r'\*\*', '', line)
+        clean = re.sub(r'\s+', ' ', clean).strip()
+        if not clean:
+            continue
+        segments.append({
+            "speaker":    "Andy",
+            "timestamp":  "00:00",
+            "start_secs": 0.0,
+            "text":       clean,
+        })
+    return segments
+
+
 def chunk_segments(segments, chunk_size=CHUNK_SIZE):
     """
     Merge short segments into chunks of ~chunk_size words.
@@ -243,8 +281,13 @@ def ingest_file(conn, filepath):
     title_match = re.search(r'\*\*([^*\n]+)\*\*', raw_text)
     title = title_match.group(1).strip() if title_match else episode_id
 
-    # Parse into segments
-    segments = parse_transcript(raw_text)
+    # Parse into segments. Andygrams are prose (no speaker/timestamps) and go
+    # through a dedicated parser; everything else is a transcript.
+    is_andygram = "ANDYGRAM" in filename.upper() or "ANDYGRAM" in episode_id.upper()
+    if is_andygram:
+        segments = parse_andygram(raw_text)
+    else:
+        segments = parse_transcript(raw_text)
     if not segments:
         print(f"  ⚠️  No segments parsed from: {filename}")
         return 0
@@ -295,10 +338,13 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 
-    docx_files = [
-        f for f in os.listdir(TRANSCRIPTS_DIR)
-        if f.lower().endswith(".docx")
-    ]
+    # Walk recursively so content-type subfolders (e.g. andygrams/) are picked
+    # up. Filenames must still be unique since episode_id = basename.
+    docx_files = []
+    for root, _dirs, files in os.walk(TRANSCRIPTS_DIR):
+        for f in files:
+            if f.lower().endswith(".docx") and not f.startswith("~$"):
+                docx_files.append(os.path.relpath(os.path.join(root, f), TRANSCRIPTS_DIR))
 
     if not docx_files:
         print(f"No .docx files found in '{TRANSCRIPTS_DIR}' — nothing to ingest.")
@@ -313,9 +359,9 @@ def main():
 
     total = 0
     reingest_happened = False
-    for i, fname in enumerate(sorted(docx_files), 1):
-        fpath = os.path.join(TRANSCRIPTS_DIR, fname)
-        print(f"[{i}/{len(docx_files)}] {fname}")
+    for i, relpath in enumerate(sorted(docx_files), 1):
+        fpath = os.path.join(TRANSCRIPTS_DIR, relpath)
+        print(f"[{i}/{len(docx_files)}] {relpath}")
         count = ingest_file(conn, fpath)
         print(f"    → {count} chunks stored")
         if count > 0:
