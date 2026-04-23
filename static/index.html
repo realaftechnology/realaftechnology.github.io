@@ -3227,6 +3227,11 @@ function renderEpisodeList(episodes) {
     if (isVN(ep)) return 'Voice Notes';
     if (isAG(ep)) return 'Andygram';
     const t = (ep.title || '').toUpperCase();
+    // Check the dedicated series labels before the generic show keywords —
+    // 75HARD VS episodes may also mention other shows in their titles, and
+    // we want them in their own bucket.
+    if (t.includes('75HARD')) return '75HARD VS';
+    if (t.includes('FULL LENGTH')) return 'FULL LENGTH';
     if (t.includes('CTI')) return 'CTI';
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
@@ -3237,7 +3242,7 @@ function renderEpisodeList(episodes) {
 
   // Display order in the sidebar. Voice Notes and Andygram are newest-first
   // (date sort); the podcast folders keep the existing numeric sort.
-  const FOLDERS = ['CTI', 'Q&AF', 'Real Talk', 'OS', 'MFCEO', 'Voice Notes', 'Andygram'];
+  const FOLDERS = ['CTI', 'Q&AF', 'Real Talk', 'OS', 'MFCEO', '75HARD VS', 'FULL LENGTH', 'Voice Notes', 'Andygram'];
   const DATE_SORTED = new Set(['Voice Notes', 'Andygram']);
   const grouped = {};
   FOLDERS.forEach(f => grouped[f] = []);
