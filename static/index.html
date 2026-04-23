@@ -3230,8 +3230,10 @@ function renderEpisodeList(episodes) {
     // Check the dedicated series labels before the generic show keywords —
     // 75HARD VS episodes may also mention other shows in their titles, and
     // we want them in their own bucket.
-    if (t.includes('75HARD')) return '75HARD VS';
-    if (t.includes('FULL LENGTH')) return 'FULL LENGTH';
+    // Match common variants: "75HARD", "75 HARD", "75-HARD"
+    if (/75[\s-]?HARD/.test(t)) return '75HARD VS';
+    // Match "FULL LENGTH", "FULL-LENGTH", "FULLLENGTH", case-insensitive
+    if (/FULL[\s-]?LENGTH/.test(t)) return 'FULL LENGTH';
     if (t.includes('CTI')) return 'CTI';
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
@@ -3306,11 +3308,17 @@ function renderEpisodeList(episodes) {
   const sectionLabel = text =>
     `<div style="padding:10px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--label-tertiary);text-transform:uppercase">${text}</div>`;
 
+  // Folders the user explicitly asked to see in the sidebar — render with a
+  // (0) count when empty rather than hiding them, so it's obvious if they
+  // exist but the matcher isn't hitting yet (vs. silently missing entirely).
+  const ALWAYS_VISIBLE = new Set(['75HARD VS', 'FULL LENGTH']);
+
   const renderFolder = name => {
     const eps = grouped[name] || [];
     // Hide folders that would render empty — keeps the sidebar clean and
-    // avoids a (0)-count header for e.g. Andygram (now excluded server-side).
-    if (!eps.length) return '';
+    // avoids a (0)-count header for e.g. Andygram. Exception: folders the
+    // user explicitly asked to see stay visible even when empty.
+    if (!eps.length && !ALWAYS_VISIBLE.has(name)) return '';
     const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
     // Voice Notes use their own renderer; everything else uses renderEp.
     const itemRenderer = name === 'Voice Notes' ? renderVoiceNote : renderEp;
