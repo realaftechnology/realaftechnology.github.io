@@ -3767,138 +3767,193 @@ function handleSubmit() {
 }
 
 function getBrainstormPrompt() {
-  // The 4 content categories. One is chosen at random per brainstorm so ideas
-  // are spread across types, not all podcast episodes or all talking heads.
+  // WHO ANDY IS (context the AI must internalize):
+  // Andy Frisella is not a business coach. He is a cultural figure in the
+  // making — think Logan Paul, Joe Rogan, Dana White. He is a polarizing,
+  // unfiltered personality who built real companies (1st Phorm, Magnum Ammo,
+  // REAL AF) from nothing. His cultural adjacencies: combat sports, firearms,
+  // hunting, trucks, dogs, American blue-collar grit, premium cars, St. Louis
+  // roots, loyalty, and a deep contempt for softness and mediocrity.
+  // Business and personal development are themes that run THROUGH his content —
+  // they are NOT the ceiling of his content. He is trying to cross over into
+  // mainstream culture as an entertainer, not just stay in the "discipline
+  // podcast" lane. Ideas must reflect that ambition.
+
+  // The 4 content categories. One is chosen at random per brainstorm.
   const categories = [
     {
       name: 'Talking Point',
-      desc: 'Andy speaks directly to camera or audience — education, hot take, personal story, or call to action. Andy talking, not doing.'
+      desc: 'Andy speaks directly to camera — hot take, cultural commentary, personal story, or call to action. Could be about ANYTHING in culture, sports, politics, entertainment, or life, not just business. Think Rogan monologue, not TED talk.'
     },
     {
       name: 'Lifestyle',
-      desc: 'Andy doing an activity with DJ, his team, or people in his world — travel, events, experiences, training, behind-the-scenes. Andy living it, not just talking about it.'
+      desc: 'Andy doing something — an experience, an event, training, travel, shooting, hunting, cars, dogs, a night out, a competition, a road trip. Andy living his actual life at full volume, cameras rolling. No voiceover needed — the footage speaks.'
     },
     {
       name: 'Podcast',
-      desc: 'A concept for a Real AF / CTI / Q&AF episode — interview, panel, solo deep-dive, or listener Q&A format.'
+      desc: 'A Real AF / CTI / Q&AF episode concept. The guest or topic should be culturally interesting to a wide audience, not just the personal development crowd. Think: who would make a Rogan listener stop and click?'
     },
     {
       name: 'Collab',
-      desc: 'A specific video or appearance with a specific named person or type of person — e.g. workout with Alex Hormozi, UFC event with Dana White, training with a specific athlete or operator.'
+      desc: 'A video or appearance with a specific real person — name them. Think outside the business/PD world: athletes, fighters, coaches, entertainers, cultural figures, military operators, celebrities with street credibility. The collab should feel culturally electric, not like a mutual podcast swap.'
     },
   ];
 
-  // Formats Andy actually produces. No "viral stunts" or "social experiments
-  // with real money" — those trigger LLM stunt-tropes (see below) and aren't
-  // on-brand.
+  // Content formats — from short social to premium production
   const formats = [
-    'short-form video (60-90 seconds)',
-    'long-form YouTube video (10-20 minutes)',
-    'podcast episode or segment (MFCEO/CTI/Q&AF style)',
-    'Instagram carousel post',
-    'Twitter/X thread',
-    'email newsletter / Andygram',
-    'Instagram Reel',
-    'YouTube Shorts',
-    'live stream topic',
-    'keynote or speech topic',
-    'long-form interview (60-90 min with a specific guest type)',
-    'multi-part breakdown series (3-5 episodes on one topic)',
-    'reaction/response video to a specific news story',
-    'deep-dive documentary-style segment',
+    'short-form video (60-90 seconds, shot and edited like a cinematic highlight)',
+    'long-form YouTube video (10-20 minutes, raw and unfiltered)',
+    'premium short-form Reel (30-60 seconds, zero text on screen, pure footage)',
+    'Instagram carousel (images + copy, strong visual series)',
+    'Twitter/X thread (punchy, controversial, quotable)',
+    'Andygram / email newsletter (long-form written opinion piece)',
+    'YouTube vlog (20-40 minutes, real-life follow, no script)',
+    'podcast episode (60-90 minute conversation, not a solo lecture)',
+    'live stream (unscripted, audience interaction, 60+ min)',
+    'documentary-style mini-film (5-10 min, cinematic, serious production)',
+    'reaction video (Andy watching something and giving raw unfiltered commentary)',
+    'YouTube Shorts series (3-5 connected 60-second clips that each stand alone)',
+    'behind-the-scenes drop (raw phone footage, no production, just access)',
+    'multi-episode series (3-5 parts on one big topic or experience)',
   ];
 
-  // Angles rooted in what Andy actually talks about across 900+ episodes and
-  // 2k+ Andygrams: mindset, discipline, operations, leadership, current
-  // events, tactical business advice, direct responses to audience.
-  const angles = [
-    'a personal story or failure Andy has overcome',
-    'a hard truth most people don\'t want to hear',
-    'a common excuse Andy would destroy',
-    'a behind-the-scenes look at running 1st Phorm, Magnum Ammo, or REAL AF',
-    'a deep dive on one of Andy\'s core philosophies',
-    'a rant about mediocrity or average thinking',
-    'a breakdown of a specific mental toughness concept',
-    'a lesson from Andy\'s early entrepreneurship days',
-    'a challenge or call to action for the audience',
-    'a controversial take on success, discipline, or hustle culture',
-    'a response to a common criticism or misconception about Andy',
-    'a day-in-the-life or routine breakdown',
-    'a "what I wish I knew" style reflection',
-    'a tactical breakdown of sales, marketing, or leadership',
-    'a raw, unfiltered opinion on current events in business or culture',
-    'a direct answer to a specific listener question (coaching moment)',
-    'a teardown of a specific business or cultural trend that\'s getting traction',
-    'a steel-man of a position Andy disagrees with, then a rebuttal',
-    'a myth-bust on a popular fitness, business, or self-help claim',
-    'a reaction to a specific current news story (politics, economy, culture)',
-    'a case study of a specific company or entrepreneur doing it right (or wrong)',
-    'a tactical playbook for a specific problem (hiring, firing, scaling, focus)',
-    'an operational deep-dive on a specific department (ops, marketing, finance)',
-    'an emotional topic Andy rarely covers directly (grief, betrayal, regret, loyalty)',
-    'a reflection on a past episode or Andygram that sparked strong reaction',
-    'a real-world ROI breakdown of a habit or decision (money, health, relationships)',
-    'a response to a specific piece of feedback or hate Andy has received',
-    'a deep dive on 75 Hard or Live Hard — who it\'s working for, who it\'s not',
-    'a candid take on fatherhood, marriage, or long-term relationships',
-    'a tactical interview with a specific type of guest (operator, athlete, veteran, founder)',
+  // Talking Point angles — cultural, not just business. Andy's POV on
+  // what's happening in the world, in culture, in sport, in masculinity,
+  // in America. This is where Andy becomes a voice, not just a teacher.
+  const talkingPointAngles = [
+    'a raw take on something happening right now in sports, entertainment, or politics that everyone is tiptoeing around',
+    'why a specific cultural figure (athlete, entertainer, politician) is either the real deal or a fraud — Andy\'s honest read',
+    'what combat sports (UFC, boxing) teach about life that no business book ever will',
+    'the death of the American man — Andy\'s unfiltered diagnosis and the antidote',
+    'a specific moment from Andy\'s past (early business, a fight he almost lost, a betrayal) told as a story, not a lesson',
+    'what most people get wrong about wealth — not how to make it, but what it actually does to you',
+    'a defense of something society is currently trying to cancel or soften',
+    'why loyalty is the most underrated currency in business and life',
+    'a response to a specific piece of mainstream media, viral video, or cultural take that Andy thinks is wrong',
+    'what Andy actually thinks about a specific current event — no hedging, no balance, just his real opinion',
+    'the difference between confidence and arrogance — a take that will piss off the people who need to hear it',
+    'what Andy would tell his 22-year-old self (not motivational — honest, uncomfortable truths)',
+    'a defense of hard work in an era when everyone is selling passive income and AI shortcuts',
+    'what real friendship looks like — who Andy would go to war with and why most people have zero real friends',
+    'a take on fatherhood, masculinity, or raising kids that will draw both fire and standing ovations',
+    'something Andy got completely wrong for years and finally changed his mind on',
+    'a breakdown of a specific fight, game, or sports moment through the lens of mental toughness',
+    'why most people who talk about discipline have never actually been tested — and what a real test looks like',
+    'a direct response to the critics, haters, or media who have misrepresented Andy or what he stands for',
+    'what Andy thinks about the current state of American culture — honest, not political talking points',
   ];
 
-  // "Big idea" scale — distinct from the stunt tropes an LLM defaults to.
-  // The pattern: Andy being authentically himself (vlog, teach, operate,
-  // train) at premium production scale, in an elevated setting, using his
-  // actual life and assets. NO strangers, NO giveaways, NO cosplay. If you
-  // can't picture Andy doing the thing without putting on a costume, it
-  // doesn't belong here.
-  //
-  // Seed example the user gave: "ship the Bugatti to New York, post up in
-  // Times Square, film a day-in-the-life vlog." It costs serious money to
-  // pull off, but nothing about it is fake — it's just Andy, in a bigger
-  // setting, with cameras.
-  const bigIdeas = [
-    'ship one of Andy\'s cars (Bugatti, Lambo, truck) to an iconic location and film a raw day-in-the-life vlog',
-    'film a full episode on location at 1st Phorm HQ, Magnum Ammo, or REAL AF studio — showing actual operations, not a tour',
-    'book a private jet for a 72-hour tour hitting 3 cities, filming honest meetings with real operators in each',
-    'cinematic shoot at Andy\'s ranch/property/home gym — his real workout, his real routine, premium camera work',
-    'rent an empty iconic venue (stadium, arena, theater) for a speech to no one, filmed documentary-style',
-    'full-crew 72-hour unfiltered follow — wake up to sleep, no breaks, no cuts, no staged moments',
-    'flagship podcast recorded in an unusual real setting (on a train, on a boat, mid-flight, at a gun range)',
-    'invite-only dinner with 8-10 operators Andy respects, single fixed camera, real conversation, no studio lights',
-    'multi-city live event tour, each stop filmed as its own mini-doc episode',
-    'documentary-style deep dive on one of Andy\'s companies — actual ops footage, real team, real numbers',
-    'shoot Andy\'s actual training (strength, shooting, discipline work) in a premium cinematic package',
-    'day-in-the-life shadowing Andy running a real board meeting, P&L review, or hiring decision',
-    'filmed road trip between his properties/businesses — the actual commute he does, elevated production',
-    'a "state of Andy" annual address — studio-quality, 45-min, honest state-of-the-businesses/state-of-culture',
+  // Lifestyle angles — Andy in the world, not at a whiteboard
+  const lifestyleAngles = [
+    'Andy\'s actual morning or training routine, shot cinematic, no explanation needed',
+    'a road trip to somewhere meaningful — filmed raw, with real conversations in the car',
+    'Andy at a shooting range, competition, or training event — the real thing, premium footage',
+    'a hunting or outdoors experience — the prep, the experience, the reflection',
+    'Andy with his dogs — real footage, no voice-over, the relationship speaks for itself',
+    'a day at Magnum Ammo — what actually happens inside an American ammunition company',
+    'Andy and DJ doing something together that has nothing to do with work',
+    'Andy at a UFC event, fight night, or training facility — in the room, not watching on TV',
+    'a car moment — the Bugatti, the truck, an iconic road, real unscripted conversation',
+    'Andy training with someone whose athletic credentials are undeniable',
+    'a 24-hour or 48-hour vlog in a city Andy never films in — no agenda, just access',
+    'Andy watching game film, fight tape, or competition footage and breaking it down out loud',
+    'a dinner or hangout with people Andy actually respects — no cameras announced, just access',
+    'Andy at a 1st Phorm athlete event or team gathering — behind the scenes, real people',
+    'an experience Andy has never filmed before — first time on camera doing something he does privately',
   ];
 
-  const audiences = [
-    'aspiring entrepreneurs just starting out',
-    'people stuck in a job they hate',
-    'athletes or competitors looking for mental edge',
-    'business owners who are plateauing',
-    'young men looking for direction',
-    'people who keep failing to follow through',
-    'existing 75 Hard participants or alumni',
-    'mid-career operators running 7-8 figure businesses',
-    'parents raising sons',
-    'people recovering from a failure or setback',
+  // Podcast angles — guests and topics that would interest mainstream audiences
+  const podcastAngles = [
+    'a UFC champion or contender talking about what the mental side of fighting actually looks like from the inside',
+    'a Navy SEAL or Special Forces operator on what real discipline looks like vs. the online version',
+    'a legendary sports coach on building teams that win when it matters most',
+    'a high-profile American entrepreneur who built something real with no outside funding and no hype',
+    'a combat sports trainer on what separates fighters who make it from those who don\'t',
+    'a political figure who says things out loud that others are afraid to — across party lines, based on substance',
+    'a musician, comedian, or entertainer who came from nothing and never compromised their identity',
+    'a conversation with a billionaire who isn\'t famous for being a billionaire — the ones who stayed quiet and built',
+    'a former athlete on the mental collapse that comes after sports end — and how they rebuilt',
+    'an episode with no guest — Andy answers the questions he\'s always avoided answering publicly',
+    'a doctor or scientist who will say things publicly that the medical establishment tries to suppress',
+    'a law enforcement or military leader on what leadership under real pressure actually demands',
+    'two people who disagree with each other on something important — Andy moderates, no filter',
+    'a young person (under 25) who is doing something real and remarkable, completely against the current cultural grain',
+    'an episode entirely about what Andy has changed his mind on in the last 5 years — and why',
   ];
 
+  // Collab targets — specific names or types, culturally credible
+  // The AI is instructed to pick ONE specific person or narrow type and make
+  // the concept revolve around what THEY uniquely bring.
+  const collabAngles = [
+    'Jon Jones — what it actually takes to be the greatest of all time when people want you to fail',
+    'Conor McGregor — building a brand when you ARE the product, the highs and the wreckage',
+    'Dana White — what running the UFC taught him about running anything, and why most people can\'t handle the truth',
+    'Joe Rogan — a rare crossover appearance where Andy is the guest, not the host',
+    'Pat McAfee — two unfiltered personalities who built audiences by refusing to be polished',
+    'Dwayne Johnson — what happens when physical discipline meets Hollywood scale (and where it breaks down)',
+    'Nick Saban — what a dynasty-level coach demands from people and how he gets it',
+    'Alex Hormozi — a real conversation about the gap between building a brand online and building a real business',
+    'a retired Delta Force or SEAL Team operator — actual discipline vs. the internet\'s cosplay version of it',
+    'a Formula 1 or NASCAR driver on risk, precision, and performing under pressure with your life on the line',
+    'a championship boxer\'s trainer — the science and psychology of building a killer in the gym',
+    'a St. Louis-based athlete or cultural figure — Andy on home turf, someone who knows where he\'s from',
+    'a legitimate firearms or tactical training expert — Andy doing the training on camera, not interviewing',
+    'an elite military sniper on patience, pressure, and the mental game of waiting for the right moment',
+    'a world-class strength athlete or powerlifter — train together on camera, no script',
+    'a professional hunter or outdoorsman that mainstream audiences don\'t know yet but should',
+    'a musician from the rock, metal, or country world who built their career the hard way with zero industry backing',
+    'a current or former NFL or NHL player known for being the hardest worker on their team, not the flashiest',
+    'an entrepreneur who built a physical-product company (not software, not content) to $100M+ without VC money',
+    'a young fighter on their way up — before they\'re famous — filmed as a mini-doc',
+  ];
+
+  // "Big swing" production ideas — elevated settings, premium execution,
+  // Andy being authentically himself at maximum scale.
+  const bigSwings = [
+    'ship the Bugatti to an iconic American city — NYC, Vegas, Miami, LA — and film a raw unscripted day',
+    'rent an empty arena or stadium and film a speech to no audience — just Andy and the room',
+    'a 72-hour private jet loop hitting 3 cities, no schedule, filming everything real',
+    'full-crew documentary following Andy for 5 straight days — sleep, train, operate, argue, decide',
+    'a cinematic short film of Andy\'s actual training — no voiceover, no text, just footage and music',
+    'film an entire Real AF episode at Magnum Ammo while production is running — rounds going out the door',
+    'Andy and 5 people he trusts — no cameras announced, just a weekend, edited into a single episode',
+    'a live unscripted Q&A in a real American city — no stage, no event production, just Andy and a crowd',
+    'document the actual 1st Phorm sponsorship selection process — who gets picked and why, on camera',
+    'a "state of everything" solo episode — no notes, no format, Andy talking for 90 minutes straight',
+  ];
+
+  // Pick category, then pick an angle appropriate to that category
   const category = categories[Math.floor(Math.random() * categories.length)];
 
+  let anglePool;
+  if (category.name === 'Talking Point') anglePool = talkingPointAngles;
+  else if (category.name === 'Lifestyle') anglePool = lifestyleAngles;
+  else if (category.name === 'Podcast') anglePool = podcastAngles;
+  else anglePool = collabAngles;
+
+  // ~20% chance to override with a big-swing production idea (any category)
+  const useBigSwing = Math.random() < 0.20;
+  const angle = useBigSwing
+    ? bigSwings[Math.floor(Math.random() * bigSwings.length)]
+    : anglePool[Math.floor(Math.random() * anglePool.length)];
+
   const format = formats[Math.floor(Math.random() * formats.length)];
-  // ~25% of the time, reach for a "big idea" production angle instead of
-  // the standard angle pool. That's frequent enough to give Andy real
-  // production ideas regularly, but not so frequent that every brainstorm
-  // is a massive shoot.
-  const useBigIdea = Math.random() < 0.25;
-  const angle = useBigIdea
-    ? bigIdeas[Math.floor(Math.random() * bigIdeas.length)]
-    : angles[Math.floor(Math.random() * angles.length)];
+
+  const audiences = [
+    'mainstream entertainment audiences who don\'t know Andy yet',
+    'young men (18-30) who follow combat sports and don\'t care about business podcasts',
+    'people who respect Joe Rogan, Dana White, or Logan Paul\'s cultural moves',
+    'Andy\'s existing core audience who want to see him in new settings',
+    'athletes and competitors at any level who respect hard work over talent',
+    'people who are tired of polished, PR-managed content and want something real',
+    'people who follow the UFC, NFL, or combat sports world religiously',
+    'entrepreneurs who have actually built something with their hands, not just content',
+  ];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
   let prompt = `Generate ONE specific content idea for Andy Frisella.
+
+ANDY'S GOAL: He is not trying to be the best business podcaster. He is trying to become a transcendent cultural figure — in the same lane as Joe Rogan, Dana White, Logan Paul. Business and personal development are themes that run through his work but they are NOT the box he lives in. Think: what would make someone who has never heard of Andy stop scrolling and watch?
 
 CATEGORY: ${category.name}
 (${category.desc})
@@ -3924,15 +3979,18 @@ Example structure:
 - Bullet 3
 
 Now generate the idea:
-Content format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. Keep it realistic and on-brand — something Andy could produce in a week or two, grounded in the actual themes from his transcripts/posts.
+Angle: ${angle}
+Content format: ${format}
+Target audience: ${audience}
 
-HARD CONSTRAINTS — IGNORE IF THEY SLIP INTO YOUR HEAD:
-- No "viral stunt" content. No giving away money. No lotteries, cash drops, or MrBeast-style prizes.
-- No handing over his companies to strangers. No "I let 10 random people run my business" concepts.
-- No survival/minimum-wage challenges or Undercover Boss cosplay.
-- No fake job interviews, fake ownership transfers, or manufactured emotional reveals.
-- No pretending to be broke, homeless, or starting from zero for a month.
-- If the angle starts to drift into "produce a reality show", pull back to a real piece of content.`;
+Keep it specific and actionable — something that could actually be produced. Name real people when the idea calls for it. Lean into what makes Andy culturally distinct: unfiltered, real, earned, American, combative in the best sense.
+
+HARD CONSTRAINTS:
+- No fake stunts, giveaways, lotteries, or MrBeast-style challenges.
+- No manufactured emotional reveals or reality-TV setups.
+- Do NOT default to "Andy talks about 75 Hard" or "Andy shares his morning routine" — that's the floor, not the ceiling.
+- Do NOT pitch generic business or personal development content unless the angle specifically demands it.
+- If the idea could have been made by any discipline-podcast guy, scrap it and think bigger.`;
   if (window._savedIdeasContext) {
     prompt += `\n\n(Soft taste signal only — do NOT repeat or remix these. Generate something completely different that a person with this taste profile would also enjoy:\n${window._savedIdeasContext})`;
   }
