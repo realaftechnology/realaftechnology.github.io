@@ -2147,6 +2147,37 @@ body.views-no-anim #input-area { transition: none; }
   transition: background 0.1s;
 }
 .ep-folder-header:hover { background: var(--bg-tertiary); }
+/* ── DEV DRAG-AND-DROP ── */
+.drag-ghost {
+  position: fixed;
+  background: var(--red);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sf);
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.92;
+  transform: translate(-50%, -120%);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.1s;
+}
+.ep-folder-header.drag-over {
+  background: var(--red) !important;
+  border-left-color: #fff;
+}
+.ep-folder-header.drag-over .ep-folder-name,
+.ep-folder-header.drag-over .ep-folder-count,
+.ep-folder-header.drag-over .ep-folder-chevron { color: #fff !important; }
+.ep-item.dragging { opacity: 0.35; }
+body.drag-active .ep-item { pointer-events: none; }
+body.drag-active .ep-folder-header { pointer-events: all; }
 .ep-folder-name {
   font-size: 11px;
   font-weight: 700;
@@ -3264,6 +3295,8 @@ function renderEpisodeList(episodes) {
     new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0);
 
   const detectType = ep => {
+    // Dev override: manually assigned folder always wins.
+    if (ep.custom_folder) return ep.custom_folder;
     // Route voice notes and Andygram first — they use filename markers that
     // beat any keyword match on the title.
     if (isVN(ep)) return 'Voice Notes';
@@ -3273,6 +3306,12 @@ function renderEpisodeList(episodes) {
     // 75HARD VS episodes may also mention other shows in their titles, and
     // we want them in their own bucket.
     // Match common variants: "75HARD", "75 HARD", "75-HARD"
+    // OS check runs first — episodes explicitly prefixed OS_ always win,
+    // even if the title also contains a show keyword like Q&AF or CTI.
+    // The regex avoids false positives (BOSS, MOST, GHOST, etc.) by
+    // requiring OS to be preceded by start-of-string or a non-letter, and
+    // not followed by another letter.
+    if (/(?:^|[^A-Z])OS(?![A-Z])/.test(t)) return 'OS';
     if (/75[\s-]?HARD/.test(t)) return '75HARD VS';
     // Match "FULL LENGTH", "FULL-LENGTH", "FULLLENGTH", case-insensitive
     if (/FULL[\s-]?LENGTH/.test(t)) return 'FULL LENGTH';
@@ -3280,14 +3319,6 @@ function renderEpisodeList(episodes) {
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
     if (t.includes('MFCEO')) return 'MFCEO';
-    // OS detection: \b treats underscores and digits as word-internal, so
-    // it misses titles like "OS_011_TimGrover" or "OS011 TimGrover". Use a
-    // letter-based boundary instead — OS must be preceded by either start
-    // or a non-letter, and must NOT be followed by another letter. Catches
-    // all the separator shapes (_, digit, space, hyphen, colon, period)
-    // while still rejecting words that happen to contain "OS" (BOSS, MOST,
-    // OSPREY, GHOST, COSMIC — none match).
-    if (/(?:^|[^A-Z])OS(?![A-Z])/.test(t)) return 'OS';
     return 'Other';
   };
 
@@ -3308,13 +3339,14 @@ function renderEpisodeList(episodes) {
   grouped['Other'].sort(numDesc);
 
   const renderEp = ep => {
+    const draggable = window._userRole === 'dev' ? ` data-ep-id="${ep.id}" data-ep-title="${(ep.title||'').replace(/"/g,'&quot;')}"` : '';
     if (ep.has_video) {
       const epId = ep.video_filename ? ep.video_filename.replace(/\.[^.]+$/, '') : ep.id;
       const dateLabel = ep.uploaded_at ? formatDateDisplay(ep.uploaded_at) : 'Video';
       const safeTitle = ep.title.replace(/'/g, "\\'").replace(/</g, '&lt;');
       const safeFilename = (ep.video_filename || '').replace(/'/g, "\\'");
       const isActive = lockedEpisode === epId;
-      return `<div class="ep-item${isActive ? ' active' : ''}" onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
+      return `<div class="ep-item${isActive ? ' active' : ''}"${draggable} onclick="openVideoEpisode('${safeFilename}','${safeTitle}','${epId}')">
         <div style="flex:1;min-width:0">
           <div class="ep-item-video-title">&#9654; ${ep.title.replace(/</g,'&lt;')}</div>
           <div class="ep-item-title">${dateLabel}</div>
@@ -3325,7 +3357,7 @@ function renderEpisodeList(episodes) {
       const subtitle = formatEpSubtitle(ep.title);
       const clean = ep.title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim();
       const isActive = lockedEpisode === num;
-      return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
+      return `<div class="ep-item${isActive ? ' active' : ''}"${draggable} onclick="loadEpisode('${num}', '${clean.replace(/'/g,"\\'")}')">
         <div style="flex:1;min-width:0">
           <div class="ep-item-num">Ep ${num}</div>
           <div class="ep-item-title">${subtitle}</div>
@@ -3400,7 +3432,153 @@ function renderEpisodeList(episodes) {
     FOLDERS.map(renderFolder).join('') +
     renderAndygramCount() +
     (grouped['Other'].length ? sectionLabel('Other') + grouped['Other'].map(renderEp).join('') : '');
+
+  // Attach dev drag handlers after every render.
+  if (typeof window._attachEpDrag === 'function') window._attachEpDrag();
 }
+
+// ── DEV DRAG-AND-DROP FOLDER ASSIGNMENT ──────────────────────────────────────
+// Long-press any episode item → drag ghost follows finger → drop on folder header
+// to permanently assign that folder (overrides keyword detection).
+// Only active when window._userRole === 'dev'.
+
+(function() {
+  const LONG_PRESS_MS = 450;
+  let _drag = null;   // { epId, epTitle, ghost, sourceEl, timer }
+
+  function _ghostEl(title) {
+    const g = document.createElement('div');
+    g.className = 'drag-ghost';
+    g.textContent = title.replace(/\.(mp3|mp4|m4a|docx)$/i, '').replace(/[_-]/g, ' ').trim() || title;
+    document.body.appendChild(g);
+    return g;
+  }
+
+  function _moveGhost(x, y) {
+    if (!_drag) return;
+    _drag.ghost.style.left = x + 'px';
+    _drag.ghost.style.top  = y + 'px';
+  }
+
+  function _folderAt(x, y) {
+    // Hide ghost briefly so elementFromPoint can see what's underneath.
+    _drag.ghost.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    _drag.ghost.style.display = '';
+    if (!el) return null;
+    return el.closest('.ep-folder-header');
+  }
+
+  function _clearHighlights() {
+    document.querySelectorAll('.ep-folder-header.drag-over')
+      .forEach(h => h.classList.remove('drag-over'));
+  }
+
+  function _startDrag(epId, epTitle, sourceEl, x, y) {
+    _drag = {
+      epId,
+      epTitle,
+      ghost: _ghostEl(epTitle),
+      sourceEl,
+    };
+    sourceEl.classList.add('dragging');
+    document.body.classList.add('drag-active');
+    _moveGhost(x, y);
+  }
+
+  function _endDrag(x, y) {
+    if (!_drag) return;
+    const header = _folderAt(x, y);
+    _clearHighlights();
+    _drag.ghost.remove();
+    _drag.sourceEl.classList.remove('dragging');
+    document.body.classList.remove('drag-active');
+
+    const epId = _drag.epId;
+    _drag = null;
+
+    if (header) {
+      const folderName = header.querySelector('.ep-folder-name')?.textContent?.trim();
+      if (folderName) _assignFolder(epId, folderName);
+    }
+  }
+
+  function _assignFolder(epId, folder) {
+    fetch(`/api/episode/${encodeURIComponent(epId)}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        // Optimistically update the in-memory episode and re-render.
+        const ep = (window.allEpisodes || []).find(e => e.id === epId);
+        if (ep) {
+          ep.custom_folder = folder;
+          renderEpisodeList(window.allEpisodes);
+        }
+      }
+    })
+    .catch(() => {});
+  }
+
+  // Attach handlers after each render (delegated from episode-list container).
+  function _attachDrag() {
+    if (window._userRole !== 'dev') return;
+    const list = document.getElementById('episode-list');
+    if (!list || list._dragAttached) return;
+    list._dragAttached = true;
+
+    list.addEventListener('touchstart', e => {
+      const item = e.target.closest('[data-ep-id]');
+      if (!item) return;
+      const epId    = item.dataset.epId;
+      const epTitle = item.dataset.epTitle || epId;
+      const t = e.touches[0];
+
+      const timer = setTimeout(() => {
+        _startDrag(epId, epTitle, item, t.clientX, t.clientY);
+      }, LONG_PRESS_MS);
+
+      // Stash timer on the item so touchmove/touchend can cancel it.
+      item._lpTimer = timer;
+    }, { passive: true });
+
+    list.addEventListener('touchmove', e => {
+      const item = e.target.closest('[data-ep-id]');
+      if (item?._lpTimer) {
+        clearTimeout(item._lpTimer);
+        item._lpTimer = null;
+      }
+      if (!_drag) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      _moveGhost(t.clientX, t.clientY);
+      _clearHighlights();
+      const header = _folderAt(t.clientX, t.clientY);
+      if (header) header.classList.add('drag-over');
+    }, { passive: false });
+
+    list.addEventListener('touchend', e => {
+      const item = e.target.closest('[data-ep-id]');
+      if (item?._lpTimer) {
+        clearTimeout(item._lpTimer);
+        item._lpTimer = null;
+      }
+      if (!_drag) return;
+      const t = e.changedTouches[0];
+      _endDrag(t.clientX, t.clientY);
+    }, { passive: true });
+  }
+
+  // Re-attach after every episode list render.
+  const _origRender = window.renderEpisodeList;
+  window._attachEpDrag = _attachDrag;
+
+  // Patch into the MutationObserver approach: just expose _attachDrag and
+  // call it from the bottom of renderEpisodeList.
+})();
 
 function filterEpisodes(query) {
   const q = query.toLowerCase();

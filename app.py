@@ -555,6 +555,8 @@ def get_db():
         )""",
         # Remove any BrainStorm auto-generated prompts that slipped into history
         "DELETE FROM search_history WHERE query LIKE 'Generate ONE specific content idea for Andy Frisella%'",
+        # Dev-override: manually assigned folder that wins over keyword detection.
+        "ALTER TABLE episodes ADD COLUMN custom_folder TEXT",
     ]:
         try:
             conn.execute(stmt)
@@ -1028,7 +1030,7 @@ def episodes_list():
     # confirmation that the corpus is loaded.
     rows = conn.execute("""
         SELECT e.id, e.title, e.video_path, e.uploaded_at, e.published_at,
-               COUNT(s.id) as segment_count
+               e.custom_folder, COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
         WHERE (e.transcribe_status IS NULL OR e.transcribe_status = 'done')
           AND UPPER(COALESCE(e.id, '')) NOT LIKE '%ANDYGRAM%'
@@ -1045,11 +1047,29 @@ def episodes_list():
              "has_video": bool(r["video_path"]),
              "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
              "uploaded_at": r["uploaded_at"],
-             "published_at": r["published_at"]}
+             "published_at": r["published_at"],
+             "custom_folder": r["custom_folder"]}
             for r in rows
         ],
         "andygram_count": andygram_count,
     })
+
+
+@app.route("/api/episode/<episode_id>/folder", methods=["PATCH"])
+@requires_auth
+def set_episode_folder(episode_id):
+    """Dev-only: manually assign an episode to a folder, overriding keyword detection."""
+    if current_role() != "dev":
+        return jsonify({"error": "Dev access required"}), 403
+    data = request.get_json(silent=True) or {}
+    folder = data.get("folder") or None   # None clears the override
+    conn = get_db()
+    if not conn:
+        return jsonify({"error": "DB unavailable"}), 500
+    conn.execute("UPDATE episodes SET custom_folder = ? WHERE id = ?", (folder, episode_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "episode_id": episode_id, "folder": folder})
 
 
 @app.route("/api/stats")
