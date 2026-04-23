@@ -910,7 +910,8 @@ def episodes_list():
     conn = get_db()
     if not conn: return jsonify({"episodes": []})
     rows = conn.execute("""
-        SELECT e.id, e.title, e.video_path, e.uploaded_at, COUNT(s.id) as segment_count
+        SELECT e.id, e.title, e.video_path, e.uploaded_at, e.published_at,
+               COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
         WHERE e.transcribe_status IS NULL OR e.transcribe_status = 'done'
         GROUP BY e.id ORDER BY e.id DESC
@@ -920,7 +921,8 @@ def episodes_list():
         {"id": r["id"], "title": r["title"], "segments": r["segment_count"],
          "has_video": bool(r["video_path"]),
          "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
-         "uploaded_at": r["uploaded_at"]}
+         "uploaded_at": r["uploaded_at"],
+         "published_at": r["published_at"]}
         for r in rows
     ]})
 

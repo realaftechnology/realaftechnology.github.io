@@ -3288,15 +3288,41 @@ function renderEpisodeList(episodes) {
     </div>`;
   };
 
+  // Andygrams reuse the text-episode click handler (loadEpisode) but present
+  // differently in the sidebar: the red slot where transcripts show "Ep 123"
+  // instead holds the post title, and the subtext shows the publish date
+  // (falling back to "Andygram" when we don't have one — e.g. an older
+  // record ingested before published_at existed and not yet backfilled).
+  const renderAndygram = ep => {
+    // ep.id is the filename minus .docx; loadEpisode expects the id as its
+    // first arg (non-numeric is fine — the backend looks up by id).
+    const safeId = ep.id.replace(/'/g, "\\'");
+    const displayTitle = ep.title.replace(/</g, '&lt;');
+    const safeTitle = displayTitle.replace(/'/g, "\\'");
+    const subtext = ep.published_at
+      ? formatDateDisplay(ep.published_at)
+      : 'Andygram';
+    const isActive = lockedEpisode === ep.id;
+    return `<div class="ep-item${isActive ? ' active' : ''}" onclick="loadEpisode('${safeId}', '${safeTitle}')">
+      <div style="flex:1;min-width:0">
+        <div class="ep-item-num" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${displayTitle}</div>
+        <div class="ep-item-title">${subtext}</div>
+      </div>
+    </div>`;
+  };
+
   const sectionLabel = text =>
     `<div style="padding:10px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--label-tertiary);text-transform:uppercase">${text}</div>`;
 
   const renderFolder = name => {
     const eps = grouped[name] || [];
     const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
-    // Voice Notes items use the voice-note title formatter (strip VOICENOTE_
-    // prefix, show upload date). Everything else uses the episode renderer.
-    const itemRenderer = name === 'Voice Notes' ? renderVoiceNote : renderEp;
+    // Voice Notes and Andygrams have their own renderers (different layouts
+    // from numeric-episode transcripts); everything else uses renderEp.
+    const itemRenderer =
+      name === 'Voice Notes' ? renderVoiceNote :
+      name === 'Andygram'    ? renderAndygram :
+      renderEp;
     return `<div class="ep-folder-header" onclick="toggleFolder('${safeId}')">
         <div style="display:flex;align-items:center">
           <span class="ep-folder-name">${name}</span>

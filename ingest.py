@@ -33,6 +33,13 @@ def init_db(conn):
         cur.execute("ALTER TABLE episodes ADD COLUMN file_hash TEXT")
     except:
         pass
+    # published_at: the date the content was originally published (distinct from
+    # uploaded_at, which is when the file was added to AFBrain). Used by the
+    # Andygram sidebar to show the publish date under the title. ISO YYYY-MM-DD.
+    try:
+        cur.execute("ALTER TABLE episodes ADD COLUMN published_at TEXT")
+    except:
+        pass
     cur.execute("""
         CREATE TABLE IF NOT EXISTS segments (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +120,29 @@ def parse_transcript(text):
         })
 
     return segments
+
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], start=1)}
+
+def extract_publish_date(raw_text):
+    """Pull the 'Published: Mon DD, YYYY' line out of an Andygram docx.
+
+    Returns an ISO date string (YYYY-MM-DD) or None. The converter writes this
+    line as italic metadata right after the title; we scan the first handful
+    of non-empty lines to stay cheap.
+    """
+    for line in raw_text.split("\n")[:6]:
+        m = re.match(r'^\s*Published:\s*([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\s*$', line)
+        if m:
+            mo = _MONTHS.get(m.group(1))
+            if not mo:
+                return None
+            try:
+                return f"{int(m.group(3)):04d}-{mo:02d}-{int(m.group(2)):02d}"
+            except ValueError:
+                return None
+    return None
 
 
 def parse_andygram(text):
@@ -259,10 +289,22 @@ def ingest_file(conn, filepath):
 
     # Check if already ingested with same content
     existing = cur.execute(
-        "SELECT id, file_hash FROM episodes WHERE id = ?", (episode_id,)
+        "SELECT id, file_hash, published_at FROM episodes WHERE id = ?", (episode_id,)
     ).fetchone()
     if existing:
         if existing[1] == fhash:  # existing[1] = file_hash column
+            # Backfill: older rows were ingested before published_at existed.
+            # Cheap to peek at the docx now and fill it in without re-embedding.
+            if ("ANDYGRAM" in filename.upper() or "ANDYGRAM" in episode_id.upper()) \
+                    and not existing[2]:
+                pub = extract_publish_date(extract_docx_text(filepath))
+                if pub:
+                    cur.execute(
+                        "UPDATE episodes SET published_at = ? WHERE id = ?",
+                        (pub, episode_id),
+                    )
+                    conn.commit()
+                    print(f"  🗓  Backfilled publish date ({pub}): {filename}")
             print(f"  ⏭️  Unchanged, skipping: {filename}")
             return 0
         # File changed — wipe and re-ingest
@@ -295,10 +337,14 @@ def ingest_file(conn, filepath):
     # Chunk segments
     chunks = chunk_segments(segments)
 
+    # Andygrams carry a publish date in the body header; store it so the UI
+    # can show it beneath the title. None for regular transcripts.
+    published_at = extract_publish_date(raw_text) if is_andygram else None
+
     # Store episode
     cur.execute(
-        "INSERT OR REPLACE INTO episodes (id, title, filename, file_hash) VALUES (?, ?, ?, ?)",
-        (episode_id, title, filename, fhash)
+        "INSERT OR REPLACE INTO episodes (id, title, filename, file_hash, published_at) VALUES (?, ?, ?, ?, ?)",
+        (episode_id, title, filename, fhash, published_at)
     )
 
     # Fetch all embeddings in one batch API call
