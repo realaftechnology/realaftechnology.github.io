@@ -2856,6 +2856,10 @@ let analyzing = false;
 let hasResults = false;
 let lockedEpisode = null;
 let allEpisodes = [];
+// Andygrams aren't rendered as individual sidebar rows (~2k+ items would
+// bloat the DOM), but we do show a non-interactive "Andygram (N)" header
+// so Andy can see at a glance that the corpus is loaded and searchable.
+let andygramCount = 0;
 let currentVideoContext = null; // {filename} set when AI response can reference a known video
 window._savedIdeasContext = '';
 
@@ -3162,6 +3166,7 @@ async function loadEpisodeList() {
     const res = await fetch('/api/episodes');
     const data = await res.json();
     allEpisodes = data.episodes || [];
+    andygramCount = data.andygram_count || 0;
     renderEpisodeList(allEpisodes);
   } catch(e) {
     document.getElementById('episode-list').innerHTML =
@@ -3314,8 +3319,24 @@ function renderEpisodeList(episodes) {
       <div class="ep-folder-body collapsed" id="folder-body-${safeId}">${eps.map(itemRenderer).join('')}</div>`;
   };
 
+  // Non-interactive Andygram indicator. We don't render individual rows
+  // (see renderAndygram note above) but surfacing the count here keeps the
+  // sidebar honest about what's in the corpus. No chevron, no click — it's
+  // display-only. Tooltip reminds the user Andygrams are searchable.
+  const renderAndygramCount = () => {
+    if (!andygramCount) return '';
+    return `<div class="ep-folder-header" style="cursor:default"
+                 title="${andygramCount.toLocaleString()} Andygram posts — searchable via the search bar, not individually listed">
+        <div style="display:flex;align-items:center">
+          <span class="ep-folder-name">Andygram</span>
+          <span class="ep-folder-count">(${andygramCount.toLocaleString()})</span>
+        </div>
+      </div>`;
+  };
+
   list.innerHTML =
     FOLDERS.map(renderFolder).join('') +
+    renderAndygramCount() +
     (grouped['Other'].length ? sectionLabel('Other') + grouped['Other'].map(renderEp).join('') : '');
 }
 

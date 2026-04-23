@@ -1019,10 +1019,13 @@ def ai_rerank(query, candidates, top_n=20):
 def episodes_list():
     conn = get_db()
     if not conn: return jsonify({"episodes": []})
-    # Andygrams are intentionally excluded from the sidebar: there are ~2k+
-    # of them and rendering every one into the DOM (plus shipping them all
-    # over the wire) was measurably slowing the app. They remain in the
-    # segments + embedding cache, so semantic search still finds them.
+    # Andygrams are intentionally excluded from the episodes array: there
+    # are ~2k+ of them and rendering every one into the DOM (plus shipping
+    # them all over the wire) was measurably slowing the app. They remain
+    # in the segments + embedding cache, so semantic search still finds
+    # them. We still return the COUNT so the sidebar can show a
+    # non-interactive "Andygram (N)" indicator — Andy wants visible
+    # confirmation that the corpus is loaded.
     rows = conn.execute("""
         SELECT e.id, e.title, e.video_path, e.uploaded_at, e.published_at,
                COUNT(s.id) as segment_count
@@ -1031,15 +1034,22 @@ def episodes_list():
           AND UPPER(COALESCE(e.id, '')) NOT LIKE '%ANDYGRAM%'
         GROUP BY e.id ORDER BY e.id DESC
     """).fetchall()
+    andygram_count = conn.execute("""
+        SELECT COUNT(*) FROM episodes
+        WHERE UPPER(COALESCE(id, '')) LIKE '%ANDYGRAM%'
+    """).fetchone()[0]
     conn.close()
-    return jsonify({"episodes": [
-        {"id": r["id"], "title": r["title"], "segments": r["segment_count"],
-         "has_video": bool(r["video_path"]),
-         "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
-         "uploaded_at": r["uploaded_at"],
-         "published_at": r["published_at"]}
-        for r in rows
-    ]})
+    return jsonify({
+        "episodes": [
+            {"id": r["id"], "title": r["title"], "segments": r["segment_count"],
+             "has_video": bool(r["video_path"]),
+             "video_filename": os.path.basename(r["video_path"]) if r["video_path"] else None,
+             "uploaded_at": r["uploaded_at"],
+             "published_at": r["published_at"]}
+            for r in rows
+        ],
+        "andygram_count": andygram_count,
+    })
 
 
 @app.route("/api/stats")
