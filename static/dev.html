@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>AFBrain Dev</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -46,7 +46,11 @@
 
   .header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 24px; border-bottom: 1px solid var(--sep);
+    /* env(safe-area-inset-top) covers the iOS status bar when the Capacitor
+       shell uses contentInset: 'never' (WebView fills entire screen). Falls
+       back to the normal 16px top in browsers that don't report a safe area. */
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 24px 16px;
+    border-bottom: 1px solid var(--sep);
     position: sticky; top: 0; background: var(--bg); z-index: 10;
   }
   .header-title { font-size: 15px; font-weight: 700; }
