@@ -3603,6 +3603,34 @@ function getBrainstormPrompt() {
     'a tactical interview with a specific type of guest (operator, athlete, veteran, founder)',
   ];
 
+  // "Big idea" scale — distinct from the stunt tropes an LLM defaults to.
+  // The pattern: Andy being authentically himself (vlog, teach, operate,
+  // train) at premium production scale, in an elevated setting, using his
+  // actual life and assets. NO strangers, NO giveaways, NO cosplay. If you
+  // can't picture Andy doing the thing without putting on a costume, it
+  // doesn't belong here.
+  //
+  // Seed example the user gave: "ship the Bugatti to New York, post up in
+  // Times Square, film a day-in-the-life vlog." It costs serious money to
+  // pull off, but nothing about it is fake — it's just Andy, in a bigger
+  // setting, with cameras.
+  const bigIdeas = [
+    'ship one of Andy\'s cars (Bugatti, Lambo, truck) to an iconic location and film a raw day-in-the-life vlog',
+    'film a full episode on location at 1st Phorm HQ, Magnum Ammo, or REAL AF studio — showing actual operations, not a tour',
+    'book a private jet for a 72-hour tour hitting 3 cities, filming honest meetings with real operators in each',
+    'cinematic shoot at Andy\'s ranch/property/home gym — his real workout, his real routine, premium camera work',
+    'rent an empty iconic venue (stadium, arena, theater) for a speech to no one, filmed documentary-style',
+    'full-crew 72-hour unfiltered follow — wake up to sleep, no breaks, no cuts, no staged moments',
+    'flagship podcast recorded in an unusual real setting (on a train, on a boat, mid-flight, at a gun range)',
+    'invite-only dinner with 8-10 operators Andy respects, single fixed camera, real conversation, no studio lights',
+    'multi-city live event tour, each stop filmed as its own mini-doc episode',
+    'documentary-style deep dive on one of Andy\'s companies — actual ops footage, real team, real numbers',
+    'shoot Andy\'s actual training (strength, shooting, discipline work) in a premium cinematic package',
+    'day-in-the-life shadowing Andy running a real board meeting, P&L review, or hiring decision',
+    'filmed road trip between his properties/businesses — the actual commute he does, elevated production',
+    'a "state of Andy" annual address — studio-quality, 45-min, honest state-of-the-businesses/state-of-culture',
+  ];
+
   const audiences = [
     'aspiring entrepreneurs just starting out',
     'people stuck in a job they hate',
@@ -3617,7 +3645,14 @@ function getBrainstormPrompt() {
   ];
 
   const format = formats[Math.floor(Math.random() * formats.length)];
-  const angle = angles[Math.floor(Math.random() * angles.length)];
+  // ~25% of the time, reach for a "big idea" production angle instead of
+  // the standard angle pool. That's frequent enough to give Andy real
+  // production ideas regularly, but not so frequent that every brainstorm
+  // is a massive shoot.
+  const useBigIdea = Math.random() < 0.25;
+  const angle = useBigIdea
+    ? bigIdeas[Math.floor(Math.random() * bigIdeas.length)]
+    : angles[Math.floor(Math.random() * angles.length)];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
   let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. Keep it realistic and on-brand — something Andy could produce in a week or two, grounded in the actual themes from his transcripts/posts. Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.

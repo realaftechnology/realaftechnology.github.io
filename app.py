@@ -1147,15 +1147,19 @@ CITATIONS:
         system += """
 
 BRAINSTORM GUARDRAILS (this is a content-idea generation query):
-Andy is a disciplined operator who builds real businesses (1st Phorm, Magnum Ammo, REAL AF) and produces raw, direct, opinionated content. He is NOT a MrBeast-style stunt creator. Ideas must be things Andy would plausibly produce in a week or two with his existing team.
+Andy is a disciplined operator who builds real businesses (1st Phorm, Magnum Ammo, REAL AF) and produces raw, direct, opinionated content. He is NOT a MrBeast-style stunt creator.
 
-Reject these patterns even if the prompt asks for them — quietly steer to a realistic alternative:
+A GOOD "BIG IDEA" for Andy is: Andy being authentically himself, at premium production scale, in an elevated setting, using his actual life and assets. Example Andy has given: "ship the Bugatti to New York City, post up in Times Square, film a day-in-the-life vlog." It costs money. Production is cinematic. But nothing about it is fake — it's just Andy, with cameras, somewhere bigger. Real cars, real locations, real businesses, real operators, real training, real meetings.
+
+A BAD IDEA for Andy is anything that requires him to pretend, stage, or cosplay — reject even if the prompt asks for them, quietly steer to a realistic alternative:
 - Giving away money / cash drops / lottery-style giveaways
 - Handing over a company or department to strangers
 - "I let 10 random people run my business" / Undercover Boss cosplay
 - Survival, minimum-wage, or homeless challenges
-- Fake job interviews or manufactured emotional reveals
-- Any concept that would require Andy to pretend he's something he isn't
+- Fake job interviews, manufactured emotional reveals, or staged surprises for strangers
+- Any concept that asks Andy to pretend he's something he isn't
+
+Litmus test: if you can't picture Andy doing the thing without putting on a costume or faking a setup, the idea is wrong. Steer back to something authentic.
 
 Prefer ideas grounded in the transcript excerpts you were given. If the excerpts strongly suggest a different (better) angle than what the prompt framed, take the better angle."""
 
