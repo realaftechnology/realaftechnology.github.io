@@ -3940,20 +3940,25 @@ function getBrainstormPrompt() {
   const format = formats[Math.floor(Math.random() * formats.length)];
 
   const audiences = [
+    'guys aged 16-22 who follow combat sports, gaming, and YouTube — and have no idea who Andy is yet',
+    'high school and college athletes who want something real, not a motivational poster',
+    'young men (18-25) who grew up on Logan Paul, MrBeast, and Joe Rogan but are starting to want substance',
+    'teenagers who are already serious about something — sport, a side hustle, training — and need a voice that isn\'t fake',
+    'young men in their early 20s who feel like the culture has nothing to offer them',
     'mainstream entertainment audiences who don\'t know Andy yet',
     'young men (18-30) who follow combat sports and don\'t care about business podcasts',
-    'people who respect Joe Rogan, Dana White, or Logan Paul\'s cultural moves',
     'Andy\'s existing core audience who want to see him in new settings',
     'athletes and competitors at any level who respect hard work over talent',
     'people who are tired of polished, PR-managed content and want something real',
     'people who follow the UFC, NFL, or combat sports world religiously',
-    'entrepreneurs who have actually built something with their hands, not just content',
   ];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
   let prompt = `Generate ONE specific content idea for Andy Frisella.
 
 ANDY'S GOAL: He is not trying to be the best business podcaster. He is trying to become a transcendent cultural figure — in the same lane as Joe Rogan, Dana White, Logan Paul. Business and personal development are themes that run through his work but they are NOT the box he lives in. Think: what would make someone who has never heard of Andy stop scrolling and watch?
+
+SECONDARY OBJECTIVE (keep in the background, don't force it): Andy is actively trying to pull in a younger demographic — guys aged 16-25 who grew up on YouTube, combat sports, and short-form content. He doesn't want to pander to them or chase trends, but the ideas should have a natural on-ramp for that age group when it fits the concept.
 
 CATEGORY: ${category.name}
 (${category.desc})
