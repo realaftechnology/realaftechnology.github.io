@@ -3245,7 +3245,14 @@ function renderEpisodeList(episodes) {
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
     if (t.includes('MFCEO')) return 'MFCEO';
-    if (/\bOS\b/.test(t)) return 'OS';
+    // OS detection: \b treats underscores and digits as word-internal, so
+    // it misses titles like "OS_011_TimGrover" or "OS011 TimGrover". Use a
+    // letter-based boundary instead — OS must be preceded by either start
+    // or a non-letter, and must NOT be followed by another letter. Catches
+    // all the separator shapes (_, digit, space, hyphen, colon, period)
+    // while still rejecting words that happen to contain "OS" (BOSS, MOST,
+    // OSPREY, GHOST, COSMIC — none match).
+    if (/(?:^|[^A-Z])OS(?![A-Z])/.test(t)) return 'OS';
     return 'Other';
   };
 
