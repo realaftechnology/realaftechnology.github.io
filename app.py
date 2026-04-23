@@ -360,6 +360,18 @@ def google_callback():
     if not _google_oauth:
         return redirect("/")
 
+    # Idempotency guard. WKWebView occasionally fires the callback URL twice:
+    # the first hit completes auth and sets the session cookie, the second
+    # arrives milliseconds later with the same ?code= and ?state= but the
+    # oauth_states row has already been consumed by #1. Without this guard,
+    # the user sees a 400 from #2 despite being successfully authenticated
+    # by #1 (which is exactly the "reopen and I'm logged in" pattern reported
+    # from the iOS app). If the cookie shows they're already authenticated,
+    # just send them home.
+    if session.get("user"):
+        print(f"[oauth] callback hit with existing session — redirecting home (duplicate callback?)", flush=True)
+        return redirect("/")
+
     # Verify state from DB (bypasses Flask session CSRF check for iOS WKWebView compatibility)
     state = request.args.get("state", "")
     conn = get_db()
@@ -376,7 +388,12 @@ def google_callback():
         conn.close()
 
     if not state_valid:
-        return "OAuth error: invalid or expired state — please try signing in again.", 400
+        # Could be a genuinely expired state, OR a duplicate callback where
+        # the session cookie hasn't round-tripped yet. If the latter, reload
+        # root — Flask will check auth there and either render the app (good,
+        # cookie landed) or show the login screen for a fresh retry.
+        print(f"[oauth] state not found in DB — redirecting to / for auth re-check", flush=True)
+        return redirect("/")
 
     # Inject state into session so authlib's built-in CSRF check passes.
     # (The session cookie may be absent in WKWebView, but setting it here within
