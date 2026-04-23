@@ -22,8 +22,20 @@ else
   echo "==> Volume not available — using local db at $DB_PATH"
 fi
 
-echo "==> Running ingest (new episodes only)..."
-python3 ingest.py || echo "⚠️  Ingest had errors but continuing..."
+# Ingest runs in the background so the web server can start immediately and
+# pass Railway's health check. When there's nothing new, ingest's hash-check
+# finishes in seconds; when there's a big batch of new episodes (e.g. the
+# initial Andygram import, which embeds ~2k posts via the OpenAI API), it can
+# run for 30+ minutes — blocking gunicorn startup causes the deploy to be
+# marked unhealthy.
+#
+# Concurrency note: SQLite handles the concurrent read-while-write cleanly
+# at file-level locking. Newly-ingested episodes become searchable the
+# moment ingest commits them.
+echo "==> Running ingest in background (logs: /tmp/ingest.log)..."
+mkdir -p /tmp
+nohup python3 ingest.py > /tmp/ingest.log 2>&1 &
+echo "==> Ingest PID: $!"
 
 echo "==> Starting server..."
 exec gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 2 --threads 4 --timeout 3600
