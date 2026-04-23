@@ -3767,6 +3767,27 @@ function handleSubmit() {
 }
 
 function getBrainstormPrompt() {
+  // The 4 content categories. One is chosen at random per brainstorm so ideas
+  // are spread across types, not all podcast episodes or all talking heads.
+  const categories = [
+    {
+      name: 'Talking Point',
+      desc: 'Andy speaks directly to camera or audience — education, hot take, personal story, or call to action. Andy talking, not doing.'
+    },
+    {
+      name: 'Lifestyle',
+      desc: 'Andy doing an activity with DJ, his team, or people in his world — travel, events, experiences, training, behind-the-scenes. Andy living it, not just talking about it.'
+    },
+    {
+      name: 'Podcast',
+      desc: 'A concept for a Real AF / CTI / Q&AF episode — interview, panel, solo deep-dive, or listener Q&A format.'
+    },
+    {
+      name: 'Collab',
+      desc: 'A specific video or appearance with a specific named person or type of person — e.g. workout with Alex Hormozi, UFC event with Dana White, training with a specific athlete or operator.'
+    },
+  ];
+
   // Formats Andy actually produces. No "viral stunts" or "social experiments
   // with real money" — those trigger LLM stunt-tropes (see below) and aren't
   // on-brand.
@@ -3864,6 +3885,8 @@ function getBrainstormPrompt() {
     'people recovering from a failure or setback',
   ];
 
+  const category = categories[Math.floor(Math.random() * categories.length)];
+
   const format = formats[Math.floor(Math.random() * formats.length)];
   // ~25% of the time, reach for a "big idea" production angle instead of
   // the standard angle pool. That's frequent enough to give Andy real
@@ -3875,7 +3898,33 @@ function getBrainstormPrompt() {
     : angles[Math.floor(Math.random() * angles.length)];
   const audience = audiences[Math.floor(Math.random() * audiences.length)];
 
-  let prompt = `Generate ONE specific content idea for Andy Frisella. Format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. Keep it realistic and on-brand — something Andy could produce in a week or two, grounded in the actual themes from his transcripts/posts. Give it a working title, a 1-sentence hook, and 3 bullet points on what it covers or shows.
+  let prompt = `Generate ONE specific content idea for Andy Frisella.
+
+CATEGORY: ${category.name}
+(${category.desc})
+
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS — do not deviate:
+Line 1 must be the category label in bold: **${category.name.toUpperCase()}**
+Line 2: blank line
+Line 3: the working title as a markdown heading: ## [Working Title Here]
+Line 4: blank line
+Line 5: a single bold hook sentence
+Line 6: blank line
+Lines 7+: exactly 3 bullet points on what it covers or shows
+
+Example structure:
+**${category.name.toUpperCase()}**
+
+## [Working Title]
+
+**Hook sentence here.**
+
+- Bullet 1
+- Bullet 2
+- Bullet 3
+
+Now generate the idea:
+Content format: ${format}. Concept angle: ${angle}. Target audience: ${audience}. Keep it realistic and on-brand — something Andy could produce in a week or two, grounded in the actual themes from his transcripts/posts.
 
 HARD CONSTRAINTS — IGNORE IF THEY SLIP INTO YOUR HEAD:
 - No "viral stunt" content. No giving away money. No lotteries, cash drops, or MrBeast-style prizes.
@@ -4099,8 +4148,11 @@ function addBrainstormActionButtons(el, fullText) {
   const existing = el.parentElement.querySelector('.brainstorm-actions');
   if (existing) existing.remove();
 
-  const titleMatch = fullText.match(/^#+ (.+)|^\*\*(.+?)\*\*/m);
-  const title = stripMarkdown(titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : fullText.split('\n')[0].replace(/^#+\s*/, '').trim()).slice(0, 80);
+  // Prefer the ## working title over the **CATEGORY** label on line 1
+  const headingMatch = fullText.match(/^## (.+)/m);
+  const boldMatch = fullText.match(/^\*\*(.+?)\*\*/m);
+  const titleMatch = headingMatch || boldMatch;
+  const title = stripMarkdown(titleMatch ? (headingMatch ? headingMatch[1] : boldMatch[1]).trim() : fullText.split('\n')[0].replace(/^#+\s*/, '').trim()).slice(0, 80);
 
   const wrap = document.createElement('div');
   wrap.className = 'brainstorm-actions';
