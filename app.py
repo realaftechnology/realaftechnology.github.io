@@ -17,6 +17,7 @@ import uuid
 import smtplib
 import urllib.request
 import urllib.error
+import numpy as np
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -652,36 +653,145 @@ def get_query_embedding(query):
         return None
 
 
+# ── EMBEDDING CACHE ───────────────────────────────────────────────────────────
+# The original semantic_search loaded every row's embedding JSON on every
+# request and scored it in a Python loop. With ~2k+ Andygram segments that
+# became the dominant cost (seconds per query, 23KB JSON parse × N rows).
+#
+# The cache holds a pre-normalized float32 matrix of all embeddings keyed by
+# segment.id. Scoring is a single numpy matrix-vector product.
+#
+# Invalidation: we track MAX(segments.id) — cheap index lookup. When the
+# background ingest commits new chunks, max_id advances and the next search
+# rebuilds the cache. The rebuild is protected by a lock so only one worker
+# pays the cost.
+_EMBED_CACHE = {"max_id": -1, "ids": None, "mat": None}
+_EMBED_CACHE_LOCK = threading.Lock()
+
+
+def _load_embedding_cache():
+    """Return (ids_array, normalized_matrix) covering all segments with
+    embeddings. Rebuilds lazily when new segments have been added."""
+    conn = get_db()
+    if not conn:
+        return None, None
+    current_max = conn.execute(
+        "SELECT MAX(id) FROM segments WHERE embedding IS NOT NULL"
+    ).fetchone()[0] or 0
+
+    if current_max == _EMBED_CACHE["max_id"] and _EMBED_CACHE["mat"] is not None:
+        conn.close()
+        return _EMBED_CACHE["ids"], _EMBED_CACHE["mat"]
+
+    with _EMBED_CACHE_LOCK:
+        # Another worker may have rebuilt it while we waited for the lock.
+        if current_max == _EMBED_CACHE["max_id"] and _EMBED_CACHE["mat"] is not None:
+            conn.close()
+            return _EMBED_CACHE["ids"], _EMBED_CACHE["mat"]
+
+        rows = conn.execute(
+            "SELECT id, embedding FROM segments WHERE embedding IS NOT NULL ORDER BY id"
+        ).fetchall()
+        conn.close()
+
+        if not rows:
+            _EMBED_CACHE["max_id"] = current_max
+            _EMBED_CACHE["ids"] = np.empty(0, dtype=np.int64)
+            _EMBED_CACHE["mat"] = np.empty((0, 0), dtype=np.float32)
+            return _EMBED_CACHE["ids"], _EMBED_CACHE["mat"]
+
+        ids = []
+        vecs = []
+        for row in rows:
+            try:
+                v = json.loads(row["embedding"])
+                if v:
+                    ids.append(row["id"])
+                    vecs.append(v)
+            except Exception:
+                continue
+
+        mat = np.asarray(vecs, dtype=np.float32)
+        norms = np.linalg.norm(mat, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        mat = mat / norms  # L2-normalize so cosine == dot product
+
+        _EMBED_CACHE["max_id"] = current_max
+        _EMBED_CACHE["ids"] = np.asarray(ids, dtype=np.int64)
+        _EMBED_CACHE["mat"] = mat
+        print(f"[embed-cache] rebuilt: {len(ids)} vectors × {mat.shape[1]} dims")
+
+    return _EMBED_CACHE["ids"], _EMBED_CACHE["mat"]
+
+
 def semantic_search(query, limit=50, episode_filter=None):
     query_emb = get_query_embedding(query)
-    if not query_emb: return []
-    conn = get_db()
-    if not conn: return []
+    if not query_emb:
+        return []
+    ids, mat = _load_embedding_cache()
+    if ids is None or len(ids) == 0:
+        return []
+
+    q = np.asarray(query_emb, dtype=np.float32)
+    qn = np.linalg.norm(q)
+    if qn == 0:
+        return []
+    q = q / qn
+
+    # Episode filter is applied by masking the cached matrix rather than
+    # re-querying — we only need the allowed segment IDs.
     if episode_filter:
+        conn = get_db()
+        if not conn:
+            return []
         where, params = ep_filter_clauses(episode_filter)
-        rows = conn.execute(f"""
-            SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
-                   e.title AS episode_title, e.filename, e.video_path
-            FROM segments s JOIN episodes e ON e.id = s.episode_id
-            WHERE s.embedding IS NOT NULL AND {where}
-        """, params).fetchall()
+        allowed_ids = {r[0] for r in conn.execute(
+            f"SELECT s.id FROM segments s JOIN episodes e ON e.id = s.episode_id "
+            f"WHERE s.embedding IS NOT NULL AND {where}", params
+        ).fetchall()}
+        conn.close()
+        if not allowed_ids:
+            return []
+        mask = np.isin(ids, np.fromiter(allowed_ids, dtype=np.int64))
+        ids_f = ids[mask]
+        mat_f = mat[mask]
+        if len(ids_f) == 0:
+            return []
     else:
-        rows = conn.execute("""
-            SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text, s.embedding,
-                   e.title AS episode_title, e.filename, e.video_path
-            FROM segments s JOIN episodes e ON e.id = s.episode_id
-            WHERE s.embedding IS NOT NULL
-        """).fetchall()
+        ids_f = ids
+        mat_f = mat
+
+    scores = mat_f @ q  # (N,) cosine similarities since everything is normalized
+
+    k = min(limit, len(scores))
+    # argpartition gives unsorted top-k in O(N); sort just those k afterwards.
+    if k < len(scores):
+        top = np.argpartition(-scores, k - 1)[:k]
+        top = top[np.argsort(-scores[top])]
+    else:
+        top = np.argsort(-scores)
+
+    top_ids = [int(x) for x in ids_f[top].tolist()]
+    top_scores = scores[top].tolist()
+
+    conn = get_db()
+    if not conn:
+        return []
+    placeholders = ",".join("?" * len(top_ids))
+    row_map = {r["id"]: r for r in conn.execute(f"""
+        SELECT s.id, s.episode_id, s.speaker, s.timestamp, s.start_secs, s.text,
+               e.title AS episode_title, e.filename, e.video_path
+        FROM segments s JOIN episodes e ON e.id = s.episode_id
+        WHERE s.id IN ({placeholders})
+    """, top_ids).fetchall()}
     conn.close()
-    scored = []
-    for row in rows:
-        try:
-            emb = json.loads(row["embedding"])
-            score = cosine_similarity(query_emb, emb)
-            scored.append((score, row))
-        except: continue
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [format_result(r, score) for score, r in scored[:limit]]
+
+    results = []
+    for sid, score in zip(top_ids, top_scores):
+        row = row_map.get(sid)
+        if row:
+            results.append(format_result(row, float(score)))
+    return results
 
 
 _FTS_STOPWORDS = {
@@ -909,11 +1019,16 @@ def ai_rerank(query, candidates, top_n=20):
 def episodes_list():
     conn = get_db()
     if not conn: return jsonify({"episodes": []})
+    # Andygrams are intentionally excluded from the sidebar: there are ~2k+
+    # of them and rendering every one into the DOM (plus shipping them all
+    # over the wire) was measurably slowing the app. They remain in the
+    # segments + embedding cache, so semantic search still finds them.
     rows = conn.execute("""
         SELECT e.id, e.title, e.video_path, e.uploaded_at, e.published_at,
                COUNT(s.id) as segment_count
         FROM episodes e LEFT JOIN segments s ON s.episode_id = e.id
-        WHERE e.transcribe_status IS NULL OR e.transcribe_status = 'done'
+        WHERE (e.transcribe_status IS NULL OR e.transcribe_status = 'done')
+          AND UPPER(COALESCE(e.id, '')) NOT LIKE '%ANDYGRAM%'
         GROUP BY e.id ORDER BY e.id DESC
     """).fetchall()
     conn.close()
