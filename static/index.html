@@ -584,14 +584,48 @@ body.light-mode .view-ep-btn:hover { background: #d1d1d6; }
   background: var(--bg-secondary);
   padding: 6px 12px; border-radius: 999px;
 }
-.view-data .refresh-btn {
-  background: var(--bg-secondary);
-  color: var(--label); border: none;
-  padding: 6px 14px; border-radius: 999px;
-  font-family: var(--sf); font-size: 13px; font-weight: 500;
-  cursor: pointer;
+/* Pull-to-refresh indicator for the Data Center. Appears above the scroll
+   content once the user has dragged far enough, matches the iOS/Android
+   native refresh affordance (small spinner that fades in, then rotates
+   while the refresh runs). */
+.view-data .ptr-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-60px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 5;
 }
-.view-data .refresh-btn:active { opacity: 0.6; }
+.view-data .ptr-indicator.visible { opacity: 1; }
+.view-data .ptr-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--label-tertiary);
+  border-top-color: var(--label);
+  border-radius: 50%;
+  transition: transform 0.08s linear;
+}
+.view-data .ptr-indicator.refreshing .ptr-spinner {
+  animation: ptr-spin 0.75s linear infinite;
+}
+@keyframes ptr-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+/* Give the scroll container relative positioning so the absolute-positioned
+   indicator anchors correctly, and disable the browser's native overscroll
+   bounce on iOS so our custom pull-to-refresh owns that gesture. */
+.view-data .data-scroll {
+  position: relative;
+  overscroll-behavior-y: contain;
+}
 .view-data section { margin-bottom: 32px; }
 .view-data .section-label {
   font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
@@ -2684,6 +2718,8 @@ body.views-no-anim #input-area { transition: none; }
     <!-- Data Center view: rendered into #data-page on first activation -->
     <section class="view view-data" data-view="data">
       <div class="data-scroll" id="data-scroll">
+        <!-- Pull-to-refresh indicator. Wired up in initDataCenter(). -->
+        <div class="ptr-indicator" id="data-ptr"><div class="ptr-spinner"></div></div>
         <main class="page" id="data-page">
           <div class="page-title">
             <div>
@@ -2693,7 +2729,6 @@ body.views-no-anim #input-area { transition: none; }
                 <span class="pill" id="updated-pill">—</span>
               </div>
             </div>
-            <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">Refresh</button>
           </div>
 
           <div id="banner" class="banner" style="display:none"></div>
@@ -5866,15 +5901,92 @@ function hideSplash() {
     if (!r.ok) throw new Error("fetch failed: " + r.status);
     return r.json();
   }
+  // Shared refresh routine used by both the pull-to-refresh gesture and
+  // any legacy callers. Shows the PTR spinner while the fetch runs.
   window.refreshData = async function refreshData() {
-    const btn = document.getElementById("refresh-btn");
-    if (!btn) return;
-    btn.textContent = "Refreshing…"; btn.disabled = true;
+    const ptr = document.getElementById("data-ptr");
+    if (ptr) ptr.classList.add("visible", "refreshing");
     try { renderDataCenter(await loadDataCenterData()); }
     catch (e) { console.error(e); alert("Refresh failed: " + e.message); }
-    finally { btn.textContent = "Refresh"; btn.disabled = false; }
+    finally {
+      if (ptr) {
+        ptr.classList.remove("refreshing");
+        // Small delay so the user sees the completion state for a beat
+        // before the indicator retracts.
+        setTimeout(() => ptr.classList.remove("visible"), 250);
+      }
+    }
   };
+
+  // Pull-to-refresh gesture for the Data Center scroll container. Attach
+  // once (idempotent) when the view is first activated.
+  function wirePullToRefresh() {
+    const scroll = document.getElementById("data-scroll");
+    const ptr    = document.getElementById("data-ptr");
+    if (!scroll || !ptr || scroll.dataset.ptrWired === "1") return;
+    scroll.dataset.ptrWired = "1";
+
+    const THRESHOLD = 70;   // px of drag required to trigger a refresh
+    const MAX_PULL  = 110;  // px — indicator stops translating past this
+    let startY      = null;
+    let pulling     = false;
+    let triggered   = false;
+
+    const reset = () => {
+      ptr.style.transform = "";
+      ptr.style.opacity   = "";
+      if (!triggered) ptr.classList.remove("visible");
+      startY    = null;
+      pulling   = false;
+      triggered = false;
+    };
+
+    scroll.addEventListener("touchstart", (e) => {
+      // Only start tracking if we're already scrolled to the top — otherwise
+      // this is a normal scroll gesture.
+      if (scroll.scrollTop > 0) return;
+      if (e.touches.length !== 1) return;
+      startY  = e.touches[0].clientY;
+      pulling = true;
+    }, { passive: true });
+
+    scroll.addEventListener("touchmove", (e) => {
+      if (!pulling || startY == null) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0) return;                 // user is scrolling up, not pulling down
+      if (scroll.scrollTop > 0) { reset(); return; }
+
+      // Quadratic falloff so the drag feels progressively "heavier" —
+      // matches native pull-to-refresh resistance.
+      const pulled = Math.min(MAX_PULL, Math.pow(dy, 0.85));
+      ptr.classList.add("visible");
+      ptr.style.opacity   = Math.min(1, pulled / THRESHOLD).toString();
+      ptr.style.transform = `translateY(${pulled - 60}px)`;
+    }, { passive: true });
+
+    scroll.addEventListener("touchend", () => {
+      if (!pulling) return;
+      const transform = ptr.style.transform.match(/-?[\d.]+/);
+      const dragged   = transform ? parseFloat(transform[0]) + 60 : 0;
+      if (dragged >= THRESHOLD) {
+        triggered = true;
+        // Snap the indicator to its refreshing position, then kick off the refresh.
+        ptr.style.transform = "translateY(0)";
+        ptr.style.opacity   = "1";
+        window.refreshData().finally(reset);
+      } else {
+        reset();
+      }
+    });
+
+    // Desktop fallback: Cmd/Ctrl-R still reloads the page, but also support
+    // a manual refresh via window.refreshData() from the console.
+  }
+  window.wirePullToRefresh = wirePullToRefresh;
   window.initDataCenter = async function initDataCenter() {
+    // Attach the pull-to-refresh gesture on first activation. Idempotent
+    // via a data-* flag so re-entering the view doesn't double-bind.
+    if (typeof wirePullToRefresh === "function") wirePullToRefresh();
     try { renderDataCenter(await loadDataCenterData()); }
     catch (e) {
       const banner = document.getElementById("banner");
