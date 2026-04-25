@@ -1,9 +1,9 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-04-25T01:28:28+00:00",
+    "lastUpdated": "2026-04-25T04:26:22+00:00",
     "period": "Last 28 days",
-    "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
+    "source": "Live data from Windsor.ai — Instagram, Facebook, YouTube"
   },
   "platforms": {
     "instagram": {
@@ -12,24 +12,24 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 575282,
-        "prior": 575226
+        "current": 575423,
+        "prior": 575423
       },
       "reach": {
-        "current": 2909193,
+        "current": 2936824,
         "prior": 2815801
       },
       "impressions": {
-        "current": 4471951,
-        "prior": 3966162
+        "current": 4405236,
+        "prior": 4223701
       },
       "engagement": {
-        "current": 571117,
+        "current": 576683,
         "prior": 451073
       },
       "posts": {
         "current": 12614,
-        "prior": 12613
+        "prior": 12614
       },
       "topPosts": [],
       "timeseries": [
@@ -42,26 +42,26 @@
         {
           "date": "2026-04-04",
           "followers": null,
-          "reach": 376097,
-          "engagement": 68991
+          "reach": 458078,
+          "engagement": 80302
         },
         {
           "date": "2026-04-11",
           "followers": null,
-          "reach": 500064,
-          "engagement": 84843
+          "reach": 590238,
+          "engagement": 96292
         },
         {
           "date": "2026-04-18",
           "followers": null,
-          "reach": 666187,
-          "engagement": 115091
+          "reach": 968364,
+          "engagement": 169798
         },
         {
           "date": "2026-04-25",
           "followers": null,
-          "reach": 595913,
-          "engagement": 174621
+          "reach": 920144,
+          "engagement": 230291
         }
       ],
       "accounts": [
@@ -69,57 +69,57 @@
           "id": "17841462297134104",
           "username": "realafshow",
           "name": "Real AF Clips",
-          "followers": 379639,
+          "followers": 379673,
           "mediaCount": 1083,
           "reach": {
-            "current": 1743955,
+            "current": 1757250,
             "prior": 2014416
           },
           "engagement": {
-            "current": 283524,
+            "current": 286022,
             "prior": 335419
           },
           "impressions": {
-            "current": 2697874,
-            "prior": 2838467
+            "current": 2635875,
+            "prior": 3021624
           }
         },
         {
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
           "name": "Motivated By Freedom",
-          "followers": 109853,
+          "followers": 109858,
           "mediaCount": 2851,
           "reach": {
-            "current": 394306,
+            "current": 397186,
             "prior": 349218
           },
           "engagement": {
-            "current": 160022,
+            "current": 161027,
             "prior": 65630
           },
           "impressions": {
-            "current": 593261,
-            "prior": 486396
+            "current": 595779,
+            "prior": 523827
           }
         },
         {
           "id": "17841460302945899",
           "username": "realandyfrisellafan",
           "name": "Real Andy Frisella Fan",
-          "followers": 61668,
+          "followers": 61770,
           "mediaCount": 3802,
           "reach": {
-            "current": 684758,
+            "current": 695879,
             "prior": 374834
           },
           "engagement": {
-            "current": 114285,
+            "current": 116291,
             "prior": 36133
           },
           "impressions": {
-            "current": 1039206,
-            "prior": 502926
+            "current": 1043818,
+            "prior": 562251
           }
         },
         {
@@ -129,16 +129,16 @@
           "followers": 19553,
           "mediaCount": 3448,
           "reach": {
-            "current": 67480,
+            "current": 67663,
             "prior": 66501
           },
           "engagement": {
-            "current": 10343,
+            "current": 10387,
             "prior": 11990
           },
           "impressions": {
-            "current": 115922,
-            "prior": 123422
+            "current": 101494,
+            "prior": 99751
           }
         },
         {
@@ -148,16 +148,16 @@
           "followers": 4563,
           "mediaCount": 1410,
           "reach": {
-            "current": 18693,
+            "current": 18845,
             "prior": 10832
           },
           "engagement": {
-            "current": 2943,
+            "current": 2956,
             "prior": 1901
           },
           "impressions": {
-            "current": 25687,
-            "prior": 14951
+            "current": 28267,
+            "prior": 16248
           }
         },
         {
@@ -187,20 +187,20 @@
       "connected": true,
       "color": "#1877F2",
       "followers": {
-        "current": 300290,
-        "prior": 300595
+        "current": 300646,
+        "prior": 300646
       },
       "reach": {
-        "current": 5793137,
-        "prior": 11177944
+        "current": 10032823,
+        "prior": 16193143
       },
       "impressions": {
-        "current": 9762060,
-        "prior": 19051531
+        "current": 16895169,
+        "prior": 27645610
       },
       "engagement": {
-        "current": 612271,
-        "prior": 1241579
+        "current": 1066923,
+        "prior": 1814883
       },
       "posts": {
         "current": null,
@@ -217,26 +217,26 @@
         {
           "date": "2026-04-04",
           "followers": null,
-          "reach": 2594634,
-          "engagement": 294331
+          "reach": 4577546,
+          "engagement": 518537
         },
         {
           "date": "2026-04-11",
           "followers": null,
-          "reach": 1516401,
-          "engagement": 160001
+          "reach": 2022737,
+          "engagement": 223414
         },
         {
           "date": "2026-04-18",
           "followers": null,
-          "reach": 1032836,
-          "engagement": 100629
+          "reach": 2029376,
+          "engagement": 200479
         },
         {
           "date": "2026-04-25",
           "followers": null,
-          "reach": 649266,
-          "engagement": 57310
+          "reach": 1399855,
+          "engagement": 124220
         }
       ],
       "accounts": [
@@ -244,72 +244,72 @@
           "id": "190174520852138",
           "username": "realamericanfreedom1776",
           "name": "Real American Freedom 1776",
-          "followers": 175259,
+          "followers": 175296,
           "reach": {
-            "current": 2300521,
-            "prior": 4701803
+            "current": 3940848,
+            "prior": 6296374
           },
           "impressions": {
-            "current": 3975142,
-            "prior": 8133812
+            "current": 6797027,
+            "prior": 10876897
           },
           "engagement": {
-            "current": 269013,
-            "prior": 588654
+            "current": 459498,
+            "prior": 797810
           }
         },
         {
           "id": "536657016208009",
           "username": "mfceomind",
           "name": "MFCEO Mind",
-          "followers": 104134,
+          "followers": 104235,
           "reach": {
-            "current": 2346930,
-            "prior": 5635312
+            "current": 3738452,
+            "prior": 8730776
           },
           "impressions": {
-            "current": 4067361,
-            "prior": 9609239
+            "current": 6528550,
+            "prior": 14952093
           },
           "engagement": {
-            "current": 239707,
-            "prior": 587274
+            "current": 383918,
+            "prior": 925617
           }
         },
         {
           "id": "573689945825386",
           "username": "motivatedbyfreedom",
           "name": "Motivated By Freedom",
-          "followers": 15254,
+          "followers": 15317,
           "reach": {
-            "current": 564588,
-            "prior": 781237
+            "current": 1191705,
+            "prior": 1101167
           },
           "impressions": {
-            "current": 843701,
-            "prior": 1227269
+            "current": 1815913,
+            "prior": 1728658
           },
           "engagement": {
-            "current": 54946,
-            "prior": 62139
+            "current": 127026,
+            "prior": 87638
           }
         },
         {
           "id": "842151302309410",
           "username": "realaffans",
           "name": "Real AF Fans",
-          "followers": 4998,
+          "followers": 5150,
           "reach": {
-            "current": 549841,
-            "prior": 59555
+            "current": 1071138,
+            "prior": 64764
           },
           "impressions": {
-            "current": 837826,
-            "prior": 80905
+            "current": 1642081,
+            "prior": 87569
           },
           "engagement": {
-            "current": 46383,
-            "prior": 3500
+            "current": 91307,
+            "prior": 3806
           }
         },
         {
@@ -318,15 +318,15 @@
           "name": "Frisella Fire",
           "followers": 444,
           "reach": {
-            "current": 25264,
+            "current": 51920,
             "prior": 13
           },
           "impressions": {
-            "current": 30272,
+            "current": 62005,
             "prior": 139
           },
           "engagement": {
-            "current": 2069,
+            "current": 4280,
             "prior": 0
           }
         },
@@ -337,11 +337,11 @@
           "followers": 160,
           "reach": {
             "current": 6,
-            "prior": 0
+            "prior": 23
           },
           "impressions": {
             "current": 16,
-            "prior": 0
+            "prior": 72
           },
           "engagement": {
             "current": 0,
@@ -352,17 +352,17 @@
           "id": "928761296984064",
           "username": "newamericanage",
           "name": "New American Age",
-          "followers": 35,
+          "followers": 38,
           "reach": {
-            "current": 5987,
+            "current": 38754,
             "prior": 24
           },
           "impressions": {
-            "current": 7738,
+            "current": 49573,
             "prior": 167
           },
           "engagement": {
-            "current": 153,
+            "current": 894,
             "prior": 12
           }
         },
@@ -373,11 +373,11 @@
           "followers": 6,
           "reach": {
             "current": 0,
-            "prior": 0
+            "prior": 2
           },
           "impressions": {
             "current": 4,
-            "prior": 0
+            "prior": 15
           },
           "engagement": {
             "current": 0,
@@ -404,12 +404,12 @@
         "prior": 480840
       },
       "engagement": {
-        "current": 12699,
-        "prior": 24972
+        "current": 12219,
+        "prior": 24917
       },
       "posts": {
         "current": 216,
-        "prior": 215
+        "prior": 216
       },
       "topPosts": [],
       "timeseries": [
@@ -423,7 +423,7 @@
           "date": "2026-04-04",
           "followers": null,
           "reach": 108947,
-          "engagement": 5749
+          "engagement": 5710
         },
         {
           "date": "2026-04-11",
@@ -435,13 +435,13 @@
           "date": "2026-04-18",
           "followers": null,
           "reach": 27862,
-          "engagement": 783
+          "engagement": 359
         },
         {
           "date": "2026-04-25",
           "followers": null,
           "reach": 64697,
-          "engagement": 5069
+          "engagement": 5052
         }
       ],
       "accounts": [
@@ -456,8 +456,8 @@
             "prior": 480840
           },
           "engagement": {
-            "current": 12699,
-            "prior": 24972
+            "current": 12219,
+            "prior": 24917
           },
           "impressions": {
             "current": 238180,
