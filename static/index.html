@@ -2524,6 +2524,7 @@ body.drag-active .ep-folder-header { pointer-events: all; }
       <div id="drive-log" style="display:none;margin-top:10px;background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;max-height:150px;overflow-y:auto;font-family:var(--sf-mono);font-size:12px;line-height:1.6;color:var(--label-secondary)"></div>
       <div class="modal-row" style="margin-top:12px">
         <button class="modal-btn modal-btn-cancel" id="drive-cancel-btn" onclick="closeUploadModal()">Cancel</button>
+        <button class="modal-btn modal-btn-cancel" id="drive-stop-btn" onclick="stopDriveImport()" style="display:none;background:var(--red);color:#fff;border-color:var(--red)">Stop Import</button>
         <button class="modal-btn modal-btn-primary" id="drive-submit-btn" onclick="startDriveImport()">Import</button>
       </div>
     </div>
@@ -4288,6 +4289,7 @@ async function doFollowup(question) {
 let uploadQueue = [];
 
 let _driveImportES = null;
+let _driveImportJobId = null;  // job id for the active import (used to cancel)
 let _driveSources  = [];  // in-memory cache of saved Drive sources
 
 // ── Drive Sources ─────────────────────────────────────────────────────────────
@@ -4405,33 +4407,58 @@ async function startDriveImport() {
   _runDriveImport(urls, true);
 }
 
+async function stopDriveImport() {
+  const stopBtn = document.getElementById('drive-stop-btn');
+  if (!_driveImportJobId) return;
+  if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = 'Stopping…'; }
+  try {
+    await fetch(`/api/drive-import/${_driveImportJobId}/cancel`, { method: 'POST' });
+  } catch { /* server will stop the job; the SSE will close */ }
+}
+
 function _runDriveImport(urls, canReset) {
   const log = document.getElementById('drive-log');
   log.innerHTML = '';
   log.style.display = 'none';
   const btn      = document.getElementById('drive-submit-btn');
   const cancelBtn = document.getElementById('drive-cancel-btn');
+  const stopBtn  = document.getElementById('drive-stop-btn');
   const scanBtn  = document.getElementById('drive-scan-btn');
   btn.disabled = true;
   btn.textContent = 'Importing…';
   cancelBtn.disabled = true;
+  if (stopBtn) { stopBtn.style.display = ''; stopBtn.disabled = false; stopBtn.textContent = 'Stop Import'; }
   if (scanBtn) scanBtn.disabled = true;
+  _driveImportJobId = null;
 
   const params = new URLSearchParams({ urls });
   const es = new EventSource('/api/drive-import?' + params.toString());
   _driveImportES = es;
 
+  const _resetUI = () => {
+    btn.textContent = canReset ? 'Import' : 'Scan';
+    btn.disabled = false;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = 'Close';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (scanBtn) scanBtn.disabled = false;
+    _driveImportJobId = null;
+  };
+
   es.onmessage = e => {
     let data;
     try { data = JSON.parse(e.data); } catch { return; }
-    if (data.type === 'done') {
+    if (data.type === 'job_id') {
+      _driveImportJobId = data.job_id;
+    } else if (data.type === 'done') {
       es.close(); _driveImportES = null;
       _driveLog('✓ All done — reloading episodes…', 'done_file');
-      btn.textContent = canReset ? 'Import' : 'Scan';
-      btn.disabled = false;
-      cancelBtn.disabled = false;
-      cancelBtn.textContent = 'Close';
-      if (scanBtn) scanBtn.disabled = false;
+      _resetUI();
+      loadEpisodeList();
+    } else if (data.type === 'cancelled') {
+      es.close(); _driveImportES = null;
+      _driveLog('⏹ Import stopped.', 'skipped');
+      _resetUI();
       loadEpisodeList();
     } else if (data.type === 'error') {
       _driveLog('⚠ ' + data.msg, 'error');
@@ -4439,7 +4466,7 @@ function _runDriveImport(urls, canReset) {
       _driveLog('✓ ' + data.msg, 'done_file');
     } else if (data.type === 'skipped') {
       _driveLog('— ' + data.msg, 'skipped');
-    } else {
+    } else if (data.type !== 'progress') {
       _driveLog(data.msg, 'info');
     }
   };
@@ -4447,10 +4474,7 @@ function _runDriveImport(urls, canReset) {
   es.onerror = () => {
     _driveLog('Connection lost — import may still be running on server.', 'error');
     es.close(); _driveImportES = null;
-    btn.disabled = false;
-    btn.textContent = canReset ? 'Import' : 'Scan';
-    cancelBtn.disabled = false;
-    if (scanBtn) scanBtn.disabled = false;
+    _resetUI();
   };
 }
 

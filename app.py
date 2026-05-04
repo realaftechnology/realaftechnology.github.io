@@ -152,6 +152,7 @@ def _new_job(urls):
         "finished_at": None,
         "urls":        urls,
         "status":      "running",
+        "cancelled":   False,
         "logs":        [],
         "files":       [],   # per-file progress: [{name, status, started_at, finished_at, segments}]
         "stats":       {"done": 0, "skipped": 0, "errors": 0},
@@ -159,6 +160,15 @@ def _new_job(urls):
     with _jobs_lock:
         _jobs.appendleft(job)
     return job
+
+
+def _get_job(job_id):
+    """Look up a job by its short hex id. Returns None if not found."""
+    with _jobs_lock:
+        for j in _jobs:
+            if j["id"] == job_id:
+                return j
+    return None
 
 def _job_log(job, msg_type, msg, msg_q=None):
     entry = {"ts": datetime.now().strftime("%H:%M:%S"), "type": msg_type, "msg": msg}
@@ -2637,6 +2647,9 @@ def _drive_worker(job, urls, msg_q=None):
     os.makedirs(tmp_base, exist_ok=True)
 
     for i, url in enumerate(urls):
+        if job.get("cancelled"):
+            _job_log(job, "log", "Import cancelled by user.", msg_q)
+            break
         is_folder = "/folders/" in url
         try:
             if is_folder:
@@ -2665,6 +2678,9 @@ def _drive_worker(job, urls, msg_q=None):
                          msg_q)
 
                 for idx, f in enumerate(new_files):
+                    if job.get("cancelled"):
+                        _job_log(job, "log", "Import cancelled by user.", msg_q)
+                        break
                     safe    = secure_filename(f["name"])
                     tmp_dir = os.path.join(tmp_base, f"gd_f_{int(time.time())}_{idx}")
                     os.makedirs(tmp_dir, exist_ok=True)
@@ -2751,7 +2767,10 @@ def _drive_worker(job, urls, msg_q=None):
         except Exception as e:
             _job_log(job, "error", str(e), msg_q)
 
-    _finish_job(job, "done" if job["stats"]["errors"] == 0 else "error")
+    if job.get("cancelled"):
+        _finish_job(job, "cancelled")
+    else:
+        _finish_job(job, "done" if job["stats"]["errors"] == 0 else "error")
     if msg_q:
         msg_q.put(None)
 
@@ -2770,12 +2789,17 @@ def drive_import():
     threading.Thread(target=_drive_worker, args=(job, urls, msg_q), daemon=True).start()
 
     def generate():
+        # Send job_id first so the client can cancel this specific job
+        yield f"data: {json.dumps({'type': 'job_id', 'job_id': job['id']})}\n\n"
         yield f"data: {json.dumps({'type': 'log', 'msg': 'Connecting to Google Drive…'})}\n\n"
         while True:
             try:
                 item = msg_q.get(timeout=20)
                 if item is None:
-                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    if job.get("cancelled"):
+                        yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     break
                 yield f"data: {json.dumps(item)}\n\n"
             except queue_module.Empty:
@@ -2786,6 +2810,20 @@ def drive_import():
         mimetype="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
     )
+
+
+@app.route("/api/drive-import/<job_id>/cancel", methods=["POST"])
+@requires_auth
+def cancel_drive_import(job_id):
+    """Signal the background worker for a specific job to stop after the current file."""
+    job = _get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    if job["status"] != "running":
+        return jsonify({"error": "Job is not running"}), 400
+    with _jobs_lock:
+        job["cancelled"] = True
+    return jsonify({"ok": True, "job_id": job_id})
 
 
 @app.route("/api/video/<path:filename>")
