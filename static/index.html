@@ -3320,7 +3320,7 @@ function renderEpisodeList(episodes) {
     if (t.includes('Q&AF') || t.includes('QAF')) return 'Q&AF';
     if (t.includes('REAL TALK') || /\bRT\b/.test(t)) return 'Real Talk';
     if (t.includes('MFCEO')) return 'MFCEO';
-    return 'Other';
+    return 'MFCEO'; // Default: unmatched episodes go to MFCEO
   };
 
   // Display order in the sidebar. Voice Notes and Andygram are newest-first
