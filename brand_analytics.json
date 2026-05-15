@@ -1,7 +1,7 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-15T16:12:26+00:00",
+    "lastUpdated": "2026-05-15T19:16:53.592175+00:00",
     "period": "Last 28 days",
     "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
   },
@@ -12,24 +12,24 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "prior": 587945,
-        "current": 587891
+        "current": 587891,
+        "prior": 587891
       },
       "reach": {
-        "prior": 1807714,
-        "current": 3372412
+        "current": 3372412,
+        "prior": 3372412
       },
       "impressions": {
-        "prior": 1807714,
-        "current": 3372412
+        "current": 3372412,
+        "prior": 3372412
       },
       "engagement": {
-        "prior": 393734,
-        "current": 945237
+        "current": 945237,
+        "prior": 945237
       },
       "posts": {
-        "prior": 12840,
-        "current": 12841
+        "current": 12841,
+        "prior": 12841
       },
       "topPosts": [],
       "timeseries": [
@@ -68,7 +68,7 @@
         {
           "id": "17841460302945899",
           "username": "realandyfrisellafan",
-          "name": "realandyfrisellafan",
+          "name": "name not available (realandyfrisellafan)",
           "followers": 70282,
           "mediaCount": 3849,
           "reach": {
@@ -87,7 +87,7 @@
         {
           "id": "17841477407943556",
           "username": "realafanswers",
-          "name": "RealAF Answers",
+          "name": "RealAF Answers (realafanswers)",
           "followers": 6,
           "mediaCount": 20,
           "reach": {
@@ -106,7 +106,7 @@
         {
           "id": "17841469443528222",
           "username": "mfceomentality",
-          "name": "MFCEO Mentality",
+          "name": "MFCEO Mentality (mfceomentality)",
           "followers": 4654,
           "mediaCount": 1410,
           "reach": {
@@ -125,7 +125,7 @@
         {
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
-          "name": "Motivated By Freedom",
+          "name": "Motivated By Freedom (motivatedbyfreedom1776)",
           "followers": 110479,
           "mediaCount": 2882,
           "reach": {
@@ -144,7 +144,7 @@
         {
           "id": "17841462297134104",
           "username": "realafshow",
-          "name": "Real AF Clips",
+          "name": "Real AF Clips (realafshow)",
           "followers": 382958,
           "mediaCount": 1122,
           "reach": {
@@ -163,7 +163,7 @@
         {
           "id": "17841468020255374",
           "username": "newamericanage",
-          "name": "New American Age",
+          "name": "New American Age (newamericanage)",
           "followers": 19512,
           "mediaCount": 3558,
           "reach": {
@@ -384,24 +384,24 @@
       "connected": true,
       "color": "#FF0000",
       "followers": {
-        "prior": 696000,
-        "current": 696000
+        "current": 696000,
+        "prior": 696000
       },
       "reach": {
-        "prior": 292007,
-        "current": 299486
+        "current": 312396,
+        "prior": 299486
       },
       "impressions": {
-        "prior": 292007,
-        "current": 299486
+        "current": 312396,
+        "prior": 299486
       },
       "engagement": {
-        "prior": 9714,
-        "current": 14067
+        "current": 14456,
+        "prior": 14067
       },
       "posts": {
-        "prior": 224,
-        "current": 224
+        "current": 224,
+        "prior": 224
       },
       "topPosts": [],
       "timeseries": [
@@ -437,16 +437,16 @@
           "followers": 696000,
           "videoCount": 224,
           "reach": {
-            "current": 299486,
-            "prior": 292007
+            "current": 312396,
+            "prior": 299486
           },
           "engagement": {
-            "current": 14067,
-            "prior": 9714
+            "current": 14456,
+            "prior": 14067
           },
           "impressions": {
-            "current": 299486,
-            "prior": 292007
+            "current": 312396,
+            "prior": 299486
           }
         }
       ]
