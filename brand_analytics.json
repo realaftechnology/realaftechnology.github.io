@@ -1,9 +1,9 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-16T10:14:33.125699+00:00",
+    "lastUpdated": "2026-05-16T13:36:01.743477+00:00",
     "period": "Last 28 days",
-    "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
+    "source": "Live data from Windsor.ai — Instagram, Facebook, YouTube"
   },
   "platforms": {
     "instagram": {
@@ -12,7 +12,7 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 588332,
+        "current": 588384,
         "prior": 588332
       },
       "reach": {
@@ -24,11 +24,11 @@
         "prior": 2490354
       },
       "engagement": {
-        "current": 959404,
+        "current": 959399,
         "prior": 407349
       },
       "posts": {
-        "current": 12853,
+        "current": 12854,
         "prior": 12853
       },
       "topPosts": [],
@@ -63,57 +63,57 @@
           "id": "17841460302945899",
           "username": "realandyfrisellafan",
           "name": "name not available (realandyfrisellafan)",
-          "followers": 70628,
+          "followers": 70671,
           "mediaCount": 3851,
           "reach": {
-            "current": 2529087,
-            "prior": 601615
+            "current": 1802876,
+            "prior": 454731
           },
           "engagement": {
             "current": 374551,
             "prior": 81328
           },
           "impressions": {
-            "current": 2529087,
-            "prior": 601615
+            "current": 1802876,
+            "prior": 454731
           }
         },
         {
           "id": "17841462297134104",
           "username": "realafshow",
           "name": "Real AF Clips (realafshow)",
-          "followers": 382962,
-          "mediaCount": 1123,
+          "followers": 382966,
+          "mediaCount": 1124,
           "reach": {
-            "current": 1973035,
-            "prior": 1553351
+            "current": 1192981,
+            "prior": 1098931
           },
           "engagement": {
-            "current": 340635,
+            "current": 340632,
             "prior": 255461
           },
           "impressions": {
-            "current": 1973035,
-            "prior": 1553351
+            "current": 1192981,
+            "prior": 1098931
           }
         },
         {
           "id": "17841469443528222",
           "username": "mfceomentality",
-          "name": "MFCEO Mentality \ud83e\udde0 (mfceomentality)",
+          "name": "MFCEO Mentality 🧠 (mfceomentality)",
           "followers": 4654,
           "mediaCount": 1410,
           "reach": {
-            "current": 35869,
-            "prior": 12187
+            "current": 34713,
+            "prior": 11379
           },
           "engagement": {
-            "current": 5812,
+            "current": 5811,
             "prior": 1819
           },
           "impressions": {
-            "current": 35869,
-            "prior": 12187
+            "current": 34713,
+            "prior": 11379
           }
         },
         {
@@ -123,35 +123,35 @@
           "followers": 19515,
           "mediaCount": 3565,
           "reach": {
-            "current": 58790,
-            "prior": 61965
+            "current": 41609,
+            "prior": 43928
           },
           "engagement": {
             "current": 8355,
             "prior": 10591
           },
           "impressions": {
-            "current": 58790,
-            "prior": 61965
+            "current": 41609,
+            "prior": 43928
           }
         },
         {
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
           "name": "Motivated By Freedom (motivatedbyfreedom1776)",
-          "followers": 110567,
+          "followers": 110572,
           "mediaCount": 2884,
           "reach": {
-            "current": 490193,
-            "prior": 261236
+            "current": 416415,
+            "prior": 217399
           },
           "engagement": {
-            "current": 230051,
+            "current": 230050,
             "prior": 58150
           },
           "impressions": {
-            "current": 490193,
-            "prior": 261236
+            "current": 416415,
+            "prior": 217399
           }
         },
         {
@@ -181,8 +181,8 @@
       "connected": true,
       "color": "#1877F2",
       "followers": {
-        "current": 306084,
-        "prior": 298529
+        "current": 306089,
+        "prior": 306084
       },
       "reach": {
         "current": 3291848,
@@ -285,8 +285,8 @@
         {
           "id": "573689945825386",
           "name": "Motivated By Freedom",
-          "fans": 15811,
-          "fans_prior": 15160,
+          "fans": 15812,
+          "fans_prior": 15811,
           "impressions": {
             "current": 312479,
             "prior": 803738
@@ -303,8 +303,8 @@
         {
           "id": "536657016208009",
           "name": "MFCEO Mind",
-          "fans": 106121,
-          "fans_prior": 103552,
+          "fans": 106122,
+          "fans_prior": 106121,
           "impressions": {
             "current": 1491296,
             "prior": 3404684
@@ -321,8 +321,8 @@
         {
           "id": "842151302309410",
           "name": "Real AF Fans",
-          "fans": 7399,
-          "fans_prior": 4173,
+          "fans": 7401,
+          "fans_prior": 7399,
           "impressions": {
             "current": 1281174,
             "prior": 626135
@@ -339,8 +339,8 @@
         {
           "id": "190174520852138",
           "name": "Real American Freedom 1776",
-          "fans": 175764,
-          "fans_prior": 175028,
+          "fans": 175765,
+          "fans_prior": 175764,
           "impressions": {
             "current": 1223459,
             "prior": 2398604
@@ -392,8 +392,8 @@
         "prior": 266687
       },
       "engagement": {
-        "current": 18916,
-        "prior": 11891
+        "current": 18721,
+        "prior": 11468
       },
       "posts": {
         "current": 224,
@@ -442,8 +442,8 @@
             "prior": 266687
           },
           "engagement": {
-            "current": 18916,
-            "prior": 11891
+            "current": 18721,
+            "prior": 11468
           }
         }
       ]
