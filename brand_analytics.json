@@ -1,7 +1,7 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-16T19:16:26.253742+00:00",
+    "lastUpdated": "2026-05-16T23:31:22.123044+00:00",
     "period": "Last 28 days",
     "source": "Live data from Windsor.ai — Instagram, Facebook, YouTube"
   },
@@ -12,8 +12,8 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 588497,
-        "prior": 588451
+        "current": 588569,
+        "prior": 588497
       },
       "reach": {
         "current": 3488597,
@@ -63,11 +63,11 @@
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
           "name": "Motivated By Freedom (motivatedbyfreedom1776)",
-          "followers": 110585,
+          "followers": 110594,
           "mediaCount": 2884,
           "reach": {
             "current": 416415,
-            "prior": 217399
+            "prior": 416415
           },
           "engagement": {
             "current": 230050,
@@ -75,18 +75,18 @@
           },
           "impressions": {
             "current": 416415,
-            "prior": 217399
+            "prior": 416415
           }
         },
         {
           "id": "17841460302945899",
           "username": "realandyfrisellafan",
           "name": "name not available (realandyfrisellafan)",
-          "followers": 70765,
+          "followers": 70828,
           "mediaCount": 3852,
           "reach": {
             "current": 1802876,
-            "prior": 454731
+            "prior": 1802876
           },
           "engagement": {
             "current": 374549,
@@ -94,7 +94,7 @@
           },
           "impressions": {
             "current": 1802876,
-            "prior": 454731
+            "prior": 1802876
           }
         },
         {
@@ -105,7 +105,7 @@
           "mediaCount": 1124,
           "reach": {
             "current": 1192981,
-            "prior": 1098931
+            "prior": 1192981
           },
           "engagement": {
             "current": 340632,
@@ -113,7 +113,7 @@
           },
           "impressions": {
             "current": 1192981,
-            "prior": 1098931
+            "prior": 1192981
           }
         },
         {
@@ -124,7 +124,7 @@
           "mediaCount": 20,
           "reach": {
             "current": 3,
-            "prior": 0
+            "prior": 3
           },
           "engagement": {
             "current": 0,
@@ -132,7 +132,7 @@
           },
           "impressions": {
             "current": 3,
-            "prior": 0
+            "prior": 3
           }
         },
         {
@@ -143,7 +143,7 @@
           "mediaCount": 3565,
           "reach": {
             "current": 41609,
-            "prior": 43928
+            "prior": 41609
           },
           "engagement": {
             "current": 8355,
@@ -151,7 +151,7 @@
           },
           "impressions": {
             "current": 41609,
-            "prior": 43928
+            "prior": 41609
           }
         },
         {
@@ -162,7 +162,7 @@
           "mediaCount": 1410,
           "reach": {
             "current": 34713,
-            "prior": 11379
+            "prior": 34713
           },
           "engagement": {
             "current": 5812,
@@ -170,7 +170,7 @@
           },
           "impressions": {
             "current": 34713,
-            "prior": 11379
+            "prior": 34713
           }
         }
       ]
@@ -384,16 +384,16 @@
         "prior": 696000
       },
       "reach": {
-        "current": 315929,
-        "prior": 266687
+        "current": 315866,
+        "prior": 315929
       },
       "impressions": {
-        "current": 315929,
-        "prior": 266687
+        "current": 315866,
+        "prior": 315929
       },
       "engagement": {
-        "current": 14559,
-        "prior": 8527
+        "current": 18977,
+        "prior": 14559
       },
       "posts": {
         "current": 224,
@@ -427,8 +427,8 @@
         }
       ],
       "minutesWatched": {
-        "current": 6334762,
-        "prior": 5304698
+        "current": 6333238,
+        "prior": 6334762
       },
       "accounts": [
         {
@@ -438,12 +438,12 @@
           "totalViews": 16021498,
           "videoCount": 224,
           "views": {
-            "current": 315929,
-            "prior": 266687
+            "current": 315866,
+            "prior": 315929
           },
           "engagement": {
-            "current": 14559,
-            "prior": 8527
+            "current": 18977,
+            "prior": 14559
           }
         }
       ]
