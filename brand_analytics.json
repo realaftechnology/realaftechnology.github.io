@@ -1,7 +1,7 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-18T13:10:44.154355Z",
+    "lastUpdated": "2026-05-18T16:10:57.128510Z",
     "period": "Last 28 days",
     "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
   },
@@ -12,8 +12,8 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 589048,
-        "prior": 589048
+        "current": 589087,
+        "prior": 589087
       },
       "reach": {
         "current": 3529581,
@@ -24,7 +24,7 @@
         "prior": 1911131
       },
       "engagement": {
-        "current": 961643,
+        "current": 961642,
         "prior": 446750
       },
       "posts": {
@@ -34,28 +34,28 @@
       "topPosts": [],
       "timeseries": [
         {
-          "date": "2026-04-20",
+          "date": "2026-04-26",
           "followers": null,
           "reach": null,
-          "engagement": 240411
+          "engagement": 240410
         },
         {
-          "date": "2026-04-27",
+          "date": "2026-05-03",
           "followers": null,
           "reach": null,
-          "engagement": 240411
+          "engagement": 240410
         },
         {
-          "date": "2026-05-04",
+          "date": "2026-05-10",
           "followers": null,
           "reach": null,
-          "engagement": 240411
+          "engagement": 240410
         },
         {
-          "date": "2026-05-11",
+          "date": "2026-05-17",
           "followers": null,
           "reach": null,
-          "engagement": 240411
+          "engagement": 240410
         }
       ],
       "accounts": [
@@ -63,7 +63,7 @@
           "id": "17841462297134104",
           "username": "realafshow",
           "name": "Real AF Clips (realafshow)",
-          "followers": 382958,
+          "followers": 382959,
           "mediaCount": 1128,
           "reach": {
             "current": 1171039,
@@ -79,29 +79,29 @@
           }
         },
         {
-          "id": "17841460302945899",
-          "username": "realandyfrisellafan",
-          "name": "Real AF Fan Page (realandyfrisellafan)",
-          "followers": 71247,
-          "mediaCount": 3855,
+          "id": "17841460176292177",
+          "username": "motivatedbyfreedom1776",
+          "name": "Motivated By Freedom (motivatedbyfreedom1776)",
+          "followers": 110679,
+          "mediaCount": 2884,
           "reach": {
-            "current": 1879021,
-            "prior": 495978
+            "current": 406071,
+            "prior": 242967
           },
           "engagement": {
-            "current": 381894,
-            "prior": 95497
+            "current": 226993,
+            "prior": 74811
           },
           "impressions": {
-            "current": 1879021,
-            "prior": 495978
+            "current": 406071,
+            "prior": 242967
           }
         },
         {
           "id": "17841468020255374",
           "username": "newamericanage",
           "name": "New American Age (newamericanage)",
-          "followers": 19508,
+          "followers": 19507,
           "mediaCount": 3576,
           "reach": {
             "current": 40802,
@@ -114,25 +114,6 @@
           "impressions": {
             "current": 40802,
             "prior": 44345
-          }
-        },
-        {
-          "id": "17841469443528222",
-          "username": "mfceomentality",
-          "name": "MFCEO Mentality (mfceomentality)",
-          "followers": 4655,
-          "mediaCount": 1410,
-          "reach": {
-            "current": 32646,
-            "prior": 13174
-          },
-          "engagement": {
-            "current": 5453,
-            "prior": 2168
-          },
-          "impressions": {
-            "current": 32646,
-            "prior": 13174
           }
         },
         {
@@ -155,22 +136,41 @@
           }
         },
         {
-          "id": "17841460176292177",
-          "username": "motivatedbyfreedom1776",
-          "name": "Motivated By Freedom (motivatedbyfreedom1776)",
-          "followers": 110674,
-          "mediaCount": 2884,
+          "id": "17841460302945899",
+          "username": "realandyfrisellafan",
+          "name": "Real AF Fan Page (realandyfrisellafan)",
+          "followers": 71283,
+          "mediaCount": 3855,
           "reach": {
-            "current": 406071,
-            "prior": 242967
+            "current": 1879021,
+            "prior": 495978
           },
           "engagement": {
-            "current": 226993,
-            "prior": 74811
+            "current": 381893,
+            "prior": 95497
           },
           "impressions": {
-            "current": 406071,
-            "prior": 242967
+            "current": 1879021,
+            "prior": 495978
+          }
+        },
+        {
+          "id": "17841469443528222",
+          "username": "mfceomentality",
+          "name": "MFCEO Mentality (mfceomentality)",
+          "followers": 4653,
+          "mediaCount": 1410,
+          "reach": {
+            "current": 32646,
+            "prior": 13174
+          },
+          "engagement": {
+            "current": 5453,
+            "prior": 2168
+          },
+          "impressions": {
+            "current": 32646,
+            "prior": 13174
           }
         }
       ]
@@ -185,11 +185,11 @@
         "prior": 299070
       },
       "reach": {
-        "current": 10445371,
+        "current": 10430453,
         "prior": 23619465
       },
       "impressions": {
-        "current": 10445371,
+        "current": 10430453,
         "prior": 23619465
       },
       "engagement": {
@@ -203,27 +203,27 @@
       "topPosts": [],
       "timeseries": [
         {
-          "date": "2026-04-20",
+          "date": "2026-04-26",
           "followers": null,
-          "reach": 2611343,
+          "reach": 2607613,
           "engagement": 194558
         },
         {
-          "date": "2026-04-27",
+          "date": "2026-05-03",
           "followers": null,
-          "reach": 2611343,
+          "reach": 2607613,
           "engagement": 194558
         },
         {
-          "date": "2026-05-04",
+          "date": "2026-05-10",
           "followers": null,
-          "reach": 2611343,
+          "reach": 2607613,
           "engagement": 194558
         },
         {
-          "date": "2026-05-11",
+          "date": "2026-05-17",
           "followers": null,
-          "reach": 2611343,
+          "reach": 2607613,
           "engagement": 194558
         }
       ],
@@ -283,45 +283,9 @@
           }
         },
         {
-          "id": "536657016208009",
-          "name": "MFCEO Mind",
-          "fans": 106250,
-          "fans_prior": 103750,
-          "impressions": {
-            "current": 3681918,
-            "prior": 11301652
-          },
-          "reach": {
-            "current": 3681918,
-            "prior": 11301652
-          },
-          "engagement": {
-            "current": 259558,
-            "prior": 700916
-          }
-        },
-        {
-          "id": "190174520852138",
-          "name": "Real American Freedom 1776",
-          "fans": 175798,
-          "fans_prior": 175045,
-          "impressions": {
-            "current": 2614958,
-            "prior": 9542981
-          },
-          "reach": {
-            "current": 2614958,
-            "prior": 9542981
-          },
-          "engagement": {
-            "current": 201143,
-            "prior": 643646
-          }
-        },
-        {
           "id": "842151302309410",
           "name": "Real AF Fans",
-          "fans": 7932,
+          "fans": 7931,
           "fans_prior": 4429,
           "impressions": {
             "current": 2524959,
@@ -342,16 +306,52 @@
           "fans": 15820,
           "fans_prior": 15212,
           "impressions": {
-            "current": 1218049,
+            "current": 1168780,
             "prior": 1732016
           },
           "reach": {
-            "current": 1218049,
+            "current": 1168780,
             "prior": 1732016
           },
           "engagement": {
             "current": 93864,
             "prior": 117313
+          }
+        },
+        {
+          "id": "536657016208009",
+          "name": "MFCEO Mind",
+          "fans": 106250,
+          "fans_prior": 103751,
+          "impressions": {
+            "current": 3681921,
+            "prior": 11301652
+          },
+          "reach": {
+            "current": 3681921,
+            "prior": 11301652
+          },
+          "engagement": {
+            "current": 259558,
+            "prior": 700916
+          }
+        },
+        {
+          "id": "190174520852138",
+          "name": "Real American Freedom 1776",
+          "fans": 175799,
+          "fans_prior": 175044,
+          "impressions": {
+            "current": 2649306,
+            "prior": 9542981
+          },
+          "reach": {
+            "current": 2649306,
+            "prior": 9542981
+          },
+          "engagement": {
+            "current": 201143,
+            "prior": 643646
           }
         },
         {
@@ -392,8 +392,8 @@
         "prior": 255585
       },
       "engagement": {
-        "current": 15677,
-        "prior": 8269
+        "current": 20211,
+        "prior": 11146
       },
       "posts": {
         "current": 225,
@@ -406,28 +406,28 @@
       "topPosts": [],
       "timeseries": [
         {
-          "date": "2026-04-20",
+          "date": "2026-04-26",
           "followers": null,
           "reach": 82048,
-          "engagement": 3919
+          "engagement": 5053
         },
         {
-          "date": "2026-04-27",
+          "date": "2026-05-03",
           "followers": null,
           "reach": 82048,
-          "engagement": 3919
+          "engagement": 5053
         },
         {
-          "date": "2026-05-04",
+          "date": "2026-05-10",
           "followers": null,
           "reach": 82048,
-          "engagement": 3919
+          "engagement": 5053
         },
         {
-          "date": "2026-05-11",
+          "date": "2026-05-17",
           "followers": null,
           "reach": 82048,
-          "engagement": 3919
+          "engagement": 5053
         }
       ],
       "accounts": [
@@ -442,8 +442,8 @@
             "prior": 255585
           },
           "engagement": {
-            "current": 15677,
-            "prior": 8269
+            "current": 20211,
+            "prior": 11146
           }
         }
       ]
