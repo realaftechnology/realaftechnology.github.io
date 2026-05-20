@@ -4855,8 +4855,9 @@ function addAllClipButtons(containerEl, text) {
   // Don't double-add
   if (containerEl.querySelector('.view-clip-btn, .clip-chips-row')) return;
 
-  // Match "Ep 880 @ 07:37", "Ep 1014, 00:10:55", "Ep 880 @ 7:37" etc.
-  const re = /\bEp\s+(\d{3,5})[,\s@]+(\d{1,2}:\d{2}(?::\d{2})?)\b/g;
+  // Match "Ep 880 @ 07:37", "Ep 1014, 00:10:55", "Ep 11 @ 19:14" etc.
+  // Allow 1-5 digit episode numbers so early episodes (Ep 01 ... Ep 99) match too.
+  const re = /\bEp\s+(\d{1,5})[,\s@]+(\d{1,2}:\d{2}(?::\d{2})?)\b/g;
   const seen = new Set();
   const clips = [];
   let m;
@@ -4867,21 +4868,30 @@ function addAllClipButtons(containerEl, text) {
     if (seen.has(key)) continue;
     seen.add(key);
     const secs = parseTsSecs(tsStr);
-    // Find best matching result: same episode number, has video, closest timestamp
+    // Find best matching result: same episode number, has video, closest timestamp.
+    // Compare numerically so "11" matches "Ep 011" and vice versa.
+    const epNumInt = parseInt(epNum, 10);
     const match =
       currentResults.find(r => {
-        const n = (r.episode_title || '').match(/\b(\d{3,5})\b/);
-        return n && n[1] === epNum && r.has_video && Math.abs((r.start_secs || 0) - secs) < 15;
+        const n = (r.episode_title || '').match(/\b(\d{1,5})\b/);
+        return n && parseInt(n[1], 10) === epNumInt && r.has_video && Math.abs((r.start_secs || 0) - secs) < 15;
       }) ||
       currentResults.find(r => {
-        const n = (r.episode_title || '').match(/\b(\d{3,5})\b/);
-        return n && n[1] === epNum && r.has_video;
+        const n = (r.episode_title || '').match(/\b(\d{1,5})\b/);
+        return n && parseInt(n[1], 10) === epNumInt && r.has_video;
       });
     if (match) clips.push({ epNum, tsStr, filename: match.video_filename, secs });
   }
 
-  // Fallback: if no structured citations found but there's a video context + any timestamp
+  // Detect whether the AI cited any episode at all. If it did, we must NOT fall back
+  // to currentVideoContext — that would attach the AI's timestamp to a different
+  // episode's video and silently mislead the user (the View Clip bug).
+  const hasEpCitation = /\bEp\s+\d+/.test(text);
+
+  // Fallback: if no structured citations found AND the AI didn't cite any episode,
+  // and there's a video context + any timestamp, offer it as a best-effort link.
   if (!clips.length) {
+    if (hasEpCitation) return;  // Cited episode(s) but no matching video — suppress.
     if (!currentVideoContext) return;
     const fm = text.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
     if (!fm) return;

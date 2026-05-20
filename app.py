@@ -1146,7 +1146,10 @@ def analyze():
     results   = data.get("results", [])
     brainstorm = data.get("brainstorm", False)
 
-    context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in results])
+    context = "\n\n---\n\n".join([
+        f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}{' · VIDEO' if r.get('has_video') else ' · audio-only'}]\n{r['text']}"
+        for r in results
+    ])
 
     system = f"""You are an AI assistant for Andy Frisella's internal team, built on his podcast transcripts.
 
@@ -1169,6 +1172,7 @@ RETRIEVE (default mode) — trigger words: moment, clip, soundbite, segment, voi
 → Format: **Ep [N] @ [HH:MM:SS]–[HH:MM:SS]** (~XX seconds), followed by the verbatim transcript quote from that single continuous range, followed by one short sentence on why it works.
 → NEVER stitch quotes from different parts of an episode into one block presented as a single moment — that is not a real clip and an editor cannot use it.
 → NEVER compose, rewrite, or paraphrase. Use only the verbatim transcript text.
+→ Excerpt labels are tagged `· VIDEO` or `· audio-only`. For visual/short-form/Reel/Shorts/voiceover-over-footage requests, strongly PREFER `· VIDEO` excerpts — they have a watchable clip preview in the app. Only cite an `· audio-only` excerpt if no VIDEO excerpt is a meaningfully good fit, and when you do, note "(audio-only episode — VO source)" so the user knows there is no video preview.
 → Estimate duration from word count: ~150 spoken words ≈ 60 seconds (so 30–45 seconds ≈ 75–110 words).
 → Excerpt labels in the context show only the START timestamp. Use the next consecutive excerpt's start as the end, or estimate from text length. Do not fabricate timestamps.
 → If no single continuous segment is long enough for the requested duration, say so directly and offer the best continuous segment you found with its actual length.
@@ -1316,7 +1320,10 @@ def followup():
 
     # Note: semantic search still uses OpenAI embeddings; only text generation uses Claude
 
-    context = "\n\n---\n\n".join([f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}]\n{r['text']}" for r in fu_results]) if fu_results else "No relevant transcript excerpts found."
+    context = "\n\n---\n\n".join([
+        f"[{clean_ep_label(r['episode_title'])} @ {r['timestamp']}{' · VIDEO' if r.get('has_video') else ' · audio-only'}]\n{r['text']}"
+        for r in fu_results
+    ]) if fu_results else "No relevant transcript excerpts found."
 
     # Only inject blocklist for vague "give me another" requests — not when switching topics/episodes
     already_shown = ""
@@ -1339,6 +1346,7 @@ def followup():
         "→ Format: **Ep [N] @ [HH:MM:SS]–[HH:MM:SS]** (~XX seconds), then the verbatim quote from that continuous range, then one sentence on why it works.\n"
         "→ NEVER stitch quotes from different parts of an episode into one block — that is not a real clip.\n"
         "→ NEVER compose, rewrite, or paraphrase. Verbatim only.\n"
+        "→ Excerpt labels are tagged `· VIDEO` or `· audio-only`. For visual/short-form/Reel/Shorts/voiceover-over-footage requests, strongly PREFER `· VIDEO` excerpts (they have a watchable clip in the app). Only cite `· audio-only` if no VIDEO excerpt fits; when you do, note '(audio-only episode — VO source)'.\n"
         "→ ~150 spoken words ≈ 60 seconds (so 30–45s ≈ 75–110 words). Excerpt labels show only START times; use the next excerpt's start as the end, or estimate from text length. Do not fabricate timestamps.\n"
         "→ If no continuous segment is long enough, say so and offer the best you found with its actual length.\n"
         "COMPOSE — only on explicit asks: draft, write, create, generate, make me, brainstorm — combined with: tweet, caption, title, headline, show notes, script, copy, post.\n"
