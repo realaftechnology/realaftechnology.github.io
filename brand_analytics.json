@@ -1,7 +1,7 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-20T07:14:16.856893Z",
+    "lastUpdated": "2026-05-20T10:17:02.218919Z",
     "period": "Last 28 days",
     "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
   },
@@ -12,8 +12,8 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 589705,
-        "prior": 589705
+        "current": 589719,
+        "prior": 589719
       },
       "reach": {
         "current": 3533176,
@@ -24,7 +24,7 @@
         "prior": 1905529
       },
       "engagement": {
-        "current": 939927,
+        "current": 935533,
         "prior": 500333
       },
       "posts": {
@@ -69,19 +69,95 @@
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
           "name": "Motivated By Freedom (motivatedbyfreedom1776)",
-          "followers": 110793,
+          "followers": 110800,
           "mediaCount": 2888,
           "reach": {
             "current": 373297,
             "prior": 308792
           },
           "engagement": {
-            "current": 196367,
+            "current": 194082,
             "prior": 123099
           },
           "impressions": {
             "current": 373297,
             "prior": 308792
+          }
+        },
+        {
+          "id": "17841462297134104",
+          "username": "realafshow",
+          "name": "Real AF Clips (realafshow)",
+          "followers": 383036,
+          "mediaCount": 1131,
+          "reach": {
+            "current": 1159775,
+            "prior": 1126073
+          },
+          "engagement": {
+            "current": 343345,
+            "prior": 270325
+          },
+          "impressions": {
+            "current": 1159775,
+            "prior": 1126073
+          }
+        },
+        {
+          "id": "17841460302945899",
+          "username": "realandyfrisellafan",
+          "name": "Real AF Fan Page (realandyfrisellafan)",
+          "followers": 71708,
+          "mediaCount": 3858,
+          "reach": {
+            "current": 1925646,
+            "prior": 410284
+          },
+          "engagement": {
+            "current": 384765,
+            "prior": 93502
+          },
+          "impressions": {
+            "current": 1925646,
+            "prior": 410284
+          }
+        },
+        {
+          "id": "17841468020255374",
+          "username": "newamericanage",
+          "name": "New American Age (newamericanage)",
+          "followers": 19515,
+          "mediaCount": 3595,
+          "reach": {
+            "current": 43826,
+            "prior": 44973
+          },
+          "engagement": {
+            "current": 8670,
+            "prior": 10855
+          },
+          "impressions": {
+            "current": 43826,
+            "prior": 44973
+          }
+        },
+        {
+          "id": "17841469443528222",
+          "username": "mfceomentality",
+          "name": "MFCEO Mentality (mfceomentality)",
+          "followers": 4654,
+          "mediaCount": 1410,
+          "reach": {
+            "current": 30630,
+            "prior": 15406
+          },
+          "engagement": {
+            "current": 4671,
+            "prior": 2552
+          },
+          "impressions": {
+            "current": 30630,
+            "prior": 15406
           }
         },
         {
@@ -102,82 +178,6 @@
             "current": 2,
             "prior": 1
           }
-        },
-        {
-          "id": "17841462297134104",
-          "username": "realafshow",
-          "name": "Real AF Clips (realafshow)",
-          "followers": 383038,
-          "mediaCount": 1131,
-          "reach": {
-            "current": 1159775,
-            "prior": 1126073
-          },
-          "engagement": {
-            "current": 345121,
-            "prior": 270325
-          },
-          "impressions": {
-            "current": 1159775,
-            "prior": 1126073
-          }
-        },
-        {
-          "id": "17841460302945899",
-          "username": "realandyfrisellafan",
-          "name": "Real AF Fan Page (realandyfrisellafan)",
-          "followers": 71697,
-          "mediaCount": 3858,
-          "reach": {
-            "current": 1925646,
-            "prior": 410284
-          },
-          "engagement": {
-            "current": 384729,
-            "prior": 93502
-          },
-          "impressions": {
-            "current": 1925646,
-            "prior": 410284
-          }
-        },
-        {
-          "id": "17841468020255374",
-          "username": "newamericanage",
-          "name": "New American Age (newamericanage)",
-          "followers": 19516,
-          "mediaCount": 3595,
-          "reach": {
-            "current": 43826,
-            "prior": 44973
-          },
-          "engagement": {
-            "current": 8664,
-            "prior": 10855
-          },
-          "impressions": {
-            "current": 43826,
-            "prior": 44973
-          }
-        },
-        {
-          "id": "17841469443528222",
-          "username": "mfceomentality",
-          "name": "MFCEO Mentality (mfceomentality)",
-          "followers": 4655,
-          "mediaCount": 1410,
-          "reach": {
-            "current": 30630,
-            "prior": 15406
-          },
-          "engagement": {
-            "current": 5046,
-            "prior": 2552
-          },
-          "impressions": {
-            "current": 30630,
-            "prior": 15406
-          }
         }
       ]
     },
@@ -187,8 +187,8 @@
       "connected": true,
       "color": "#1877F2",
       "followers": {
-        "current": 307337,
-        "prior": 299407
+        "current": 307342,
+        "prior": 299415
       },
       "reach": {
         "current": 1916624,
@@ -238,7 +238,7 @@
           "id": "536657016208009",
           "name": "MFCEO Mind",
           "fans": 106333,
-          "fans_prior": 103844,
+          "fans_prior": 103846,
           "impressions": {
             "current": 558904,
             "prior": 2154358
@@ -251,7 +251,7 @@
         {
           "id": "360600887146803",
           "name": "Frisella Fire",
-          "fans": 457,
+          "fans": 458,
           "fans_prior": 441,
           "impressions": {
             "current": 3081,
@@ -265,7 +265,7 @@
         {
           "id": "928761296984064",
           "name": "New American Age",
-          "fans": 366,
+          "fans": 367,
           "fans_prior": 45,
           "impressions": {
             "current": 56516,
@@ -293,8 +293,8 @@
         {
           "id": "190174520852138",
           "name": "Real American Freedom 1776",
-          "fans": 175790,
-          "fans_prior": 175037,
+          "fans": 175791,
+          "fans_prior": 175040,
           "impressions": {
             "current": 428697,
             "prior": 2104873
@@ -307,8 +307,8 @@
         {
           "id": "842151302309410",
           "name": "Real AF Fans",
-          "fans": 8281,
-          "fans_prior": 4644,
+          "fans": 8283,
+          "fans_prior": 4646,
           "impressions": {
             "current": 672727,
             "prior": 290621
@@ -322,7 +322,7 @@
           "id": "573689945825386",
           "name": "Motivated By Freedom",
           "fans": 15944,
-          "fans_prior": 15230,
+          "fans_prior": 15231,
           "impressions": {
             "current": 196699,
             "prior": 444786
