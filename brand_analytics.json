@@ -1,9 +1,9 @@
 {
   "meta": {
     "brand": "AFBrain",
-    "lastUpdated": "2026-05-19T22:13:20.892299Z",
+    "lastUpdated": "2026-05-20T01:16:23.545958Z",
     "period": "Last 28 days",
-    "source": "Live data from Windsor.ai \u2014 Instagram, Facebook, YouTube"
+    "source": "Live data from Windsor.ai — Instagram, Facebook, YouTube"
   },
   "platforms": {
     "instagram": {
@@ -12,7 +12,7 @@
       "connected": true,
       "color": "#E1306C",
       "followers": {
-        "current": 589533,
+        "current": 589591,
         "prior": 589533
       },
       "reach": {
@@ -24,11 +24,11 @@
         "prior": 1953430
       },
       "engagement": {
-        "current": 923454,
+        "current": 946332,
         "prior": 480361
       },
       "posts": {
-        "current": 12889,
+        "current": 12894,
         "prior": 12889
       },
       "topPosts": [],
@@ -76,7 +76,7 @@
             "prior": 14139
           },
           "engagement": {
-            "current": 5093,
+            "current": 5261,
             "prior": 2369
           },
           "impressions": {
@@ -88,14 +88,14 @@
           "id": "17841460302945899",
           "username": "realandyfrisellafan",
           "name": "Real AF Fan Page (realandyfrisellafan)",
-          "followers": 71592,
-          "mediaCount": 3857,
+          "followers": 71625,
+          "mediaCount": 3858,
           "reach": {
             "current": 1902555,
             "prior": 494879
           },
           "engagement": {
-            "current": 363339,
+            "current": 383136,
             "prior": 99478
           },
           "impressions": {
@@ -127,13 +127,13 @@
           "username": "newamericanage",
           "name": "New American Age (newamericanage)",
           "followers": 19516,
-          "mediaCount": 3586,
+          "mediaCount": 3589,
           "reach": {
             "current": 42647,
             "prior": 44759
           },
           "engagement": {
-            "current": 8292,
+            "current": 8340,
             "prior": 10737
           },
           "impressions": {
@@ -145,14 +145,14 @@
           "id": "17841462297134104",
           "username": "realafshow",
           "name": "Real AF Clips (realafshow)",
-          "followers": 383015,
-          "mediaCount": 1130,
+          "followers": 383024,
+          "mediaCount": 1131,
           "reach": {
             "current": 1162858,
             "prior": 1123176
           },
           "engagement": {
-            "current": 338370,
+            "current": 344130,
             "prior": 265958
           },
           "impressions": {
@@ -164,14 +164,14 @@
           "id": "17841460176292177",
           "username": "motivatedbyfreedom1776",
           "name": "Motivated By Freedom (motivatedbyfreedom1776)",
-          "followers": 110749,
+          "followers": 110765,
           "mediaCount": 2886,
           "reach": {
             "current": 383386,
             "prior": 276476
           },
           "engagement": {
-            "current": 208360,
+            "current": 205465,
             "prior": 101819
           },
           "impressions": {
